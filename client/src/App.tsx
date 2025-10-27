@@ -1,34 +1,106 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { GuestRoute } from '@/components/GuestRoute'
+import { MainLayout } from '@/Layout/MainLayout'
+import Home from '@/pages/Home'
+import Login from '@/pages/Login'
+import Register from '@/pages/Register'
+import Profile from '@/pages/Profile'
+import Chat from '@/pages/Chat'
+import EditProfile from '@/pages/Profile/EditProfile'
+import Suggestions from '@/pages/Suggestions'
+import NotFound from '@/pages/NotFound'
+import UserNotFound from '@/pages/UserNotFound'
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Guest routes - redirect to home if authenticated */}
+          <Route 
+            path="/login" 
+            element={
+              <GuestRoute>
+                <Login />
+              </GuestRoute>
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              <GuestRoute>
+                <Register />
+              </GuestRoute>
+            } 
+          />
+          
+          {/* Protected routes with MainLayout */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Home />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile/:username"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Profile />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile/edit"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <EditProfile />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Chat />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/suggestions"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Suggestions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Error pages */}
+          <Route path="/user-not-found" element={<UserNotFound />} />
+          <Route path="/user-not-found/:username" element={<UserNotFound />} />
+
+          {/* Redirect unknown routes to 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
   )
 }
 

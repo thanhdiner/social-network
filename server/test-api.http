@@ -1,0 +1,46 @@
+# Test Authentication API
+
+## 1. Đăng ký user mới
+POST http://localhost:3000/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123",
+  "name": "Test User"
+}
+
+### 
+
+## 2. Đăng nhập
+POST http://localhost:3000/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 
+
+## 3. Lấy thông tin user (cần access token)
+GET http://localhost:3000/users/me
+Authorization: Bearer {{accessToken}}
+
+###
+
+## 4. Lấy profile (cần access token)
+GET http://localhost:3000/users/profile
+Authorization: Bearer {{accessToken}}
+
+###
+
+## 5. Refresh token
+POST http://localhost:3000/auth/refresh
+Content-Type: application/json
+
+###
+
+## 6. Logout
+POST http://localhost:3000/auth/logout
+Content-Type: application/json
