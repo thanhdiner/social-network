@@ -31,6 +31,13 @@ export interface SuggestedUser {
   mutualFriends?: number;
 }
 
+export interface ActiveUser {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string | null;
+}
+
 class UserService {
   /**
    * Get user by username
@@ -61,6 +68,14 @@ class UserService {
    */
   async getSuggestedUsers(): Promise<SuggestedUser[]> {
     const response = await api.get<SuggestedUser[]>('/users/suggestions');
+    return response.data;
+  }
+
+  /**
+   * Get active/online users
+   */
+  async getActiveUsers(): Promise<ActiveUser[]> {
+    const response = await api.get<ActiveUser[]>('/users/active');
     return response.data;
   }
 

@@ -1,11 +1,36 @@
-import { Plus, Circle } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import userService, { type ActiveUser } from '../../services/userService'
+import socketService from '../../services/socketService'
+import { Link } from 'react-router-dom'
 
 export const RightSidebar = () => {
-  const onlineUsers = [
-    { name: 'Anna Sthesia', img: 'https://i.pravatar.cc/40?u=1' },
-    { name: 'Paul Molive', img: 'https://i.pravatar.cc/40?u=2' },
-    { name: 'Bob Frapples', img: 'https://i.pravatar.cc/40?u=3' }
-  ]
+  const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    loadActiveUsers()
+
+    // Listen for online users updates
+    socketService.onOnlineUsersUpdated(() => {
+      loadActiveUsers()
+    })
+
+    return () => {
+      socketService.offOnlineUsersUpdated()
+    }
+  }, [])
+
+  const loadActiveUsers = async () => {
+    try {
+      const users = await userService.getActiveUsers()
+      setActiveUsers(users)
+    } catch (error) {
+      console.error('Failed to load active users:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const friendStories = [
     { id: 1, name: 'Anna Mull', img: 'https://i.pravatar.cc/40?u=4', timeAgo: '1h ago' },
@@ -55,17 +80,36 @@ export const RightSidebar = () => {
       {/* Active Users */}
       <section>
         <h3 className="text-base font-semibold text-gray-800 mb-3">Active Users</h3>
-        <ul className="space-y-2">
-          {onlineUsers.map(u => (
-            <li key={u.name} className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50 transition cursor-pointer">
-              <div className="relative">
-                <img src={u.img} alt={u.name} className="w-9 h-9 rounded-full border border-gray-200" />
-                <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
-              </div>
-              <span className="text-gray-800 font-medium">{u.name}</span>
-            </li>
-          ))}
-        </ul>
+        {isLoading ? (
+          <div className="text-center py-4 text-gray-500">
+            <div className="animate-pulse">Loading...</div>
+          </div>
+        ) : activeUsers.length === 0 ? (
+          <div className="text-center py-4 text-gray-500">
+            <p className="text-sm">No active users</p>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {activeUsers.map(user => (
+              <li key={user.id}>
+                <Link 
+                  to={`/${user.username}`}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50 transition cursor-pointer"
+                >
+                  <div className="relative">
+                    <img 
+                      src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=fb923c&color=fff`} 
+                      alt={user.name} 
+                      className="w-9 h-9 rounded-full border border-gray-200 object-cover" 
+                    />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+                  </div>
+                  <span className="text-gray-800 font-medium truncate">{user.name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </aside>
   )

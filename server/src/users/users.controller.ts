@@ -37,10 +37,10 @@ export class UsersController {
     if (!profile) {
       return { error: 'User not found' };
     }
-    
+
     // Get user stats
     const stats = await this.usersService.getUserStats(profile.id);
-    
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = profile;
     return {
@@ -62,6 +62,15 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   getSuggestedUsers(@CurrentUser() user: CurrentUserData) {
     return this.usersService.getSuggestedUsers(user.userId);
+  }
+
+  @Get('active')
+  @UseGuards(JwtAuthGuard)
+  getActiveUsers(@CurrentUser() currentUser: CurrentUserData) {
+    const onlineUserIds = this.chatGateway.getOnlineUserIds();
+    // Filter out current user
+    const filteredIds = onlineUserIds.filter((id) => id !== currentUser.userId);
+    return this.usersService.getUsersByIds(filteredIds);
   }
 
   @Get(':userId/follow-status')
@@ -88,10 +97,10 @@ export class UsersController {
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng');
     }
-    
+
     // Get user stats
     const stats = await this.usersService.getUserStats(user.id);
-    
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
     return {
@@ -138,7 +147,7 @@ export class UsersController {
     @Param('userId') userId: string,
   ) {
     await this.usersService.followUser(currentUser.userId, userId);
-    
+
     // Get follower data for notification
     const follower = await this.usersService.findById(currentUser.userId);
     if (follower) {
@@ -156,11 +165,11 @@ export class UsersController {
       this.chatGateway.notifyFollow(currentUser.userId, userId, {
         id: follower.id,
         name: follower.name,
-        username: follower.username as string,
+        username: follower.username ?? '',
         avatar: follower.avatar,
       });
     }
-    
+
     return { message: 'Followed successfully' };
   }
 
@@ -172,7 +181,7 @@ export class UsersController {
     @Param('userId') userId: string,
   ) {
     await this.usersService.unfollowUser(currentUser.userId, userId);
-    
+
     // Get user data
     const follower = await this.usersService.findById(currentUser.userId);
     if (follower) {
@@ -186,10 +195,10 @@ export class UsersController {
         actorAvatar: follower.avatar || undefined,
       });
     }
-    
+
     // Notify via Socket.IO
     this.chatGateway.notifyUnfollow(currentUser.userId, userId);
-    
+
     return { message: 'Unfollowed successfully' };
   }
 }

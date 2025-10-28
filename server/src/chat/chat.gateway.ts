@@ -33,6 +33,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log(`Client disconnected: ${client.id}`);
     if (client.userId) {
       this.userSockets.delete(client.userId);
+      // Broadcast updated online users list
+      this.broadcastOnlineUsers();
     }
   }
 
@@ -44,7 +46,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.userId = data.userId;
     this.userSockets.set(data.userId, client.id);
     console.log(`User ${data.userId} registered with socket ${client.id}`);
+    // Broadcast updated online users list
+    this.broadcastOnlineUsers();
     return { success: true };
+  }
+
+  // Get online user IDs
+  getOnlineUserIds(): string[] {
+    return Array.from(this.userSockets.keys());
+  }
+
+  // Broadcast online users to all connected clients
+  private broadcastOnlineUsers() {
+    const onlineUserIds = this.getOnlineUserIds();
+    this.server.emit('online_users_updated', { userIds: onlineUserIds });
   }
 
   @SubscribeMessage('message')

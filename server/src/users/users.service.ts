@@ -189,10 +189,7 @@ export class UsersService {
 
     const suggestedUsers = await this.prisma.user.findMany({
       where: {
-        AND: [
-          { id: { not: currentUserId } },
-          { id: { notIn: followingIds } },
-        ],
+        AND: [{ id: { not: currentUserId } }, { id: { notIn: followingIds } }],
       },
       select: {
         id: true,
@@ -208,6 +205,26 @@ export class UsersService {
     });
 
     return suggestedUsers;
+  }
+
+  async getUsersByIds(userIds: string[]) {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        avatar: true,
+      },
+    });
+
+    return users;
   }
 
   async checkFollowStatus(

@@ -65,6 +65,15 @@ class SocketService {
     this.socket?.off('unfollowed')
   }
 
+  // Online users events
+  onOnlineUsersUpdated(callback: (data: { userIds: string[] }) => void) {
+    this.socket?.on('online_users_updated', callback)
+  }
+
+  offOnlineUsersUpdated() {
+    this.socket?.off('online_users_updated')
+  }
+
   getSocket() {
     return this.socket
   }
