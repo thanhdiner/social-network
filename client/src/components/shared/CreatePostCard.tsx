@@ -135,20 +135,22 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
                 className="w-full min-h-[150px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none text-lg"
               />
 
-              {/* Image Preview */}
+              {/* Image Preview with Scroll */}
               {previewUrls.length > 0 && (
-                <div className={`grid gap-2 ${previewUrls.length === 1 ? 'grid-cols-1' : previewUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                  {previewUrls.map((url, index) => (
-                    <div key={index} className="relative rounded-lg overflow-hidden border aspect-square">
-                      <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover bg-gray-100" />
-                      <button
-                        onClick={() => handleRemoveImage(index)}
-                        className="absolute top-2 right-2 bg-white hover:bg-gray-100 p-1.5 rounded-full shadow-lg transition cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                <div className="max-h-[300px] overflow-y-auto border rounded-lg p-2">
+                  <div className={`grid gap-2 ${previewUrls.length === 1 ? 'grid-cols-1' : previewUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                    {previewUrls.map((url, index) => (
+                      <div key={index} className="relative rounded-lg overflow-hidden border aspect-square">
+                        <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover bg-gray-100" />
+                        <button
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute top-2 right-2 bg-white hover:bg-gray-100 p-1.5 rounded-full shadow-lg transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
