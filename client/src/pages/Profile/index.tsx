@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUserProfile } from '@/hooks/useUserProfile'
 import { ProfileHeader } from './components/ProfileHeader'
 import { ProfileTabs } from './components/ProfileTabs'
 import { ProfileTimeline } from './components/ProfileTimeline'
@@ -22,6 +23,14 @@ export default function MyProfilePage() {
       : 'timeline'
   )
 
+  // Kiểm tra xem có phải profile của mình không
+  const isOwnProfile = username === currentUser?.username
+  // Username thực tế để fetch data (ưu tiên username từ URL, fallback về currentUser.username)
+  const profileUsername = username || currentUser?.username
+
+  // Fetch profile user data
+  const { user: profileUser } = useUserProfile(profileUsername)
+
   // Update URL when tab changes
   useEffect(() => {
     const profileUsername = username || currentUser?.username
@@ -42,10 +51,13 @@ export default function MyProfilePage() {
     }
   }, [tabFromUrl])
 
-  // Kiểm tra xem có phải profile của mình không
-  const isOwnProfile = username === currentUser?.username
-  // Username thực tế để fetch data (ưu tiên username từ URL, fallback về currentUser.username)
-  const profileUsername = username || currentUser?.username
+  if (!profileUser) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col items-center bg-gray-50 min-h-screen py-2">
@@ -57,10 +69,10 @@ export default function MyProfilePage() {
 
       {/* Tab Content */}
       <div className="max-w-4xl w-full mt-6 space-y-6">
-        {activeTab === 'timeline' && <ProfileTimeline username={profileUsername} />}
+        {activeTab === 'timeline' && <ProfileTimeline userId={profileUser.id} isOwnProfile={isOwnProfile} />}
         {activeTab === 'about' && <ProfileAbout username={profileUsername} />}
         {activeTab === 'connections' && <ProfileConnections username={profileUsername} />}
-        {activeTab === 'photos' && <ProfilePhotos username={profileUsername} />}
+        {activeTab === 'photos' && <ProfilePhotos userId={profileUser.id} />}
       </div>
     </div>
   )

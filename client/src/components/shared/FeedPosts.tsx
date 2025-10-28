@@ -4,15 +4,14 @@ import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
-import { EditPostModal } from '@/components/shared/EditPostModal'
-import { ImageViewer } from '@/components/shared/ImageViewer'
+import { EditPostModal } from './EditPostModal'
+import { ImageViewer } from './ImageViewer'
 
-interface PostsListProps {
-  userId?: string
+interface FeedPostsProps {
   refresh?: number
 }
 
-export const PostsList = ({ userId, refresh }: PostsListProps) => {
+export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   const { user: currentUser } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -42,11 +41,9 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
   }, [menuOpen])
 
   const loadPosts = useCallback(async () => {
-    if (!userId) return
-    
     setIsLoading(true)
     try {
-      const response = await postService.getUserPosts(userId, currentUser?.id)
+      const response = await postService.getAllPosts()
       setPosts(response.posts)
     } catch (error) {
       console.error('Failed to load posts:', error)
@@ -54,7 +51,7 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
     } finally {
       setIsLoading(false)
     }
-  }, [userId, currentUser?.id])
+  }, [])
 
   useEffect(() => {
     loadPosts()
@@ -76,6 +73,9 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
         }
         return post
       }))
+
+      // Call API
+      await postService.toggleLike(postId)
     } catch (error) {
       console.error('Failed to toggle like:', error)
       // Revert on error

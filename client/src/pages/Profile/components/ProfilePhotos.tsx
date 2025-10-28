@@ -1,37 +1,114 @@
-const photos = [
-  'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=300',
-  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=300',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300',
-  'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=300',
-  'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300',
-  'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=300',
-  'https://images.unsplash.com/photo-1531256379411-0b7b8c7de9e8?w=300',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300'
-]
+import { useState, useEffect, useCallback } from 'react'
+import postService, { type Photo } from '../../../services/postService'
+import { ImageViewer } from '../../../components/shared/ImageViewer'
+import { AllPhotosModal } from './AllPhotosModal'
+import { useAuth } from '../../../contexts/AuthContext'
+import { Loader2 } from 'lucide-react'
 
 interface ProfilePhotosProps {
-  username?: string
+  userId: string
 }
 
-export const ProfilePhotos = ({ username: _username }: ProfilePhotosProps) => {
-  // TODO: Fetch photos based on _username
-  
+export const ProfilePhotos = ({ userId }: ProfilePhotosProps) => {
+  const { user: currentUser } = useAuth()
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [selectedPostId, setSelectedPostId] = useState<string>('')
+  const [allPhotosOpen, setAllPhotosOpen] = useState(false)
+
+  const loadPhotos = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await postService.getUserPhotos(userId, 1, 9)
+      setPhotos(response.photos)
+    } catch (error) {
+      console.error('Failed to load photos:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    loadPhotos()
+  }, [loadPhotos])
+
+
+  const handlePhotoClick = (index: number, postId: string) => {
+    setSelectedIndex(index)
+    setSelectedPostId(postId)
+    setViewerOpen(true)
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow">
+        <h2 className="text-lg font-semibold mb-4">Photos</h2>
+        <div className="flex justify-center items-center h-40">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        </div>
+      </div>
+    )
+  }
+
+  if (photos.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow">
+        <h2 className="text-lg font-semibold mb-4">Photos</h2>
+        <p className="text-gray-500 text-center py-8">No photos yet</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-white rounded-2xl p-6 shadow">
-      <h2 className="text-lg font-semibold mb-4">Photos</h2>
+    <>
+      <div className="bg-white rounded-2xl p-6 shadow">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Photos</h2>
+          {photos.length >= 9 && (
+            <button
+              onClick={() => setAllPhotosOpen(true)}
+              className="text-orange-500 hover:text-orange-600 text-sm font-medium cursor-pointer"
+            >
+              See All Photos
+            </button>
+          )}
+        </div>
 
-      <div className="flex gap-6 border-b pb-3 text-sm text-gray-600 mb-4">
-        <button className="text-orange-500 font-medium">Photos of You</button>
-        <button className="hover:text-orange-500">Your Photos</button>
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((photo, index) => (
+            <div
+              key={`${photo.postId}-${index}`}
+              className="aspect-square overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => handlePhotoClick(index, photo.postId)}
+            >
+              <img
+                src={photo.imageUrl}
+                alt={`Photo ${index + 1}`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        {photos.map((p, i) => (
-          <div key={i} className="overflow-hidden rounded-xl shadow-sm">
-            <img src={p} alt={`photo-${i}`} className="w-full h-40 object-cover hover:scale-110 transition-transform duration-300" />
-          </div>
-        ))}
-      </div>
-    </div>
+      <ImageViewer
+        images={photos.map(p => p.imageUrl)}
+        initialIndex={selectedIndex}
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        postId={selectedPostId}
+        updateUrl={false}
+        canDelete={currentUser?.id === userId}
+      />
+
+      <AllPhotosModal
+        userId={userId}
+        open={allPhotosOpen}
+        onClose={() => setAllPhotosOpen(false)}
+      />
+    </>
   )
 }
+

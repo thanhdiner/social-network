@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Post" ADD COLUMN     "privacy" TEXT NOT NULL DEFAULT 'PUBLIC';

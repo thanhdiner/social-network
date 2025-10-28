@@ -32,7 +32,7 @@ export const ProfileConnections = ({ username }: ProfileConnectionsProps) => {
         const data = await userService.getFollowers(profileUser.id)
         // Check follow status for each follower
         const followersWithStatus = await Promise.all(
-          data.map(async (follower) => {
+          data.map(async follower => {
             if (follower.id === currentUser?.id) {
               return { ...follower, isFollowing: false } // Don't show button for self
             }
@@ -122,64 +122,65 @@ export const ProfileConnections = ({ username }: ProfileConnectionsProps) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {activeTab === 'followers' ? (
-            followers.map(person => (
-              <div key={person.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow transition">
-                <Link to={`/profile/${person.username}`} className="flex items-center gap-3 flex-1">
-                  <img
-                    src={person.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name)}&background=fb923c&color=fff`}
-                    alt={person.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-800 hover:text-orange-600 transition">{person.name}</p>
-                    <p className="text-sm text-gray-500">@{person.username}</p>
-                  </div>
-                </Link>
-                {person.id !== currentUser?.id && (
-                  person.isFollowing ? (
+          {activeTab === 'followers'
+            ? followers.map(person => (
+                <div key={person.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow transition">
+                  <Link to={`/profile/${person.username}`} className="flex items-center gap-3 flex-1">
+                    <img
+                      src={
+                        person.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name)}&background=fb923c&color=fff`
+                      }
+                      alt={person.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-800 hover:text-orange-600 transition">{person.name}</p>
+                      <p className="text-sm text-gray-500">@{person.username}</p>
+                    </div>
+                  </Link>
+                  {person.id !== currentUser?.id &&
+                    (person.isFollowing ? (
+                      <button
+                        onClick={() => handleUnfollow(person.id)}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded-lg transition cursor-pointer"
+                      >
+                        Following
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleFollow(person.id)}
+                        className="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-1.5 rounded-lg transition cursor-pointer"
+                      >
+                        {isOwnProfile ? 'Follow Back' : 'Follow'}
+                      </button>
+                    ))}
+                </div>
+              ))
+            : following.map(person => (
+                <div key={person.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow transition">
+                  <Link to={`/profile/${person.username}`} className="flex items-center gap-3 flex-1">
+                    <img
+                      src={
+                        person.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name)}&background=fb923c&color=fff`
+                      }
+                      alt={person.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-800 hover:text-orange-600 transition">{person.name}</p>
+                      <p className="text-sm text-gray-500">@{person.username}</p>
+                    </div>
+                  </Link>
+                  {person.id !== currentUser?.id && (
                     <button
                       onClick={() => handleUnfollow(person.id)}
                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded-lg transition cursor-pointer"
                     >
                       Following
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => handleFollow(person.id)}
-                      className="bg-orange-500 hover:bg-orange-600 text-white text-sm px-4 py-1.5 rounded-lg transition cursor-pointer"
-                    >
-                      {isOwnProfile ? 'Follow Back' : 'Follow'}
-                    </button>
-                  )
-                )}
-              </div>
-            ))
-          ) : (
-            following.map(person => (
-              <div key={person.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow transition">
-                <Link to={`/profile/${person.username}`} className="flex items-center gap-3 flex-1">
-                  <img
-                    src={person.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(person.name)}&background=fb923c&color=fff`}
-                    alt={person.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-800 hover:text-orange-600 transition">{person.name}</p>
-                    <p className="text-sm text-gray-500">@{person.username}</p>
-                  </div>
-                </Link>
-                {person.id !== currentUser?.id && (
-                  <button
-                    onClick={() => handleUnfollow(person.id)}
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-1.5 rounded-lg transition cursor-pointer"
-                  >
-                    Following
-                  </button>
-                )}
-              </div>
-            ))
-          )}
+                  )}
+                </div>
+              ))}
         </div>
       )}
     </div>

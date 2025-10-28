@@ -12,6 +12,7 @@ import EditProfile from '@/pages/Profile/EditProfile'
 import Suggestions from '@/pages/Suggestions'
 import NotFound from '@/pages/NotFound'
 import UserNotFound from '@/pages/UserNotFound'
+import { PostDetail } from '@/pages/PostDetail'
 
 function App() {
   return (
@@ -65,6 +66,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <EditProfile />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/post/:postId"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PostDetail />
                 </MainLayout>
               </ProtectedRoute>
             }
