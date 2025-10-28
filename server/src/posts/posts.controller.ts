@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import {
   CurrentUser,
@@ -101,7 +102,7 @@ export class PostsController {
   update(
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserData,
-    @Body() updatePostDto: CreatePostDto,
+    @Body() updatePostDto: UpdatePostDto,
   ) {
     return this.postsService.update(id, user.userId, updatePostDto);
   }

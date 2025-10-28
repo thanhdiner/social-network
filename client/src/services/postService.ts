@@ -21,7 +21,7 @@ export interface Post {
 }
 
 export interface CreatePostData {
-  content: string;
+  content?: string;
   imageUrl?: string;
 }
 
@@ -36,6 +36,7 @@ export interface Photo {
   imageUrl: string;
   postId: string;
   createdAt: string;
+  imageIndex: number;
 }
 
 export interface PhotosResponse {
