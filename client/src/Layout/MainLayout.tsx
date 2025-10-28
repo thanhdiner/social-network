@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Header } from '../components/Layout/Header.tsx'
 import { LeftSidebar } from '../components/Layout/LeftSidebar.tsx'
 import { RightSidebar } from '../components/Layout/RightSidebar.tsx'
@@ -8,6 +10,16 @@ interface MainLayoutProps {
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
+  const location = useLocation()
+  const mainRef = useRef<HTMLDivElement>(null)
+
+  // Reset scroll position when route changes
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0
+    }
+  }, [location.pathname])
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
@@ -21,7 +33,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </aside>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-y-auto p-4">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4">
           {/* Middle content */}
           <div className="max-w-3xl mx-auto space-y-4">{children}</div>
         </main>
