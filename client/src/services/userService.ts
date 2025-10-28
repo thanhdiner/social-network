@@ -102,6 +102,22 @@ class UserService {
     const response = await api.get<{ isFollowing: boolean; followsMe: boolean }>(`/users/${userId}/follow-status`);
     return response.data;
   }
+
+  /**
+   * Get followers of a user
+   */
+  async getFollowers(userId: string): Promise<ActiveUser[]> {
+    const response = await api.get<ActiveUser[]>(`/users/${userId}/followers`);
+    return response.data;
+  }
+
+  /**
+   * Get users that a user is following
+   */
+  async getFollowing(userId: string): Promise<ActiveUser[]> {
+    const response = await api.get<ActiveUser[]>(`/users/${userId}/following`);
+    return response.data;
+  }
 }
 
 export default new UserService()

@@ -90,6 +90,18 @@ export class UsersController {
     return { isFollowing, followsMe };
   }
 
+  @Get(':userId/followers')
+  @UseGuards(JwtAuthGuard)
+  async getFollowers(@Param('userId') userId: string) {
+    return this.usersService.getFollowers(userId);
+  }
+
+  @Get(':userId/following')
+  @UseGuards(JwtAuthGuard)
+  async getFollowing(@Param('userId') userId: string) {
+    return this.usersService.getFollowing(userId);
+  }
+
   @Get(':username')
   @UseGuards(JwtAuthGuard)
   async getUserByUsername(@Param('username') username: string) {

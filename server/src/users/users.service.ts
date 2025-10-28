@@ -243,6 +243,42 @@ export class UsersService {
     return !!follow;
   }
 
+  async getFollowers(userId: string) {
+    const follows = await this.prisma.follow.findMany({
+      where: { followingId: userId },
+      include: {
+        follower: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => f.follower);
+  }
+
+  async getFollowing(userId: string) {
+    const follows = await this.prisma.follow.findMany({
+      where: { followerId: userId },
+      include: {
+        following: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return follows.map((f) => f.following);
+  }
+
   async followUser(followerId: string, followingId: string) {
     if (followerId === followingId) {
       throw new ConflictException('Không thể follow chính mình');

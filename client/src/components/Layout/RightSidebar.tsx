@@ -93,7 +93,7 @@ export const RightSidebar = () => {
             {activeUsers.map(user => (
               <li key={user.id}>
                 <Link 
-                  to={`/${user.username}`}
+                  to={`/profile/${user.username}`}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50 transition cursor-pointer"
                 >
                   <div className="relative">
