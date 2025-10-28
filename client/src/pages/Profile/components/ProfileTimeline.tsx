@@ -21,7 +21,7 @@ export const ProfileTimeline = ({ userId, isOwnProfile }: ProfileTimelineProps) 
       {/* Left Sidebar */}
       <div className="space-y-6">
         <LifeEvents />
-        <PhotosGallery />
+        <PhotosGallery userId={userId} />
       </div>
 
       {/* Main Content */}

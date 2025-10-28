@@ -281,24 +281,36 @@ export class PostsService {
       },
     });
 
-    // Extract tất cả ảnh từ posts
+    // Extract tất cả ảnh từ posts và thêm index để track thứ tự trong post
     const allPhotos: Array<{
       imageUrl: string;
       postId: string;
       createdAt: Date;
+      imageIndex: number;
     }> = [];
 
     posts.forEach((post) => {
       if (post.imageUrl) {
         const urls = post.imageUrl.split(',');
-        urls.forEach((url) => {
+        urls.forEach((url, index) => {
           allPhotos.push({
             imageUrl: url.trim(),
             postId: post.id,
             createdAt: post.createdAt,
+            imageIndex: index,
           });
         });
       }
+    });
+
+    // Sort by createdAt desc (mới nhất lên đầu)
+    allPhotos.sort((a, b) => {
+      const dateCompare = b.createdAt.getTime() - a.createdAt.getTime();
+      // Nếu cùng post, sắp xếp theo thứ tự ảnh
+      if (dateCompare === 0) {
+        return a.imageIndex - b.imageIndex;
+      }
+      return dateCompare;
     });
 
     // Pagination
