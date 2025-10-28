@@ -9,6 +9,7 @@ import { PostsModule } from './posts/posts.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadModule } from './upload/upload.module';
+import { LifeEventsModule } from './life-events/life-events.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UploadModule } from './upload/upload.module';
     ChatModule,
     NotificationsModule,
     UploadModule,
+    LifeEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

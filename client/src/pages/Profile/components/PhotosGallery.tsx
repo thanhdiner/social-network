@@ -41,55 +41,31 @@ export const PhotosGallery = ({ userId }: PhotosGalleryProps) => {
 
   const handleDeleteImage = async (imageIndex: number) => {
     try {
-      console.log('=== DELETE IMAGE DEBUG ===')
-      console.log('imageIndex:', imageIndex)
-      console.log('photos array:', photos)
-      
       // Get the photo being viewed
       const photo = photos[imageIndex]
-      console.log('photo at index:', photo)
-      if (!photo) {
-        console.log('ERROR: No photo found at index', imageIndex)
-        return
-      }
+      if (!photo) return
 
       // Fetch the full post to get all current images
-      console.log('Fetching post:', photo.postId)
       const post = await postService.getPost(photo.postId)
-      console.log('Full post:', post)
-      
-      if (!post || !post.imageUrl) {
-        console.log('ERROR: No post or imageUrl found')
-        return
-      }
+      if (!post || !post.imageUrl) return
 
       // Get all images from the post
       const images = post.imageUrl.split(',').filter(url => url.trim())
-      console.log('All images in post:', images)
-      console.log('Current photo URL:', photo.imageUrl)
       
       // Find the index of the current photo URL in the post's images
       const photoIndexInPost = images.findIndex(url => url.trim() === photo.imageUrl.trim())
-      console.log('Photo index in post:', photoIndexInPost)
-      
-      if (photoIndexInPost === -1) {
-        console.log('ERROR: Photo URL not found in post images')
-        return
-      }
+      if (photoIndexInPost === -1) return
 
       // Remove the image at the found index
       const newImages = images.filter((_, i) => i !== photoIndexInPost)
-      console.log('New images after delete:', newImages)
       
       // Update post with new images
       const newImageUrl = newImages.length > 0 ? newImages.join(',') : undefined
-      console.log('New imageUrl string:', newImageUrl)
       
       await postService.updatePost(photo.postId, {
         imageUrl: newImageUrl,
       })
 
-      console.log('Post updated successfully')
       // Reload photos
       loadPhotos()
     } catch (error) {
