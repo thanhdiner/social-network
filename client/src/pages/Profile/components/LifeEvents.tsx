@@ -98,10 +98,7 @@ export const LifeEvents = ({ userId }: LifeEventsProps) => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-800">Life Events</h3>
           {isOwnProfile && (
-            <button
-              onClick={handleCreate}
-              className="text-orange-500 hover:text-orange-600 font-medium text-sm cursor-pointer"
-            >
+            <button onClick={handleCreate} className="text-orange-500 hover:text-orange-600 font-medium text-sm cursor-pointer">
               Create
             </button>
           )}
@@ -117,10 +114,7 @@ export const LifeEvents = ({ userId }: LifeEventsProps) => {
           <div className="text-center py-8 text-gray-500">
             <p className="text-sm">No life events yet</p>
             {isOwnProfile && (
-              <button
-                onClick={handleCreate}
-                className="mt-2 text-orange-500 hover:text-orange-600 text-sm font-medium cursor-pointer"
-              >
+              <button onClick={handleCreate} className="mt-2 text-orange-500 hover:text-orange-600 text-sm font-medium cursor-pointer">
                 Add your first event
               </button>
             )}
@@ -128,36 +122,29 @@ export const LifeEvents = ({ userId }: LifeEventsProps) => {
         ) : (
           <div className="space-y-3">
             {events.map(event => (
-              <div
-                key={event.id}
-                className="group relative rounded-xl overflow-hidden hover:shadow-md transition"
-              >
-                {event.imageUrl && (
-                  <img 
-                    src={event.imageUrl} 
-                    alt={event.title} 
-                    className="w-full h-40 object-cover"
-                  />
-                )}
-                <div className={`${event.imageUrl ? 'absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent' : 'bg-gray-50 border border-gray-200'} p-4`}>
+              <div key={event.id} className="group relative rounded-xl overflow-hidden hover:shadow-md transition">
+                {event.imageUrl && <img src={event.imageUrl} alt={event.title} className="w-full h-40 object-cover" />}
+                <div
+                  className={`${
+                    event.imageUrl
+                      ? 'absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent'
+                      : 'bg-gray-50 border border-gray-200 rounded-xl'
+                  } p-4`}
+                >
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
                       {getIcon(event.type)}
                     </div>
                     <div className={`flex-1 ${event.imageUrl ? 'text-white' : 'text-gray-800'}`}>
                       <p className="font-semibold">{event.title}</p>
-                      <p className={`text-sm ${event.imageUrl ? 'text-gray-200' : 'text-gray-600'}`}>
-                        {formatDate(event.date)}
-                      </p>
+                      <p className={`text-sm ${event.imageUrl ? 'text-gray-200' : 'text-gray-600'}`}>{formatDate(event.date)}</p>
                     </div>
                     {isOwnProfile && (
                       <div className="relative">
                         <button
                           onClick={() => setMenuOpen(menuOpen === event.id ? null : event.id)}
                           className={`p-1.5 rounded-full transition ${
-                            event.imageUrl
-                              ? 'hover:bg-white/20 text-white'
-                              : 'hover:bg-gray-200 text-gray-600'
+                            event.imageUrl ? 'hover:bg-white/20 text-white' : 'hover:bg-gray-200 text-gray-600'
                           } cursor-pointer`}
                         >
                           <MoreHorizontal className="w-4 h-4" />
@@ -184,9 +171,7 @@ export const LifeEvents = ({ userId }: LifeEventsProps) => {
                     )}
                   </div>
                   {event.description && (
-                    <p className={`text-sm mt-2 ml-13 ${event.imageUrl ? 'text-gray-200' : 'text-gray-600'}`}>
-                      {event.description}
-                    </p>
+                    <p className={`text-sm mt-2 ml-13 ${event.imageUrl ? 'text-gray-200' : 'text-gray-600'}`}>{event.description}</p>
                   )}
                 </div>
               </div>

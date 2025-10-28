@@ -102,10 +102,10 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 -mb-2.5" onClick={() => setOpen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between rounded-t-2xl">
+            <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
               <h2 className="text-xl font-semibold">Create Post</h2>
               <button
                 onClick={() => setOpen(false)}
@@ -116,7 +116,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               {/* User Info */}
               <div className="flex items-center gap-3">
                 <img 
@@ -173,7 +173,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
             </div>
 
             {/* Footer */}
-            <div className="sticky bottom-0 bg-white border-t px-6 py-4 rounded-b-2xl">
+            <div className="bg-white border-t px-6 py-4 shrink-0">
               <button
                 onClick={handleSubmit}
                 disabled={(!content.trim() && selectedImages.length === 0) || isSubmitting}

@@ -18,7 +18,7 @@ const eventTypes = [
   { value: 'location', label: 'Location', icon: MapPin },
   { value: 'achievement', label: 'Achievement', icon: Trophy },
   { value: 'health', label: 'Health & Wellness', icon: HeartPulse },
-  { value: 'travel', label: 'Travel', icon: Plane },
+  { value: 'travel', label: 'Travel', icon: Plane }
 ]
 
 export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: CreateLifeEventModalProps) => {
@@ -89,7 +89,7 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
         description: description || undefined,
         date,
         endDate: endDate || undefined,
-        imageUrl: imageUrl || undefined,
+        imageUrl: imageUrl || undefined
       }
 
       if (editEvent) {
@@ -112,23 +112,19 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
-            {editEvent ? 'Edit Life Event' : 'Create Life Event'}
-          </h2>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 -mb-2.5" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between shrink-0">
+          <h2 className="text-xl font-semibold">{editEvent ? 'Edit Life Event' : 'Create Life Event'}</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Event Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Event Type
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Event Type</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {eventTypes.map(type => {
                 const TypeIcon = type.icon
@@ -153,13 +149,11 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Title *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
               placeholder={`e.g., Started New Job at Google`}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
               required
@@ -168,12 +162,10 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value)}
               placeholder="Add more details about this event..."
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
@@ -183,25 +175,21 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
           {/* Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
               <input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={e => setDate(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date (Optional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Optional)</label>
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={e => setEndDate(e.target.value)}
                 min={date}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer"
               />
@@ -210,9 +198,7 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
 
           {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Photo
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Photo</label>
             <div className="space-y-3">
               {imagePreview ? (
                 <div className="relative rounded-lg overflow-hidden">
@@ -232,12 +218,7 @@ export const CreateLifeEventModal = ({ open, onClose, onSuccess, editEvent }: Cr
                 <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center cursor-pointer hover:border-orange-500 transition">
                   <Upload className="w-12 h-12 text-gray-400 mb-2" />
                   <span className="text-sm text-gray-600">Click to upload photo</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                 </label>
               )}
             </div>

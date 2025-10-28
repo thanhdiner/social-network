@@ -22,7 +22,7 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
       // Giới hạn tối đa 10 ảnh
       const newImages = [...selectedImages, ...files].slice(0, 10)
       setSelectedImages(newImages)
-      
+
       // Tạo preview URLs
       const newUrls = newImages.map(file => URL.createObjectURL(file))
       // Revoke old URLs
@@ -34,7 +34,7 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
   const handleRemoveImage = (index: number) => {
     const newImages = selectedImages.filter((_, i) => i !== index)
     setSelectedImages(newImages)
-    
+
     // Revoke URL of removed image
     URL.revokeObjectURL(previewUrls[index])
     const newUrls = previewUrls.filter((_, i) => i !== index)
@@ -62,16 +62,16 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
       // Create post
       await postService.createPost({
         content: content.trim(),
-        imageUrl,
+        imageUrl
       })
-      
+
       // Reset form
       setContent('')
       setSelectedImages([])
       previewUrls.forEach(url => URL.revokeObjectURL(url))
       setPreviewUrls([])
       setOpen(false)
-      
+
       // Callback to refresh posts list
       onPostCreated?.()
     } catch (error) {
@@ -86,10 +86,10 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
     <>
       <div className="bg-white rounded-2xl p-5 shadow">
         <div className="flex items-start gap-3">
-          <img 
-            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`} 
-            alt="avatar" 
-            className="w-10 h-10 rounded-full object-cover" 
+          <img
+            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`}
+            alt="avatar"
+            className="w-10 h-10 rounded-full object-cover"
           />
           <button
             onClick={() => setOpen(true)}
@@ -102,31 +102,37 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg relative">
-            <div className="flex items-center justify-center border-b p-4 relative">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 -mb-2.5" onClick={() => setOpen(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-center border-b p-4 relative shrink-0">
               <h2 className="text-xl font-semibold text-gray-800">Create Post</h2>
-              <button 
-                onClick={() => setOpen(false)} 
+              <button
+                onClick={() => setOpen(false)}
                 className="absolute right-4 text-gray-500 hover:bg-gray-100 p-2 rounded-full transition cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               <div className="flex items-center gap-3">
-                <img 
-                  src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`} 
-                  alt="avatar" 
-                  className="w-10 h-10 rounded-full object-cover" 
+                <img
+                  src={
+                    user?.avatar ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`
+                  }
+                  alt="avatar"
+                  className="w-10 h-10 rounded-full object-cover"
                 />
                 <p className="font-semibold text-gray-800">{user?.name}</p>
               </div>
 
               <textarea
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={e => setContent(e.target.value)}
                 placeholder={`What's on your mind, ${user?.name?.split(' ')[0]}?`}
                 className="w-full h-32 resize-none border-0 focus:ring-0 outline-none text-gray-800 placeholder-gray-400 text-lg"
               />
@@ -134,7 +140,11 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
               {/* Image Preview with Scroll */}
               {previewUrls.length > 0 && (
                 <div className="max-h-[300px] overflow-y-auto border rounded-lg p-2">
-                  <div className={`grid gap-2 ${previewUrls.length === 1 ? 'grid-cols-1' : previewUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                  <div
+                    className={`grid gap-2 ${
+                      previewUrls.length === 1 ? 'grid-cols-1' : previewUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'
+                    }`}
+                  >
                     {previewUrls.map((url, index) => (
                       <div key={index} className="relative rounded-lg overflow-hidden border aspect-square">
                         <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover bg-gray-100" />
@@ -155,20 +165,16 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
                   <span className="text-sm font-medium text-gray-700">Add to your post</span>
                   <div className="flex gap-2">
                     <label className="cursor-pointer hover:bg-gray-100 p-2 rounded-full transition">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
+                      <input type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
                       <ImageIcon className="w-5 h-5 text-green-500" />
                     </label>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <button 
+            <div className="border-t p-4 shrink-0">
+              <button
                 onClick={handleSubmit}
                 disabled={(!content.trim() && selectedImages.length === 0) || isSubmitting}
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition cursor-pointer"
