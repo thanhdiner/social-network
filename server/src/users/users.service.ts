@@ -227,6 +227,43 @@ export class UsersService {
     return users;
   }
 
+  async getActiveFollowingUsers(
+    currentUserId: string,
+    onlineUserIds: string[],
+  ) {
+    // Get list of users that current user is following
+    const following = await this.prisma.follow.findMany({
+      where: { followerId: currentUserId },
+      select: { followingId: true },
+    });
+
+    const followingIds = following.map((f) => f.followingId);
+
+    // Filter to get only following users who are online
+    const activeFollowingIds = followingIds.filter((id) =>
+      onlineUserIds.includes(id),
+    );
+
+    if (activeFollowingIds.length === 0) {
+      return [];
+    }
+
+    // Get user details
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: activeFollowingIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+        avatar: true,
+      },
+    });
+
+    return users;
+  }
+
   async checkFollowStatus(
     followerId: string,
     followingId: string,

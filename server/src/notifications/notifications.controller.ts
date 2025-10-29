@@ -75,4 +75,3 @@ export class NotificationsController {
     await this.notificationsService.clearAll(user.userId);
   }
 }
-

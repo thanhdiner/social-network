@@ -24,7 +24,10 @@ export class LifeEventsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  create(@CurrentUser() user: CurrentUserData, @Body() createLifeEventDto: CreateLifeEventDto) {
+  create(
+    @CurrentUser() user: CurrentUserData,
+    @Body() createLifeEventDto: CreateLifeEventDto,
+  ) {
     return this.lifeEventsService.create(user.userId, createLifeEventDto);
   }
 

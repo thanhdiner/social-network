@@ -68,9 +68,11 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   getActiveUsers(@CurrentUser() currentUser: CurrentUserData) {
     const onlineUserIds = this.chatGateway.getOnlineUserIds();
-    // Filter out current user
-    const filteredIds = onlineUserIds.filter((id) => id !== currentUser.userId);
-    return this.usersService.getUsersByIds(filteredIds);
+    // Get users that current user is following and are online
+    return this.usersService.getActiveFollowingUsers(
+      currentUser.userId,
+      onlineUserIds,
+    );
   }
 
   @Get(':userId/follow-status')

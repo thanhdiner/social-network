@@ -3,7 +3,16 @@ import { IsString, IsOptional, IsDateString, IsIn } from 'class-validator';
 export class UpdateLifeEventDto {
   @IsString()
   @IsOptional()
-  @IsIn(['work', 'education', 'relationship', 'home', 'location', 'achievement', 'health', 'travel'])
+  @IsIn([
+    'work',
+    'education',
+    'relationship',
+    'home',
+    'location',
+    'achievement',
+    'health',
+    'travel',
+  ])
   type?: string;
 
   @IsString()

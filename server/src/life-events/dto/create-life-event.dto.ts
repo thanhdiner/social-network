@@ -1,9 +1,24 @@
-import { IsString, IsNotEmpty, IsOptional, IsDateString, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsDateString,
+  IsIn,
+} from 'class-validator';
 
 export class CreateLifeEventDto {
   @IsString()
   @IsNotEmpty()
-  @IsIn(['work', 'education', 'relationship', 'home', 'location', 'achievement', 'health', 'travel'])
+  @IsIn([
+    'work',
+    'education',
+    'relationship',
+    'home',
+    'location',
+    'achievement',
+    'health',
+    'travel',
+  ])
   type: string;
 
   @IsString()

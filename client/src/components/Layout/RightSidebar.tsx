@@ -86,7 +86,8 @@ export const RightSidebar = () => {
           </div>
         ) : activeUsers.length === 0 ? (
           <div className="text-center py-4 text-gray-500">
-            <p className="text-sm">No active users</p>
+            <p className="text-sm">No friends online</p>
+            <p className="text-xs mt-1">People you follow are not active right now</p>
           </div>
         ) : (
           <ul className="space-y-2">

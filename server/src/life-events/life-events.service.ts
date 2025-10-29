@@ -13,7 +13,9 @@ export class LifeEventsService {
         ...createLifeEventDto,
         userId,
         date: new Date(createLifeEventDto.date),
-        endDate: createLifeEventDto.endDate ? new Date(createLifeEventDto.endDate) : null,
+        endDate: createLifeEventDto.endDate
+          ? new Date(createLifeEventDto.endDate)
+          : null,
       },
     });
   }
@@ -39,7 +41,11 @@ export class LifeEventsService {
     });
   }
 
-  async update(id: string, userId: string, updateLifeEventDto: UpdateLifeEventDto) {
+  async update(
+    id: string,
+    userId: string,
+    updateLifeEventDto: UpdateLifeEventDto,
+  ) {
     const event = await this.prisma.lifeEvent.findUnique({
       where: { id },
     });
@@ -56,8 +62,12 @@ export class LifeEventsService {
       where: { id },
       data: {
         ...updateLifeEventDto,
-        date: updateLifeEventDto.date ? new Date(updateLifeEventDto.date) : undefined,
-        endDate: updateLifeEventDto.endDate ? new Date(updateLifeEventDto.endDate) : undefined,
+        date: updateLifeEventDto.date
+          ? new Date(updateLifeEventDto.date)
+          : undefined,
+        endDate: updateLifeEventDto.endDate
+          ? new Date(updateLifeEventDto.endDate)
+          : undefined,
       },
     });
   }

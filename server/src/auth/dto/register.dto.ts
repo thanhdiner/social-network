@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  Matches,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Email không hợp lệ' })
@@ -7,8 +13,8 @@ export class RegisterDto {
   @IsString()
   @MinLength(3, { message: 'Username phải có ít nhất 3 ký tự' })
   @MaxLength(30, { message: 'Username không được quá 30 ký tự' })
-  @Matches(/^[a-zA-Z0-9_]+$/, { 
-    message: 'Username chỉ được chứa chữ cái, số và dấu gạch dưới' 
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Username chỉ được chứa chữ cái, số và dấu gạch dưới',
   })
   username: string;
 
