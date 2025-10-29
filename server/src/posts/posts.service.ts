@@ -12,6 +12,7 @@ export class PostsService {
       data: {
         content: createPostDto.content,
         imageUrl: createPostDto.imageUrl,
+        videoUrl: createPostDto.videoUrl,
         userId,
       },
       include: {
@@ -236,15 +237,39 @@ export class PostsService {
       throw new Error('Unauthorized');
     }
 
+    console.log('=== UPDATE POST BACKEND DEBUG ===');
+    console.log('Post ID:', id);
+    console.log('Received updatePostDto:', updatePostDto);
+    console.log('content:', updatePostDto.content);
+    console.log('imageUrl:', updatePostDto.imageUrl);
+    console.log('videoUrl:', updatePostDto.videoUrl);
+    console.log('================================');
+
+    // Prepare update data
+    const updateData: {
+      content?: string;
+      imageUrl?: string | null;
+      videoUrl?: string | null;
+    } = {};
+
+    if (updatePostDto.content !== undefined) {
+      updateData.content = updatePostDto.content;
+    }
+
+    if (updatePostDto.imageUrl !== undefined) {
+      updateData.imageUrl = updatePostDto.imageUrl || null;
+    }
+
+    if (updatePostDto.videoUrl !== undefined) {
+      updateData.videoUrl = updatePostDto.videoUrl || null;
+    }
+
+    console.log('Final updateData:', updateData);
+    console.log('================================');
+
     return this.prisma.post.update({
       where: { id },
-      data: {
-        content: updatePostDto.content || post.content, // Preserve existing content if not provided
-        imageUrl:
-          updatePostDto.imageUrl !== undefined
-            ? updatePostDto.imageUrl
-            : post.imageUrl, // Preserve existing imageUrl if not provided
-      },
+      data: updateData,
       include: {
         user: {
           select: {

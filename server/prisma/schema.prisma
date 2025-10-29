@@ -45,6 +45,7 @@ model Post {
   id        String   @id @default(uuid())
   content   String
   imageUrl  String?
+  videoUrl  String?
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

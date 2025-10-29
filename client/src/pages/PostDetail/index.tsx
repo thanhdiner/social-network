@@ -290,6 +290,19 @@ export const PostDetail = () => {
           )
         })()}
 
+        {/* Post Video */}
+        {post.videoUrl && (
+          <div className="mb-4 rounded-xl overflow-hidden bg-black">
+            <video 
+              src={post.videoUrl} 
+              controls 
+              controlsList="nodownload"
+              className="w-full max-h-[600px] object-contain"
+              preload="metadata"
+            />
+          </div>
+        )}
+
         {/* Post Stats */}
         <div className="flex items-center justify-between text-sm text-gray-500 mb-3 pb-3 border-b">
           <button className="hover:underline cursor-pointer">
@@ -330,6 +343,7 @@ export const PostDetail = () => {
           postId={editingPost.id}
           initialContent={editingPost.content}
           initialImages={editingPost.imageUrl || ''}
+          initialVideo={editingPost.videoUrl}
           open={!!editingPost}
           onClose={() => setEditingPost(null)}
           onUpdated={handlePostUpdated}

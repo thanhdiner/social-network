@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Image as ImageIcon, X } from 'lucide-react'
+import { Image as ImageIcon, X, Video } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import postService from '@/services/postService'
 import uploadService from '@/services/uploadService'
@@ -13,12 +13,14 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
   const [open, setOpen] = useState(false)
   const [content, setContent] = useState('')
   const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null)
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    if (files.length > 0) {
+    if (files.length > 0 && !selectedVideo) {
       // Limit to 10 images total
       const newFiles = [...selectedImages, ...files].slice(0, 10)
       setSelectedImages(newFiles)
@@ -32,6 +34,27 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
     }
   }
 
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && selectedImages.length === 0) {
+      // Validate video
+      const validation = uploadService.validateVideo(file)
+      if (!validation.valid) {
+        alert(validation.error)
+        return
+      }
+
+      setSelectedVideo(file)
+      
+      // Revoke old video preview URL
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl)
+      }
+      
+      setVideoPreviewUrl(URL.createObjectURL(file))
+    }
+  }
+
   const handleRemoveImage = (index: number) => {
     const newFiles = selectedImages.filter((_, i) => i !== index)
     setSelectedImages(newFiles)
@@ -41,12 +64,21 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
     setPreviewUrls(newUrls)
   }
 
+  const handleRemoveVideo = () => {
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl)
+    }
+    setSelectedVideo(null)
+    setVideoPreviewUrl(null)
+  }
+
   const handleSubmit = async () => {
-    if (!content.trim() && selectedImages.length === 0) return
+    if (!content.trim() && selectedImages.length === 0 && !selectedVideo) return
 
     setIsSubmitting(true)
     try {
       let imageUrl: string | undefined
+      let videoUrl: string | undefined
 
       // Upload images if selected
       if (selectedImages.length > 0) {
@@ -55,21 +87,32 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
           const url = await uploadService.uploadImage(image)
           uploadedUrls.push(url)
         }
-        // Store as comma-separated URLs for now
+        // Store as comma-separated URLs
         imageUrl = uploadedUrls.join(',')
+      }
+
+      // Upload video if selected
+      if (selectedVideo) {
+        videoUrl = await uploadService.uploadVideo(selectedVideo)
       }
 
       // Create post
       await postService.createPost({
         content: content.trim(),
         imageUrl,
+        videoUrl,
       })
       
       // Reset form
       setContent('')
       setSelectedImages([])
+      setSelectedVideo(null)
       previewUrls.forEach(url => URL.revokeObjectURL(url))
       setPreviewUrls([])
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl)
+      }
+      setVideoPreviewUrl(null)
       setOpen(false)
       
       // Callback to refresh posts list
@@ -154,11 +197,31 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
                 </div>
               )}
 
+              {/* Video Preview */}
+              {videoPreviewUrl && (
+                <div className="max-h-[300px] overflow-hidden border rounded-lg p-2">
+                  <div className="relative rounded-lg overflow-hidden">
+                    <video 
+                      src={videoPreviewUrl} 
+                      controls 
+                      controlsList="nodownload"
+                      className="w-full max-h-[280px] object-contain bg-black"
+                    />
+                    <button
+                      onClick={handleRemoveVideo}
+                      className="absolute top-2 right-2 bg-white hover:bg-gray-100 p-1.5 rounded-full shadow-lg transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Add to Post */}
               <div className="border rounded-xl p-3">
                 <p className="text-sm font-medium text-gray-700 mb-2">Add to your post</p>
                 <div className="flex gap-2">
-                  <label className="cursor-pointer hover:bg-gray-100 p-2 rounded-full transition">
+                  <label className={`${selectedVideo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'} p-2 rounded-full transition`}>
                     <ImageIcon className="w-6 h-6 text-green-500" />
                     <input
                       type="file"
@@ -166,6 +229,17 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
                       multiple
                       onChange={handleImageSelect}
                       className="hidden"
+                      disabled={!!selectedVideo}
+                    />
+                  </label>
+                  <label className={`${selectedImages.length > 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-100'} p-2 rounded-full transition`}>
+                    <Video className="w-6 h-6 text-red-500" />
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoSelect}
+                      className="hidden"
+                      disabled={selectedImages.length > 0}
                     />
                   </label>
                 </div>
@@ -176,7 +250,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
             <div className="bg-white border-t px-6 py-4 shrink-0">
               <button
                 onClick={handleSubmit}
-                disabled={(!content.trim() && selectedImages.length === 0) || isSubmitting}
+                disabled={(!content.trim() && selectedImages.length === 0 && !selectedVideo) || isSubmitting}
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition cursor-pointer"
               >
                 {isSubmitting ? 'Posting...' : 'Post'}

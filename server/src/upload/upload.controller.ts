@@ -30,6 +30,17 @@ export class UploadController {
     return { url };
   }
 
+  @Post('video')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadVideo(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+
+    const url = await this.uploadService.uploadToCloudinary(file);
+    return { url };
+  }
+
   @Delete('image')
   async deleteImage(@Body('imageUrl') imageUrl: string) {
     if (!imageUrl) {
@@ -37,6 +48,16 @@ export class UploadController {
     }
 
     await this.uploadService.deleteFromCloudinary(imageUrl);
+    return { success: true };
+  }
+
+  @Delete('video')
+  async deleteVideo(@Body('videoUrl') videoUrl: string) {
+    if (!videoUrl) {
+      throw new Error('No video URL provided');
+    }
+
+    await this.uploadService.deleteFromCloudinary(videoUrl);
     return { success: true };
   }
 }

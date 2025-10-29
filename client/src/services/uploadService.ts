@@ -27,6 +27,31 @@ class UploadService {
   }
 
   /**
+   * Upload video to Cloudinary via backend
+   */
+  async uploadVideo(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post<{ url: string }>('/upload/video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.url;
+  }
+
+  /**
+   * Delete video from Cloudinary
+   */
+  async deleteVideo(videoUrl: string): Promise<void> {
+    await api.delete('/upload/video', {
+      data: { videoUrl }
+    });
+  }
+
+  /**
    * Validate image file
    */
   validateImage(file: File): { valid: boolean; error?: string } {
@@ -45,6 +70,31 @@ class UploadService {
       return {
         valid: false,
         error: 'Kích thước file không được vượt quá 5MB'
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validate video file
+   */
+  validateVideo(file: File): { valid: boolean; error?: string } {
+    // Check file type
+    const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+    if (!validTypes.includes(file.type)) {
+      return {
+        valid: false,
+        error: 'Chỉ chấp nhận file video (MP4, WebM, OGG, MOV)'
+      };
+    }
+
+    // Check file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: 'Kích thước video không được vượt quá 50MB'
       };
     }
 

@@ -4,6 +4,7 @@ export interface Post {
   id: string;
   content: string;
   imageUrl?: string;
+  videoUrl?: string;
   userId: string;
   createdAt: string;
   updatedAt: string;
@@ -22,7 +23,8 @@ export interface Post {
 
 export interface CreatePostData {
   content?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
 }
 
 export interface PostsResponse {
