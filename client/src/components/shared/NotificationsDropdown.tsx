@@ -110,7 +110,8 @@ export const NotificationsDropdown = () => {
     }
   }
 
-  const removeNotification = async (id: string) => {
+  const removeNotification = async (id: string, event: React.MouseEvent) => {
+    event.stopPropagation() // Ngăn event bubble lên và đóng dropdown
     try {
       await notificationService.deleteNotification(id)
       setNotifications((prev) => prev.filter((n) => n.id !== id))
@@ -211,14 +212,14 @@ export const NotificationsDropdown = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[500px] overflow-hidden flex flex-col">
+        <div className="fixed md:absolute right-0 md:right-0 left-0 md:left-auto top-[65px] md:top-auto md:mt-2 w-full md:w-96 bg-white md:rounded-lg md:shadow-xl border-t md:border border-gray-200 z-50 max-h-[calc(100vh-65px)] md:max-h-[500px] overflow-hidden flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
             <h3 className="font-semibold text-lg text-gray-800">Notifications</h3>
             {notifications.length > 0 && (
               <button
                 onClick={clearAll}
-                className="text-sm text-orange-500 hover:text-orange-600 font-medium"
+                className="text-sm text-orange-500 hover:text-orange-600 font-medium cursor-pointer"
               >
                 Clear all
               </button>
@@ -276,8 +277,8 @@ export const NotificationsDropdown = () => {
                     </div>
 
                     <button
-                      onClick={() => removeNotification(notification.id)}
-                      className="shrink-0 text-gray-400 hover:text-gray-600 transition"
+                      onClick={(e) => removeNotification(notification.id, e)}
+                      className="shrink-0 text-gray-400 hover:text-gray-600 transition cursor-pointer"
                     >
                       <X size={16} />
                     </button>
