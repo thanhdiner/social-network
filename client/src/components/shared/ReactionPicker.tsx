@@ -107,7 +107,7 @@ export const ReactionPicker = ({ onReact, currentReaction }: ReactionPickerProps
 
   return (
     <div 
-      className="relative flex-1"
+      className="relative"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

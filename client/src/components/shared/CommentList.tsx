@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, Trash2, Pencil, X, Check } from 'lucide-react'
+import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { commentService } from '@/services/commentService'
-import type { Comment } from '@/types'
+import type { Comment, ReactionType } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from './Avatar'
+import { ReactionPicker } from './ReactionPicker'
 
 interface CommentListProps {
   postId: string
@@ -25,7 +26,12 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null)
+  const [replyContent, setReplyContent] = useState('')
+  const [commentLikes, setCommentLikes] = useState<Record<string, { liked: boolean; type: ReactionType | null; count: number }>>({})
   const menuRef = useRef<HTMLDivElement>(null)
+  const replyInputRef = useRef<HTMLInputElement>(null)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -44,6 +50,15 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
     }
   }, [menuOpen])
 
+  // Auto focus on reply input when replyingTo changes
+  useEffect(() => {
+    if (replyingTo && replyInputRef.current) {
+      setTimeout(() => {
+        replyInputRef.current?.focus()
+      }, 100)
+    }
+  }, [replyingTo])
+
   const loadComments = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -52,6 +67,27 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
       setTotal(response.total)
       setPage(1)
       setHasMore(response.comments.length < response.total)
+      
+      // Load like information for all comments and replies
+      const allCommentIds = response.comments.flatMap(c => [c.id, ...(c.replies?.map(r => r.id) || [])])
+      const likesData: Record<string, { liked: boolean; type: ReactionType | null; count: number }> = {}
+      
+      await Promise.all(
+        allCommentIds.map(async (commentId) => {
+          try {
+            const likeInfo = await commentService.getCommentLikes(commentId)
+            likesData[commentId] = {
+              liked: !!likeInfo.userLike,
+              type: likeInfo.userLike,
+              count: likeInfo.likes.reduce((sum, l) => sum + l.count, 0)
+            }
+          } catch (error) {
+            console.error(`Failed to load likes for comment ${commentId}:`, error)
+          }
+        })
+      )
+      
+      setCommentLikes(likesData)
     } catch (error) {
       console.error('Failed to load comments:', error)
       setComments([])
@@ -69,6 +105,27 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
       setComments(prev => [...prev, ...response.comments])
       setPage(nextPage)
       setHasMore(comments.length + response.comments.length < response.total)
+      
+      // Load like information for new comments and replies
+      const allCommentIds = response.comments.flatMap(c => [c.id, ...(c.replies?.map(r => r.id) || [])])
+      const likesData = { ...commentLikes }
+      
+      await Promise.all(
+        allCommentIds.map(async (commentId) => {
+          try {
+            const likeInfo = await commentService.getCommentLikes(commentId)
+            likesData[commentId] = {
+              liked: !!likeInfo.userLike,
+              type: likeInfo.userLike,
+              count: likeInfo.likes.reduce((sum, l) => sum + l.count, 0)
+            }
+          } catch (error) {
+            console.error(`Failed to load likes for comment ${commentId}:`, error)
+          }
+        })
+      )
+      
+      setCommentLikes(likesData)
     } catch (error) {
       console.error('Failed to load more comments:', error)
     } finally {
@@ -118,6 +175,55 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
     }
   }
 
+  const handleLikeComment = async (commentId: string, type: ReactionType = 'like') => {
+    try {
+      const result = await commentService.toggleLike(commentId, type)
+      setCommentLikes(prev => ({
+        ...prev,
+        [commentId]: {
+          liked: result.liked,
+          type: result.type,
+          count: result.liked ? (prev[commentId]?.count || 0) + 1 : Math.max(0, (prev[commentId]?.count || 0) - 1)
+        }
+      }))
+    } catch (error) {
+      console.error('Failed to like comment:', error)
+    }
+  }
+
+  const handleReplySubmit = async (parentId: string) => {
+    if (!replyContent.trim()) return
+
+    try {
+      // Nếu reply to reply, thêm @tag vào đầu content
+      const content = replyingToUser 
+        ? `@${replyingToUser.name} ${replyContent.trim()}`
+        : replyContent.trim()
+
+      const newReply = await commentService.createComment(postId, {
+        content,
+        parentId,
+      })
+      
+      // Add reply to parent comment
+      setComments(prev => prev.map(c => {
+        if (c.id === parentId) {
+          return {
+            ...c,
+            replies: [...(c.replies || []), newReply]
+          }
+        }
+        return c
+      }))
+      
+      setReplyingTo(null)
+      setReplyingToUser(null)
+      setReplyContent('')
+    } catch (error) {
+      console.error('Failed to create reply:', error)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -144,7 +250,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
 
   return (
     <div className="space-y-3">
-      <div className="max-h-96 overflow-y-auto space-y-3 pr-2">
+      <div className="max-h-96 overflow-y-auto space-y-3 pr-4 pb-2">
         {comments.map(comment => (
         <div key={comment.id} className="flex gap-2 group">
           <Link to={`/profile/${comment.user?.username}`} className="cursor-pointer">
@@ -196,9 +302,231 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 </>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+            <div className="flex items-center gap-2 mt-1 px-3 text-xs text-gray-500">
               <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
+              
+              {/* Like button with ReactionPicker */}
+              <ReactionPicker
+                onReact={(type) => handleLikeComment(comment.id, type)}
+                currentReaction={commentLikes[comment.id]?.type || null}
+              />
+
+              {/* Reply button */}
+              <button
+                onClick={() => {
+                  if (replyingTo === comment.id) {
+                    setReplyingTo(null);
+                    setReplyingToUser(null);
+                    setReplyContent('');
+                  } else {
+                    setReplyingTo(comment.id);
+                    setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+                  }
+                }}
+                className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
+              >
+                <MessageCircle className="w-3 h-3" />
+                Phản hồi
+              </button>
+
+              {/* Like count */}
+              {commentLikes[comment.id]?.count > 0 && (
+                <span className="text-gray-600">
+                  {commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'lượt thích' : 'lượt thích'}
+                </span>
+              )}
             </div>
+            
+            {/* Reply form */}
+            {replyingTo === comment.id && (
+              <div className="mt-2 ml-3">
+                <div className="flex items-center gap-2 mb-2 px-3">
+                  <span className="text-xs text-gray-500">Đang phản hồi</span>
+                  <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
+                  <button
+                    onClick={() => {
+                      setReplyingTo(null);
+                      setReplyingToUser(null);
+                      setReplyContent('');
+                    }}
+                    className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <Avatar 
+                    src={currentUser?.avatar || undefined}
+                    name={currentUser?.name || 'User'}
+                    size="sm"
+                  />
+                  <div className="flex-1 flex gap-2">
+                    <input
+                      ref={replyingTo === comment.id ? replyInputRef : null}
+                      type="text"
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                      className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && replyContent.trim()) {
+                          handleReplySubmit(comment.id);
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => handleReplySubmit(comment.id)}
+                      disabled={!replyContent.trim()}
+                      className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      Gửi
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Nested replies */}
+            {comment.replies && comment.replies.length > 0 && (
+              <div className="mt-2 ml-8 space-y-2">
+                {comment.replies.map((reply) => (
+                  <div key={reply.id} className="flex gap-2 group">
+                    <Avatar 
+                      src={reply.user?.avatar || undefined}
+                      name={reply.user?.name || 'User'}
+                      size="sm"
+                    />
+                    <div className="flex-1">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block max-w-full">
+                        <Link to={`/profile/${reply.userId}`} className="font-semibold text-sm hover:underline">
+                          {reply.user?.name}
+                        </Link>
+                        <p className="text-sm text-gray-800 wrap-break-word">
+                          {reply.content.startsWith('@') ? (
+                            <>
+                              {/* Hiển thị tag nếu content bắt đầu bằng @ */}
+                              {(() => {
+                                const match = reply.content.match(/^@([^\s]+)\s(.*)$/);
+                                if (match) {
+                                  const [, taggedName, remainingContent] = match;
+                                  // Tìm user được tag trong comment gốc hoặc replies
+                                  const taggedUser = comment.user?.name === taggedName ? comment.user : 
+                                    comment.replies?.find(r => r.user?.name === taggedName)?.user;
+                                  return (
+                                    <>
+                                      {taggedUser && (
+                                        <Link to={`/profile/${taggedUser.id}`} className="font-semibold text-orange-500 hover:underline mr-1">
+                                          @{taggedName}
+                                        </Link>
+                                      )}
+                                      {remainingContent}
+                                    </>
+                                  );
+                                }
+                                return reply.content;
+                              })()}
+                            </>
+                          ) : (
+                            reply.content
+                          )}
+                        </p>
+                        {reply.imageUrl && (
+                          <img
+                            src={reply.imageUrl}
+                            alt="Reply attachment"
+                            className="mt-2 max-w-xs max-h-60 rounded-lg object-cover cursor-pointer"
+                            onClick={() => window.open(reply.imageUrl, '_blank')}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 px-3 text-xs text-gray-500">
+                        <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}</span>
+                        
+                        {/* Like button for reply with ReactionPicker */}
+                        <ReactionPicker
+                          onReact={(type) => handleLikeComment(reply.id, type)}
+                          currentReaction={commentLikes[reply.id]?.type || null}
+                        />
+
+                        {/* Reply button for reply */}
+                        <button
+                          onClick={() => {
+                            if (replyingTo === `reply-${reply.id}`) {
+                              setReplyingTo(null);
+                              setReplyingToUser(null);
+                              setReplyContent('');
+                            } else {
+                              setReplyingTo(`reply-${reply.id}`);
+                              setReplyingToUser({ id: reply.userId, name: reply.user?.name || 'User' });
+                            }
+                          }}
+                          className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          Phản hồi
+                        </button>
+
+                        {/* Like count for reply */}
+                        {commentLikes[reply.id]?.count > 0 && (
+                          <span className="text-gray-600">
+                            {commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'lượt thích' : 'lượt thích'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Reply form for replying to a reply */}
+                {replyingTo?.startsWith('reply-') && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 mb-2 px-3">
+                      <span className="text-xs text-gray-500">Đang phản hồi</span>
+                      <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
+                      <button
+                        onClick={() => {
+                          setReplyingTo(null);
+                          setReplyingToUser(null);
+                          setReplyContent('');
+                        }}
+                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Avatar 
+                        src={currentUser?.avatar || undefined}
+                        name={currentUser?.name || 'User'}
+                        size="sm"
+                      />
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          ref={replyingTo?.startsWith('reply-') ? replyInputRef : null}
+                          type="text"
+                          value={replyContent}
+                          onChange={(e) => setReplyContent(e.target.value)}
+                          placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                          className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && replyContent.trim()) {
+                              handleReplySubmit(comment.id);
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => handleReplySubmit(comment.id)}
+                          disabled={!replyContent.trim()}
+                          className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          Gửi
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {comment.userId === currentUser?.id && editingId !== comment.id && (
             <div className="relative opacity-0 group-hover:opacity-100 transition-opacity" ref={menuOpen === comment.id ? menuRef : null}>

@@ -1,10 +1,11 @@
 import api from './api';
-import type { Comment } from '../types';
+import type { Comment, ReactionType } from '../types';
 
 export interface CreateCommentData {
   content: string;
   imageUrl?: string; // URL của ảnh đính kèm
   imageIndex?: number; // Index của ảnh trong post (optional)
+  parentId?: string; // ID của comment cha (nếu là reply)
 }
 
 export interface CommentResponse {
@@ -51,6 +52,21 @@ export const commentService = {
   // Xóa comment
   async deleteComment(commentId: string): Promise<{ message: string }> {
     const response = await api.delete(`/comments/${commentId}`);
+    return response.data;
+  },
+
+  // Like/Unlike comment hoặc thay đổi reaction
+  async toggleLike(commentId: string, type: ReactionType = 'like'): Promise<{ liked: boolean; type: ReactionType | null }> {
+    const response = await api.post(`/comments/${commentId}/like`, { type });
+    return response.data;
+  },
+
+  // Lấy thông tin likes của comment
+  async getCommentLikes(commentId: string): Promise<{
+    likes: { type: ReactionType; count: number }[];
+    userLike: ReactionType | null;
+  }> {
+    const response = await api.get(`/comments/${commentId}/likes`);
     return response.data;
   },
 };

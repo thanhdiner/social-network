@@ -75,16 +75,33 @@ export interface Comment {
   postId: string;
   userId: string;
   imageIndex?: number; // Index của ảnh trong post (null = comment chung)
+  parentId?: string; // ID của comment cha (null = comment gốc)
   createdAt: string;
   updatedAt: string;
   user?: User;
+  replies?: Comment[]; // Danh sách reply
+  likes?: CommentLike[]; // Danh sách likes
+  _count?: {
+    likes: number;
+    replies: number;
+  };
 }
 
 export interface CreateCommentData {
   content: string;
   imageUrl?: string;
-  postId: string;
+  postId?: string;
   imageIndex?: number;
+  parentId?: string; // ID của comment cha nếu là reply
+}
+
+export interface CommentLike {
+  id: string;
+  commentId: string;
+  userId: string;
+  type: ReactionType;
+  createdAt: string;
+  user?: User;
 }
 
 // Like Types
