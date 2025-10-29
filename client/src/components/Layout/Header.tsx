@@ -50,7 +50,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const displayName = user?.name || 'User'
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b bg-white relative z-1000">
+    <header className="flex items-center justify-between px-6 py-3 border-b bg-white relative z-49">
       {/* Left section */}
       <div className="flex items-center md:gap-20 gap-3">
         <Link to="/" className="flex items-center gap-2 cursor-pointer">
