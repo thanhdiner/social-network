@@ -42,11 +42,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <div className="flex flex-1 overflow-hidden bg-gray-50 relative">
         {/* Left Sidebar - Desktop */}
         <aside 
-          className={`fixed left-0 top-[65px] bottom-0 w-64 border-r bg-white overflow-y-auto transition-transform duration-300 z-30 hidden md:block ${
-            isLeftSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          className={`fixed left-0 top-[65px] bottom-0 border-r bg-white overflow-y-auto transition-all duration-300 z-30 hidden md:block ${
+            isLeftSidebarOpen ? 'w-64' : 'w-20'
           }`}
         >
-          <LeftSidebar />
+          <LeftSidebar isCollapsed={!isLeftSidebarOpen} />
         </aside>
 
         {/* Left Sidebar - Mobile (toggle) */}
@@ -60,7 +60,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             
             {/* Sidebar */}
             <aside className="fixed left-0 top-[65px] bottom-0 w-64 bg-white z-50 overflow-y-auto md:hidden shadow-xl animate-in slide-in-from-left duration-300">
-              <LeftSidebar />
+              <LeftSidebar isCollapsed={false} />
             </aside>
           </>
         )}
@@ -68,7 +68,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         {/* Main content area */}
         <main 
           ref={mainRef} 
-          className="flex-1 overflow-y-auto p-4 md:ml-64"
+          className="flex-1 overflow-y-auto p-4 md:pl-8 md:ml-62"
         >
           {/* Middle content */}
           <div className="max-w-3xl mx-auto space-y-4">{children}</div>
