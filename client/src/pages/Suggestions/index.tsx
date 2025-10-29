@@ -26,7 +26,7 @@ const Suggestions = () => {
     loadSuggestions()
 
     // Listen for real-time follow events
-    socketService.onNewFollower((data) => {
+    socketService.onNewFollower(data => {
       console.log('New follower event received:', data)
       // Update followers map when someone follows me
       if (data.followerId) {
@@ -44,9 +44,9 @@ const Suggestions = () => {
       setLoading(true)
       const data = await userService.getSuggestedUsers()
       setUsers(data)
-      
+
       // Check follow status for each user
-      const followStatusPromises = data.map(async (user) => {
+      const followStatusPromises = data.map(async user => {
         try {
           const status = await userService.checkFollowStatus(user.id)
           return { userId: user.id, ...status }
@@ -55,13 +55,13 @@ const Suggestions = () => {
           return { userId: user.id, isFollowing: false, followsMe: false }
         }
       })
-      
+
       const statuses = await Promise.all(followStatusPromises)
-      
+
       // Update following users
       const following = new Set<string>()
       const followers = new Map<string, boolean>()
-      
+
       statuses.forEach(status => {
         if (status.isFollowing) {
           following.add(status.userId)
@@ -70,7 +70,7 @@ const Suggestions = () => {
           followers.set(status.userId, true)
         }
       })
-      
+
       setFollowingUsers(following)
       setFollowersMap(followers)
     } catch (error) {
@@ -82,9 +82,9 @@ const Suggestions = () => {
 
   const handleFollow = async (userId: string, e: React.MouseEvent) => {
     e.stopPropagation() // Prevent card click event
-    
+
     const isCurrentlyFollowing = followingUsers.has(userId)
-    
+
     try {
       if (isCurrentlyFollowing) {
         // Unfollow
@@ -134,7 +134,7 @@ const Suggestions = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {users.map((user) => {
+          {users.map(user => {
             const isFollowing = followingUsers.has(user.id)
             return (
               <div
@@ -145,31 +145,16 @@ const Suggestions = () => {
                 <div className="flex flex-col items-center text-center">
                   <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-orange-200">
                     {user.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-orange-100 flex items-center justify-center">
-                        <span className="text-2xl font-semibold text-orange-600">
-                          {user.name.charAt(0).toUpperCase()}
-                        </span>
+                        <span className="text-2xl font-semibold text-orange-600">{user.name.charAt(0).toUpperCase()}</span>
                       </div>
                     )}
                   </div>
 
-                  <h3 className="font-semibold text-gray-800 text-lg mb-1">
-                    {user.name}
-                  </h3>
+                  <h3 className="font-semibold text-gray-800 text-lg mb-1">{user.name}</h3>
                   <p className="text-gray-500 text-sm mb-2">@{user.username}</p>
-
-                  {user.bio && (
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                      {user.bio}
-                    </p>
-                  )}
-
                   {user.mutualFriends !== undefined && user.mutualFriends > 0 && (
                     <p className="text-xs text-gray-500 mb-3">
                       {user.mutualFriends} mutual friend{user.mutualFriends > 1 ? 's' : ''}
@@ -177,7 +162,7 @@ const Suggestions = () => {
                   )}
 
                   <button
-                    onClick={(e) => handleFollow(user.id, e)}
+                    onClick={e => handleFollow(user.id, e)}
                     className={`w-full py-2 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center cursor-pointer gap-2 ${
                       isFollowing
                         ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
@@ -185,12 +170,7 @@ const Suggestions = () => {
                     }`}
                   >
                     <UserPlus size={16} />
-                    {isFollowing 
-                      ? 'Following' 
-                      : followersMap.get(user.id) 
-                        ? 'Follow Back' 
-                        : 'Follow'
-                    }
+                    {isFollowing ? 'Following' : followersMap.get(user.id) ? 'Follow Back' : 'Follow'}
                   </button>
                 </div>
               </div>

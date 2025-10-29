@@ -1,14 +1,4 @@
-import {
-  Mail,
-  TextAlignJustify,
-  Users,
-  Search,
-  LogOut,
-  User,
-  UserCog,
-  Settings,
-  Shield,
-} from 'lucide-react'
+import { Mail, TextAlignJustify, Users, Search, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
@@ -79,9 +69,6 @@ export const Header = () => {
       <div className="flex items-center gap-2 relative" ref={dropdownRef}>
         {/* Icons */}
         <span className="flex items-center mr-2">
-          <Link to="/friends" className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition">
-            <Users className="text-orange-400" />
-          </Link>
           <NotificationsDropdown />
           <Link to="/chat" className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition">
             <Mail className="text-orange-400" />
@@ -106,7 +93,7 @@ export const Header = () => {
         {open && (
           <div className="absolute top-14 right-0 w-72 bg-white rounded-2xl shadow-lg border z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
             {/* Header card */}
-            <div className="bg-gradient-to-r from-orange-400 to-orange-500 px-5 py-4 text-white">
+            <div className="bg-linear-to-r from-orange-400 to-orange-500 px-5 py-4 text-white">
               <div className="flex items-center gap-3">
                 <img
                   src={avatarUrl || 'https://i.pravatar.cc/100'}
