@@ -2,10 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class PostsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private chatGateway: ChatGateway,
+  ) {}
 
   async create(userId: string, createPostDto: CreatePostDto) {
     return this.prisma.post.create({
@@ -225,6 +231,43 @@ export class PostsService {
           type,
         },
       });
+
+      // Lấy thông tin post và user để tạo notification
+      const post = await this.prisma.post.findUnique({
+        where: { id: postId },
+        include: {
+          user: {
+            select: {
+              id: true,
+            },
+          },
+        },
+      });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          name: true,
+          avatar: true,
+        },
+      });
+
+      // Tạo thông báo cho chủ post (nếu không phải chính mình like)
+      if (post && post.user.id !== userId && user) {
+        const notification = await this.notificationsService.create({
+          type: 'like',
+          content: `reacted to your post`,
+          userId: post.user.id,
+          actorId: userId,
+          actorName: user.name,
+          actorAvatar: user.avatar || undefined,
+          relatedId: postId,
+        });
+
+        // Emit realtime notification
+        this.chatGateway.notifyUser(post.user.id, notification);
+      }
+
       return { liked: true, type: created.type as string, message: 'Post liked' };
     }
   }

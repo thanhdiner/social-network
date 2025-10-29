@@ -8,6 +8,8 @@ import { EditPostModal } from '@/components/shared/EditPostModal'
 import { ImageViewer } from '@/components/shared/ImageViewer'
 import { useTitle } from '@/hooks/useTitle'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
+import { CommentList } from '@/components/shared/CommentList'
+import { CommentForm } from '@/components/shared/CommentForm'
 
 export const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>()
@@ -20,6 +22,7 @@ export const PostDetail = () => {
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [viewerOpen, setViewerOpen] = useState(false)
+  const [commentRefresh, setCommentRefresh] = useState(0)
 
   useTitle(post ? `${post.user.name}'s Post` : 'Post')
 
@@ -317,7 +320,7 @@ export const PostDetail = () => {
         </div>
 
         {/* Post Actions */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 mb-4 pb-4 border-b">
           <ReactionPicker 
             onReact={handleToggleLike}
             currentReaction={post.reactionType}
@@ -333,6 +336,29 @@ export const PostDetail = () => {
           <button className="cursor-pointer p-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
             <Bookmark className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Comments Section */}
+        <div className="space-y-4">
+          <h3 className="font-semibold text-gray-800">Comments</h3>
+          <CommentForm 
+            postId={post.id}
+            onCommentAdded={() => {
+              setCommentRefresh(Date.now())
+              // Update comment count
+              setPost(prev => {
+                if (!prev) return prev
+                return {
+                  ...prev,
+                  _count: { ...prev._count, comments: prev._count.comments + 1 }
+                }
+              })
+            }}
+          />
+          <CommentList 
+            postId={post.id}
+            refresh={commentRefresh}
+          />
         </div>
       </article>
 

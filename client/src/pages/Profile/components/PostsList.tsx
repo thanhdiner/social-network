@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from '@/components/shared/EditPostModal'
 import { ImageViewer } from '@/components/shared/ImageViewer'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
+import { CommentList } from '@/components/shared/CommentList'
+import { CommentForm } from '@/components/shared/CommentForm'
 
 interface PostsListProps {
   userId?: string
@@ -23,6 +25,8 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
   const [viewerIndex, setViewerIndex] = useState(0)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerPostId, setViewerPostId] = useState<string | undefined>(undefined)
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
+  const [commentRefresh, setCommentRefresh] = useState<Record<string, number>>({})
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close menu when clicking outside
@@ -326,7 +330,20 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
             <button className="hover:underline cursor-pointer">
               {post._count.likes} {post._count.likes === 1 ? 'Like' : 'Likes'}
             </button>
-            <button className="hover:underline cursor-pointer">
+            <button 
+              onClick={() => {
+                setExpandedComments(prev => {
+                  const newSet = new Set(prev)
+                  if (newSet.has(post.id)) {
+                    newSet.delete(post.id)
+                  } else {
+                    newSet.add(post.id)
+                  }
+                  return newSet
+                })
+              }}
+              className="hover:underline cursor-pointer"
+            >
               {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
             </button>
           </div>
@@ -337,7 +354,20 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
               onReact={(type) => handleLike(post.id, type)}
               currentReaction={post.reactionType}
             />
-            <button className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+            <button 
+              onClick={() => {
+                setExpandedComments(prev => {
+                  const newSet = new Set(prev)
+                  if (newSet.has(post.id)) {
+                    newSet.delete(post.id)
+                  } else {
+                    newSet.add(post.id)
+                  }
+                  return newSet
+                })
+              }}
+              className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+            >
               <MessageCircle className="w-5 h-5" />
               <span className="font-medium">Comment</span>
             </button>
@@ -349,6 +379,28 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
               <Bookmark className="w-5 h-5" />
             </button>
           </div>
+
+          {/* Comments Section */}
+          {expandedComments.has(post.id) && (
+            <div className="mt-4 pt-4 border-t space-y-3">
+              <CommentList 
+                postId={post.id} 
+                refresh={commentRefresh[post.id]}
+              />
+              <CommentForm 
+                postId={post.id}
+                onCommentAdded={() => {
+                  setCommentRefresh(prev => ({ ...prev, [post.id]: Date.now() }))
+                  // Update comment count
+                  setPosts(prevPosts => prevPosts.map(p => 
+                    p.id === post.id 
+                      ? { ...p, _count: { ...p._count, comments: p._count.comments + 1 } }
+                      : p
+                  ))
+                }}
+              />
+            </div>
+          )}
         </article>
       ))}
 

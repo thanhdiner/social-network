@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Bell, X, UserPlus, Heart, MessageCircle, UserMinus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import socketService from '@/services/socketService'
 import notificationService from '@/services/notificationService'
 import type { Notification } from '@/services/notificationService'
 import { formatDistanceToNow } from 'date-fns'
 
 export const NotificationsDropdown = () => {
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -64,9 +66,16 @@ export const NotificationsDropdown = () => {
       loadNotifications()
     })
 
+    // Listen for new notifications (like, comment)
+    socketService.onNewNotification((notification) => {
+      setNotifications(prev => [notification, ...prev])
+      setUnreadCount(prev => prev + 1)
+    })
+
     return () => {
       socketService.offNewFollower()
       socketService.offUnfollowed()
+      socketService.offNewNotification()
     }
   }, [])
 
@@ -149,8 +158,28 @@ export const NotificationsDropdown = () => {
             <span className="font-semibold">{notification.actorName}</span> unfollowed you
           </>
         )
+      case 'like':
+        return (
+          <>
+            <span className="font-semibold">{notification.actorName}</span> {notification.content}
+          </>
+        )
+      case 'comment':
+        return (
+          <>
+            <span className="font-semibold">{notification.actorName}</span> {notification.content}
+          </>
+        )
       default:
         return notification.content
+    }
+  }
+
+  const handleNotificationClick = (notification: Notification) => {
+    // Navigate to related post if it's a like or comment notification
+    if ((notification.type === 'like' || notification.type === 'comment') && notification.relatedId) {
+      setIsOpen(false)
+      navigate(`/post/${notification.relatedId}`)
     }
   }
 
@@ -198,9 +227,10 @@ export const NotificationsDropdown = () => {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                     !notification.read ? 'bg-orange-50' : ''
-                  }`}
+                  } ${notification.type === 'like' || notification.type === 'comment' ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="shrink-0">{getIcon(notification.type)}</div>

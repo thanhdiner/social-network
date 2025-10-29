@@ -10,6 +10,7 @@ import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadModule } from './upload/upload.module';
 import { LifeEventsModule } from './life-events/life-events.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { LifeEventsModule } from './life-events/life-events.module';
     NotificationsModule,
     UploadModule,
     LifeEventsModule,
+    CommentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -74,6 +74,15 @@ class SocketService {
     this.socket?.off('online_users_updated')
   }
 
+  // Notification events
+  onNewNotification(callback: (notification: any) => void) {
+    this.socket?.on('new_notification', callback)
+  }
+
+  offNewNotification() {
+    this.socket?.off('new_notification')
+  }
+
   getSocket() {
     return this.socket
   }
