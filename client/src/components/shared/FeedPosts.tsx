@@ -473,10 +473,12 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
 
           {/* Post Actions */}
           <div className="flex items-center gap-2">
-            <ReactionPicker 
-              onReact={(type) => handleLike(post.id, type)}
-              currentReaction={post.reactionType}
-            />
+            <div className="flex-1 flex justify-center">
+              <ReactionPicker 
+                onReact={(type) => handleLike(post.id, type)}
+                currentReaction={post.reactionType}
+              />
+            </div>
             <button 
               onClick={() => {
                 setExpandedComments(prev => {

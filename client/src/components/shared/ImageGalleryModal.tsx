@@ -525,9 +525,11 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
 
           {/* Action Buttons - React, Comment, Share */}
           <div className="px-2 md:px-4 py-2 border-b">
-            <div className="flex items-center justify-around">
+            <div className="flex items-center justify-around gap-2">
               {/* React Button */}
-              <ReactionPicker onReact={handleLikeClick} currentReaction={currentImageLike.reactionType} />
+              <div className="flex-1 flex justify-center">
+                <ReactionPicker onReact={handleLikeClick} currentReaction={currentImageLike.reactionType} />
+              </div>
 
               {/* Comment Button - Focus on input when clicked */}
               <button

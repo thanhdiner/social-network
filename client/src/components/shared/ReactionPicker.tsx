@@ -143,7 +143,7 @@ export const ReactionPicker = ({ onReact, currentReaction }: ReactionPickerProps
       {/* Main Button */}
       <button
         onClick={handleQuickLike}
-        className={`cursor-pointer w-full flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 transition ${
+        className={`cursor-pointer w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg hover:bg-gray-50 transition ${
           currentReaction ? '' : 'text-gray-600'
         }`}
         style={currentReaction ? { color: currentReactionData?.color } : {}}

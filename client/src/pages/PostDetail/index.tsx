@@ -425,11 +425,13 @@ export const PostDetail = () => {
         </div>
 
         {/* Post Actions */}
-        <div className="flex items-center gap-1 mb-4 pb-4 border-b">
-          <ReactionPicker 
-            onReact={handleToggleLike}
-            currentReaction={post.reactionType}
-          />
+        <div className="flex items-center gap-2 mb-4 pb-4 border-b">
+          <div className="flex-1 flex justify-center">
+            <ReactionPicker 
+              onReact={handleToggleLike}
+              currentReaction={post.reactionType}
+            />
+          </div>
           <button className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Comment</span>
