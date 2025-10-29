@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pencil, Camera, X } from 'lucide-react'
+import { Avatar } from '@/components/shared/Avatar'
 
 export default function EditProfile() {
   const { user, refreshUser } = useAuth()
@@ -372,11 +373,21 @@ export default function EditProfile() {
         <div className="flex items-center gap-6 mb-10 -mt-20">
           <div className="relative">
             <div className="w-32 h-32 rounded-full border-4 border-white bg-white overflow-hidden">
-              <img 
-                src={avatarPreview || 'https://i.pravatar.cc/150'} 
-                alt="avatar" 
-                className="w-full h-full object-cover" 
-              />
+              {avatarPreview ? (
+                <img 
+                  src={avatarPreview} 
+                  alt="avatar" 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <div className="w-full h-full">
+                  <Avatar
+                    src={user?.avatar || undefined}
+                    name={user?.name || 'User'}
+                    size="xl"
+                  />
+                </div>
+              )}
             </div>
             {uploadingAvatar && (
               <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">

@@ -7,6 +7,7 @@ import { ReactionPicker, type ReactionType } from './ReactionPicker'
 import { SharePostModal } from './SharePostModal'
 import { LikeListModal } from './LikeListModal'
 import uploadService from '@/services/uploadService'
+import { Avatar } from './Avatar'
 
 // Like state for each image
 interface ImageLikeState {
@@ -24,14 +25,7 @@ interface ImageGalleryModalProps {
   onShare?: (post: Post) => void
 }
 
-export const ImageGalleryModal = ({
-  images,
-  initialIndex = 0,
-  postId,
-  post,
-  onClose,
-  onShare,
-}: ImageGalleryModalProps) => {
+export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onClose, onShare }: ImageGalleryModalProps) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -43,26 +37,26 @@ export const ImageGalleryModal = ({
   const [sharingPost, setSharingPost] = useState(false)
   const [showLikeList, setShowLikeList] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   // Track like state for each image separately
   const [imageLikes, setImageLikes] = useState<Record<number, ImageLikeState>>({})
 
   const currentImageUrl = images[currentIndex]
   const photoUrl = `${window.location.origin}/post/${postId}/photo/${currentIndex + 1}`
-  
+
   // Get current image like state
   const currentImageLike = imageLikes[currentIndex] || {
     isLiked: false,
     reactionType: null,
-    count: 0,
+    count: 0
   }
 
   const handlePrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1))
+    setCurrentIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))
   }, [images.length])
 
   const handleNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0))
+    setCurrentIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))
   }, [images.length])
 
   // Update URL when image changes - always update to show shareable link
@@ -98,7 +92,7 @@ export const ImageGalleryModal = ({
         setLoading(false)
       }
     }
-    
+
     loadComments()
   }, [currentIndex, postId])
 
@@ -140,10 +134,10 @@ export const ImageGalleryModal = ({
       const data: CreateCommentData = {
         content: commentText.trim(),
         imageIndex: currentIndex,
-        imageUrl: commentImageUrl || undefined,
+        imageUrl: commentImageUrl || undefined
       }
       const newComment = await commentService.createComment(postId, data)
-      setComments((prev) => [newComment, ...prev])
+      setComments(prev => [newComment, ...prev])
       setCommentText('')
       setCommentImageUrl(null)
     } catch (error) {
@@ -191,7 +185,7 @@ export const ImageGalleryModal = ({
   const handleDeleteComment = async (commentId: string) => {
     try {
       await commentService.deleteComment(commentId)
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      setComments(prev => prev.filter(c => c.id !== commentId))
     } catch (error) {
       console.error('Error deleting comment:', error)
     }
@@ -225,20 +219,20 @@ export const ImageGalleryModal = ({
   const handleLikeClick = async (type: ReactionType = 'like') => {
     try {
       // Optimistic update
-      setImageLikes((prev) => {
+      setImageLikes(prev => {
         const current = prev[currentIndex] || { isLiked: false, reactionType: null, count: 0 }
         const isSameReaction = current.reactionType === type
-        
+
         return {
           ...prev,
           [currentIndex]: {
             isLiked: !isSameReaction,
             reactionType: isSameReaction ? null : type,
-            count: isSameReaction ? current.count - 1 : (current.isLiked ? current.count : current.count + 1),
-          },
+            count: isSameReaction ? current.count - 1 : current.isLiked ? current.count : current.count + 1
+          }
         }
       })
-      
+
       // Call API with imageIndex
       await postService.toggleLike(postId, type, currentIndex)
     } catch (error) {
@@ -328,15 +322,9 @@ export const ImageGalleryModal = ({
         <div className="w-full md:w-[450px] bg-white flex flex-col max-h-[50vh] md:max-h-full">
           {/* Header - Post author info */}
           <div className="px-4 py-3 border-b flex items-center gap-3">
-            <img
-              src={post.user?.avatar || 'https://i.pravatar.cc/100'}
-              alt={post.user?.name || 'User'}
-              className="w-10 h-10 rounded-full object-cover"
-            />
+            <Avatar src={post.user?.avatar} name={post.user?.name || 'User'} size="md" />
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-800">
-                {post.user?.name || 'Unknown User'}
-              </h3>
+              <h3 className="font-semibold text-gray-800">{post.user?.name || 'Unknown User'}</h3>
               <p className="text-xs text-gray-500">
                 {new Date(post.createdAt).toLocaleDateString()} • Image {currentIndex + 1} of {images.length}
               </p>
@@ -350,22 +338,27 @@ export const ImageGalleryModal = ({
                 <div className="flex -space-x-1">
                   {currentImageLike.reactionType && (
                     <span className="text-lg">
-                      {currentImageLike.reactionType === 'like' ? '👍' :
-                       currentImageLike.reactionType === 'love' ? '❤️' :
-                       currentImageLike.reactionType === 'haha' ? '😂' :
-                       currentImageLike.reactionType === 'wow' ? '😮' :
-                       currentImageLike.reactionType === 'sad' ? '😢' : '😠'}
+                      {currentImageLike.reactionType === 'like'
+                        ? '👍'
+                        : currentImageLike.reactionType === 'love'
+                        ? '❤️'
+                        : currentImageLike.reactionType === 'haha'
+                        ? '😂'
+                        : currentImageLike.reactionType === 'wow'
+                        ? '😮'
+                        : currentImageLike.reactionType === 'sad'
+                        ? '😢'
+                        : '😠'}
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => setShowLikeList(true)}
-                  className="hover:underline cursor-pointer"
-                >
+                <button onClick={() => setShowLikeList(true)} className="hover:underline cursor-pointer">
                   {currentImageLike.count} {currentImageLike.count === 1 ? 'người' : 'người'}
                 </button>
                 {comments.length > 0 && (
-                  <span className="ml-auto">{comments.length} {comments.length === 1 ? 'bình luận' : 'bình luận'}</span>
+                  <span className="ml-auto">
+                    {comments.length} {comments.length === 1 ? 'bình luận' : 'bình luận'}
+                  </span>
                 )}
               </div>
             </div>
@@ -375,10 +368,7 @@ export const ImageGalleryModal = ({
           <div className="px-2 md:px-4 py-2 border-b">
             <div className="flex items-center justify-around">
               {/* React Button */}
-              <ReactionPicker
-                onReact={handleLikeClick}
-                currentReaction={currentImageLike.reactionType}
-              />
+              <ReactionPicker onReact={handleLikeClick} currentReaction={currentImageLike.reactionType} />
 
               {/* Comment Button - Focus on input when clicked */}
               <button
@@ -413,20 +403,14 @@ export const ImageGalleryModal = ({
                 <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
               </div>
             ) : comments.length > 0 ? (
-              comments.map((comment) => (
+              comments.map(comment => (
                 <div key={comment.id} className="flex gap-2 md:gap-3">
-                  <img
-                    src={comment.user?.avatar || 'https://i.pravatar.cc/100'}
-                    alt={comment.user?.name || 'User'}
-                    className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover shrink-0"
-                  />
+                  <Avatar src={comment.user?.avatar} name={comment.user?.name || 'User'} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="bg-gray-100 rounded-2xl px-3 md:px-4 py-2">
-                      <p className="font-semibold text-xs md:text-sm text-gray-800">
-                        {comment.user?.name || 'Unknown User'}
-                      </p>
+                      <p className="font-semibold text-xs md:text-sm text-gray-800">{comment.user?.name || 'Unknown User'}</p>
                       <p className="text-sm md:text-base text-gray-700 wrap-break-word">{comment.content}</p>
-                      
+
                       {/* Display comment image if exists */}
                       {comment.imageUrl && (
                         <img
@@ -438,9 +422,7 @@ export const ImageGalleryModal = ({
                       )}
                     </div>
                     <div className="flex items-center gap-2 md:gap-3 mt-1 px-3 md:px-4">
-                      <span className="text-xs text-gray-500">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </span>
+                      <span className="text-xs text-gray-500">{new Date(comment.createdAt).toLocaleString()}</span>
                       {/* Add delete button if it's user's comment */}
                       <button
                         onClick={() => handleDeleteComment(comment.id)}
@@ -481,49 +463,35 @@ export const ImageGalleryModal = ({
                 </button>
               </div>
             )}
-            
+
             <div className="flex gap-2">
               <input
                 id="comment-input"
                 type="text"
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                onChange={e => setCommentText(e.target.value)}
                 placeholder="Write a comment..."
                 className="flex-1 rounded-full border px-3 md:px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 disabled={submitting}
               />
-              
+
               {/* Image Upload Button */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingImage || submitting}
                 className="p-2 text-gray-600 hover:text-orange-500 hover:bg-orange-50 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {uploadingImage ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Image className="w-5 h-5" />
-                )}
+                {uploadingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Image className="w-5 h-5" />}
               </button>
-              
+
               <button
                 type="submit"
                 disabled={(!commentText.trim() && !commentImageUrl) || submitting}
                 className="p-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                {submitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
               </button>
             </div>
           </form>

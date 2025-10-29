@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchService, type SearchResults } from '@/services/searchService'
 import { useDebounce } from '@/hooks/useDebounce'
+import { Avatar } from './Avatar'
 
 interface PopularSearch {
   type: 'user'
@@ -158,10 +159,10 @@ export const SearchDropdown = () => {
                       onClick={() => handleUserClick(item.data.username)}
                       className="flex items-center gap-3 px-3 py-2 hover:bg-orange-50 rounded-lg transition cursor-pointer"
                     >
-                      <img
-                        src={item.data.avatar || 'https://i.pravatar.cc/100'}
-                        alt={item.data.name}
-                        className="w-10 h-10 rounded-full object-cover"
+                      <Avatar
+                        src={item.data.avatar}
+                        name={item.data.name}
+                        size="md"
                       />
                       <div>
                         <p className="font-medium text-gray-800">{item.data.name}</p>
@@ -191,10 +192,10 @@ export const SearchDropdown = () => {
                         className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-orange-50 rounded-lg transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
-                          <img
-                            src={user.avatar || 'https://i.pravatar.cc/100'}
-                            alt={user.name}
-                            className="w-10 h-10 rounded-full object-cover"
+                          <Avatar
+                            src={user.avatar}
+                            name={user.name}
+                            size="md"
                           />
                           <div>
                             <p className="font-medium text-gray-800">{user.name}</p>
@@ -224,10 +225,10 @@ export const SearchDropdown = () => {
                         onClick={() => handlePostClick(post.id)}
                         className="flex items-start gap-3 px-3 py-2 hover:bg-orange-50 rounded-lg transition cursor-pointer"
                       >
-                        <img
-                          src={post.user.avatar || 'https://i.pravatar.cc/100'}
-                          alt={post.user.name}
-                          className="w-10 h-10 rounded-full object-cover"
+                        <Avatar
+                          src={post.user.avatar}
+                          name={post.user.name}
+                          size="md"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-800 text-sm">{post.user.name}</p>

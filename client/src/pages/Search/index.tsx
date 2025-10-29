@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Search, User, FileText, Loader2 } from 'lucide-react'
 import { searchService, type SearchUser, type SearchPost } from '@/services/searchService'
 import { useTitle } from '@/hooks/useTitle'
+import { Avatar } from '@/components/shared/Avatar'
 
 export const SearchResults = () => {
   const [searchParams] = useSearchParams()
@@ -121,10 +122,10 @@ export const SearchResults = () => {
                     onClick={() => handleUserClick(user.username)}
                     className="flex items-center gap-3 p-3 hover:bg-orange-50 rounded-xl transition cursor-pointer"
                   >
-                    <img
-                      src={user.avatar || 'https://i.pravatar.cc/100'}
-                      alt={user.name}
-                      className="w-14 h-14 rounded-full object-cover"
+                    <Avatar
+                      src={user.avatar}
+                      name={user.name}
+                      size="xl"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800">{user.name}</p>
@@ -159,10 +160,10 @@ export const SearchResults = () => {
                     className="border rounded-xl p-4 hover:bg-orange-50 transition cursor-pointer"
                   >
                     <div className="flex items-start gap-3">
-                      <img
-                        src={post.user.avatar || 'https://i.pravatar.cc/100'}
-                        alt={post.user.name}
-                        className="w-12 h-12 rounded-full object-cover"
+                      <Avatar
+                        src={post.user.avatar}
+                        name={post.user.name}
+                        size="lg"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">

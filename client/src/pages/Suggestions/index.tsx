@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import userService from '@/services/userService'
 import socketService from '@/services/socketService'
 import { useTitle } from '@/hooks/useTitle'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface SuggestedUser {
   id: string
@@ -143,14 +144,13 @@ const Suggestions = () => {
                 className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-5 border border-gray-100 cursor-pointer"
               >
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-orange-200">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-orange-100 flex items-center justify-center">
-                        <span className="text-2xl font-semibold text-orange-600">{user.name.charAt(0).toUpperCase()}</span>
-                      </div>
-                    )}
+                  <div className="mb-3">
+                    <Avatar
+                      src={user.avatar}
+                      name={user.name}
+                      size="xl"
+                      className="border-2 border-orange-200"
+                    />
                   </div>
 
                   <h3 className="font-semibold text-gray-800 text-lg mb-1">{user.name}</h3>

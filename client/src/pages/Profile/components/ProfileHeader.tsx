@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import uploadService from '@/services/uploadService'
 import userService from '@/services/userService'
 import socketService from '@/services/socketService'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface ProfileHeaderProps {
   username?: string
@@ -393,10 +394,11 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
                 <div className="text-white text-xs">Uploading...</div>
               </div>
             )}
-            <img
-              src={profileUser?.avatar || 'https://i.pravatar.cc/150'}
-              alt="avatar"
-              className="w-24 h-24 rounded-full object-cover border-2 border-white"
+            <Avatar
+              src={profileUser?.avatar}
+              name={profileUser?.name || 'User'}
+              size="xl"
+              className="border-2 border-white"
             />
             {/* ✏️ Edit Avatar - Chỉ hiện cho profile của mình */}
             {isOwnProfile && (
@@ -411,7 +413,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
                 <button
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute bottom-0 right-0 p-2 bg-orange-500 text-white rounded-full shadow-md hover:bg-orange-600 transition"
+                  className="absolute bottom-0 right-0 p-2 bg-orange-500 text-white rounded-full shadow-md hover:bg-orange-600 transition cursor-pointer"
                   title="Thay đổi avatar"
                 >
                   <Pencil size={14} />

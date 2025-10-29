@@ -3,6 +3,7 @@ import { Image as ImageIcon, X, Video } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import postService from '@/services/postService'
 import uploadService from '@/services/uploadService'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface CreatePostProps {
   onPostCreated?: () => void
@@ -129,10 +130,10 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
     <>
       <div className="bg-white rounded-2xl p-5 shadow">
         <div className="flex items-start gap-3">
-          <img
-            src={user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`}
-            alt="avatar"
-            className="w-10 h-10 rounded-full object-cover"
+          <Avatar
+            src={user?.avatar}
+            name={user?.name || 'User'}
+            size="md"
           />
           <button
             onClick={() => setOpen(true)}
@@ -162,13 +163,10 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
 
             <div className="p-4 space-y-4 overflow-y-auto flex-1">
               <div className="flex items-center gap-3">
-                <img
-                  src={
-                    user?.avatar ||
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=fb923c&color=fff`
-                  }
-                  alt="avatar"
-                  className="w-10 h-10 rounded-full object-cover"
+                <Avatar
+                  src={user?.avatar}
+                  name={user?.name || 'User'}
+                  size="md"
                 />
                 <p className="font-semibold text-gray-800">{user?.name}</p>
               </div>

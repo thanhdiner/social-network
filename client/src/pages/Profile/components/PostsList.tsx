@@ -10,6 +10,7 @@ import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionP
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
 import { SharePostModal } from '@/components/shared/SharePostModal'
+import { Avatar } from '@/components/shared/Avatar'
 
 interface PostsListProps {
   userId?: string
@@ -261,10 +262,10 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
           <div className="flex items-start justify-between mb-4">
             <div className="flex gap-3">
               <Link to={`/profile/${post.user.username}`} className="cursor-pointer">
-                <img
-                  src={post.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.user.name)}&background=fb923c&color=fff`}
-                  alt={post.user.name}
-                  className="w-12 h-12 rounded-full object-cover"
+                <Avatar
+                  src={post.user.avatar}
+                  name={post.user.name}
+                  size="lg"
                 />
               </Link>
               <div>
@@ -323,10 +324,10 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
             <div className="border border-gray-200 rounded-xl p-4 mb-4">
               <div className="flex gap-3 mb-3">
                 <Link to={`/profile/${post.sharedPost.user.username}`} className="cursor-pointer">
-                  <img
-                    src={post.sharedPost.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.sharedPost.user.name)}&background=fb923c&color=fff`}
-                    alt={post.sharedPost.user.name}
-                    className="w-10 h-10 rounded-full object-cover"
+                  <Avatar
+                    src={post.sharedPost.user.avatar}
+                    name={post.sharedPost.user.name}
+                    size="md"
                   />
                 </Link>
                 <div>

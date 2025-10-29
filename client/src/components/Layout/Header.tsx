@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { NotificationsDropdown } from '../shared/NotificationsDropdown'
 import { SearchDropdown } from '../shared/SearchDropdown'
+import { Avatar } from '../shared/Avatar'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
@@ -82,15 +83,14 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         {/* Avatar */}
         <div
           onClick={() => setOpen(!open)}
-          className="w-11 h-11 rounded-full overflow-hidden border-2 border-orange-200 cursor-pointer hover:ring-2 hover:ring-orange-300 transition"
+          className="cursor-pointer hover:ring-2 hover:ring-orange-300 transition rounded-full"
         >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-orange-500 flex items-center justify-center text-white font-bold">
-              {displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <Avatar
+            src={avatarUrl}
+            name={displayName}
+            size="lg"
+            className="border-2 border-orange-200"
+          />
         </div>
 
         {/* Dropdown menu */}
@@ -99,10 +99,11 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
             {/* Header card */}
             <div className="bg-linear-to-r from-orange-400 to-orange-500 px-5 py-4 text-white">
               <div className="flex items-center gap-3">
-                <img
-                  src={avatarUrl || 'https://i.pravatar.cc/100'}
-                  alt={displayName}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                <Avatar
+                  src={avatarUrl}
+                  name={displayName}
+                  size="lg"
+                  className="border-2 border-white"
                 />
                 <div>
                   <p className="font-semibold text-base">{displayName}</p>
