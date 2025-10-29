@@ -1,11 +1,15 @@
-import { Mail, TextAlignJustify, Users, Search, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
+import { Mail, TextAlignJustify, Search, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { NotificationsDropdown } from '../shared/NotificationsDropdown'
 
-export const Header = () => {
+interface HeaderProps {
+  onToggleSidebar?: () => void
+}
+
+export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user, logout } = useAuth()
   const { user: currentUser } = useCurrentUser()
   const navigate = useNavigate()
@@ -45,14 +49,18 @@ export const Header = () => {
   const displayName = user?.name || 'User'
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 border-b bg-white relative">
+    <header className="flex items-center justify-between px-6 py-3 border-b bg-white relative z-1000">
       {/* Left section */}
-      <div className="flex items-center gap-20">
+      <div className="flex items-center md:gap-20 gap-3">
         <Link to="/" className="flex items-center gap-2 cursor-pointer">
           <img className="w-11 h-11 rounded-md object-cover" src="/logo.jpg" alt="Logo" />
           <h1 className="text-2xl font-semibold leading-none">Diner</h1>
         </Link>
-        <TextAlignJustify size={22} className="text-gray-600 mt-0.5 cursor-pointer" />
+        <TextAlignJustify
+          size={22}
+          className="text-gray-600 mt-0.5 cursor-pointer hover:text-orange-500 transition"
+          onClick={onToggleSidebar}
+        />
       </div>
 
       {/* Middle search */}
