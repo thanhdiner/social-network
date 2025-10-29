@@ -138,7 +138,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
             onClick={() => setOpen(true)}
             className="flex-1 text-left text-gray-500 bg-gray-50 hover:bg-gray-100 rounded-full px-4 py-3 transition cursor-pointer"
           >
-            What's on your mind, {user?.name?.split(' ')[0]}?
+            What's on your mind, {user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?
           </button>
         </div>
       </div>
@@ -174,7 +174,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder={`What's on your mind, ${user?.name?.split(' ')[0]}?`}
+                placeholder={`What's on your mind, ${user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?`}
                 className="w-full min-h-[150px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none text-lg"
               />
 

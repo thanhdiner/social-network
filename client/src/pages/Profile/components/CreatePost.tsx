@@ -138,7 +138,7 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
             onClick={() => setOpen(true)}
             className="flex-1 text-left text-gray-500 bg-gray-50 hover:bg-gray-100 border rounded-full px-4 py-2.5 transition cursor-pointer"
           >
-            What's on your mind, {user?.name?.split(' ')[0]}?
+            What's on your mind, {user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?
           </button>
         </div>
       </div>
@@ -176,7 +176,7 @@ export const CreatePost = ({ onPostCreated }: CreatePostProps) => {
               <textarea
                 value={content}
                 onChange={e => setContent(e.target.value)}
-                placeholder={`What's on your mind, ${user?.name?.split(' ')[0]}?`}
+                placeholder={`What's on your mind, ${user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?`}
                 className="w-full h-32 resize-none border-0 focus:ring-0 outline-none text-gray-800 placeholder-gray-400 text-lg"
               />
 
