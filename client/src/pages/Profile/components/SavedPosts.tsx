@@ -59,24 +59,43 @@ export const SavedPosts = () => {
 
   const handleLike = async (postId: string, type: string) => {
     try {
-      const result = await postService.toggleLike(postId, type)
+      // Optimistic update
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           const isSameReaction = post.reactionType === type
+          const currentLikes = post._count?.likes || 0
+          return {
+            ...post,
+            isLiked: !isSameReaction,
+            reactionType: isSameReaction ? null : type,
+            _count: {
+              ...post._count,
+              likes: isSameReaction ? currentLikes - 1 : (post.isLiked ? currentLikes : currentLikes + 1)
+            }
+          }
+        }
+        return post
+      }))
+
+      // Call API
+      const result = await postService.toggleLike(postId, type)
+      
+      // Update with server response (keep the optimistic count)
+      setPosts(prev => prev.map(post => {
+        if (post.id === postId) {
           return {
             ...post,
             isLiked: result.liked,
             reactionType: result.type,
-            _count: {
-              ...post._count,
-              likes: isSameReaction ? post._count.likes - 1 : (post.isLiked ? post._count.likes : post._count.likes + 1)
-            }
+            // Keep the _count from optimistic update
           }
         }
         return post
       }))
     } catch (error) {
       console.error('Failed to toggle like:', error)
+      // Reload on error
+      loadSavedPosts()
     }
   }
 
@@ -337,7 +356,19 @@ export const SavedPosts = () => {
               onClick={() => {
                 setExpandedComments(prev => {
                   const newSet = new Set(prev)
-                  newSet.add(post.id)
+                  if (newSet.has(post.id)) {
+                    newSet.delete(post.id)
+                  } else {
+                    newSet.add(post.id)
+                    // Focus on comment input after state update
+                    setTimeout(() => {
+                      const commentInput = document.getElementById(`comment-input-${post.id}`)
+                      if (commentInput) {
+                        commentInput.focus()
+                        commentInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }
+                    }, 100)
+                  }
                   return newSet
                 })
               }}

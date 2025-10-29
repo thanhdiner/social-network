@@ -121,8 +121,23 @@ class PostService {
   }
 
   /**
+   * Get list of users who liked a post or specific image
+   */
+  async getLikeList(
+    postId: string,
+    imageIndex?: number,
+  ): Promise<Array<{ id: string; name: string; username: string; avatar: string | null; type: string }>> {
+    const response = await api.get(
+      `/posts/${postId}/like-list`,
+      imageIndex !== undefined ? { params: { imageIndex } } : undefined,
+    );
+    return response.data;
+  }
+
+  /**
    * Update a post
    */
+
   async updatePost(postId: string, data: CreatePostData): Promise<Post> {
     const response = await api.patch<Post>(`/posts/${postId}`, data);
     return response.data;

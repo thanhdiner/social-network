@@ -10,6 +10,7 @@ import { ReactionPicker, type ReactionType } from './ReactionPicker'
 import { CommentList } from './CommentList'
 import { CommentForm } from './CommentForm'
 import { SharePostModal } from './SharePostModal'
+import { LikeListModal } from './LikeListModal'
 
 interface FeedPostsProps {
   refresh?: number
@@ -28,6 +29,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
   const [commentRefresh, setCommentRefresh] = useState<Record<string, number>>({})
   const [sharingPost, setSharingPost] = useState<Post | null>(null)
+  const [likeListPost, setLikeListPost] = useState<Post | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   
   // Save original URL when modal opens
@@ -73,13 +75,14 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           const isSameReaction = post.reactionType === type
+          const currentLikes = post._count?.likes || 0
           return {
             ...post,
             isLiked: !isSameReaction,
             reactionType: isSameReaction ? null : type,
             _count: {
               ...post._count,
-              likes: isSameReaction ? post._count.likes - 1 : (post.isLiked ? post._count.likes : post._count.likes + 1)
+              likes: isSameReaction ? currentLikes - 1 : (post.isLiked ? currentLikes : currentLikes + 1)
             }
           }
         }
@@ -89,13 +92,14 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
       // Call API
       const result = await postService.toggleLike(postId, type)
       
-      // Update with server response
+      // Update with server response (keep the optimistic count)
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           return {
             ...post,
             isLiked: result.liked,
             reactionType: result.type,
+            // Keep the _count from optimistic update
           }
         }
         return post
@@ -413,8 +417,11 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
 
           {/* Post Stats */}
           <div className="flex items-center justify-between text-sm text-gray-500 mb-3 pb-3 border-b">
-            <button className="hover:underline cursor-pointer">
-              {post._count.likes} {post._count.likes === 1 ? 'Like' : 'Likes'}
+            <button 
+              onClick={() => setLikeListPost(post)}
+              className="hover:underline cursor-pointer"
+            >
+              {post._count?.likes || 0} {(post._count?.likes || 0) === 1 ? 'Like' : 'Likes'}
             </button>
             <div className="flex items-center gap-3">
               <button 
@@ -431,9 +438,9 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
                 }}
                 className="hover:underline cursor-pointer"
               >
-                {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
+                {post._count?.comments || 0} {(post._count?.comments || 0) === 1 ? 'Comment' : 'Comments'}
               </button>
-              {post._count.shares !== undefined && post._count.shares > 0 && (
+              {post._count?.shares !== undefined && post._count.shares > 0 && (
                 <span>
                   {post._count.shares} {post._count.shares === 1 ? 'Share' : 'Shares'}
                 </span>
@@ -455,6 +462,14 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
                     newSet.delete(post.id)
                   } else {
                     newSet.add(post.id)
+                    // Focus on comment input after state update
+                    setTimeout(() => {
+                      const commentInput = document.getElementById(`comment-input-${post.id}`)
+                      if (commentInput) {
+                        commentInput.focus()
+                        commentInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }
+                    }, 100)
                   }
                   return newSet
                 })
@@ -493,7 +508,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
                   // Update comment count
                   setPosts(prevPosts => prevPosts.map(p => 
                     p.id === post.id 
-                      ? { ...p, _count: { ...p._count, comments: p._count.comments + 1 } }
+                      ? { ...p, _count: { ...p._count, comments: (p._count?.comments || 0) + 1 } }
                       : p
                   ))
                 }}
@@ -522,7 +537,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
           postId={viewerPostId}
           post={posts.find(p => p.id === viewerPostId)!}
           onClose={handleCloseViewer}
-          onShare={(post) => setSharingPost(post)}
+          onShare={(post: Post) => setSharingPost(post)}
         />
       )}
 
@@ -537,6 +552,14 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
           }}
           currentUserName={currentUser.name}
           currentUserAvatar={currentUser.avatar}
+        />
+      )}
+
+      {likeListPost && (
+        <LikeListModal
+          postId={likeListPost.id}
+          totalLikes={likeListPost._count?.likes || 0}
+          onClose={() => setLikeListPost(null)}
         />
       )}
     </div>

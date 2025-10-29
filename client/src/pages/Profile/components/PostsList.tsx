@@ -76,13 +76,14 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           const isSameReaction = post.reactionType === type
+          const currentLikes = post._count?.likes || 0
           return {
             ...post,
             isLiked: !isSameReaction,
             reactionType: isSameReaction ? null : type,
             _count: {
               ...post._count,
-              likes: isSameReaction ? post._count.likes - 1 : (post.isLiked ? post._count.likes : post._count.likes + 1)
+              likes: isSameReaction ? currentLikes - 1 : (post.isLiked ? currentLikes : currentLikes + 1)
             }
           }
         }
@@ -92,13 +93,14 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
       // Call API
       const result = await postService.toggleLike(postId, type)
       
-      // Update with server response
+      // Update with server response (keep the optimistic count)
       setPosts(prev => prev.map(post => {
         if (post.id === postId) {
           return {
             ...post,
             isLiked: result.liked,
             reactionType: result.type,
+            // Keep the _count from optimistic update
           }
         }
         return post
@@ -458,6 +460,14 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
                     newSet.delete(post.id)
                   } else {
                     newSet.add(post.id)
+                    // Focus on comment input after state update
+                    setTimeout(() => {
+                      const commentInput = document.getElementById(`comment-input-${post.id}`)
+                      if (commentInput) {
+                        commentInput.focus()
+                        commentInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }
+                    }, 100)
                   }
                   return newSet
                 })

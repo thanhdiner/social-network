@@ -175,6 +175,18 @@ export class PostsController {
     );
   }
 
+  @Get(':id/like-list')
+  @UseGuards(JwtAuthGuard)
+  getLikeList(
+    @Param('id') id: string,
+    @Query('imageIndex') imageIndex?: string,
+  ) {
+    return this.postsService.getLikeList(
+      id,
+      imageIndex !== undefined ? parseInt(imageIndex, 10) : undefined,
+    );
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   update(

@@ -14,7 +14,7 @@ export class PostsService {
   ) {}
 
   async create(userId: string, createPostDto: CreatePostDto) {
-    return this.prisma.post.create({
+    const newPost = await this.prisma.post.create({
       data: {
         content: createPostDto.content,
         imageUrl: createPostDto.imageUrl,
@@ -33,11 +33,19 @@ export class PostsService {
         _count: {
           select: {
             comments: true,
-            likes: true,
           },
         },
       },
     });
+
+    // New post has 0 likes initially
+    return {
+      ...newPost,
+      _count: {
+        ...newPost._count,
+        likes: 0,
+      },
+    };
   }
 
   async findAll(page = 1, limit = 10, userId?: string) {
@@ -94,7 +102,6 @@ export class PostsService {
           _count: {
             select: {
               comments: true,
-              likes: true,
               shares: true,
             },
           },
@@ -103,8 +110,28 @@ export class PostsService {
       this.prisma.post.count({ where: whereClause }),
     ]);
 
+    // Count likes with imageIndex = null for each post
+    const postsWithLikes = await Promise.all(
+      posts.map(async (post) => {
+        const postLikesCount = await this.prisma.like.count({
+          where: {
+            postId: post.id,
+            imageIndex: null,
+          },
+        });
+
+        return {
+          ...post,
+          _count: {
+            ...post._count,
+            likes: postLikesCount,
+          },
+        };
+      }),
+    );
+
     return {
-      posts,
+      posts: postsWithLikes,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -146,7 +173,6 @@ export class PostsService {
           _count: {
             select: {
               comments: true,
-              likes: true,
               shares: true,
             },
           },
@@ -155,8 +181,28 @@ export class PostsService {
       this.prisma.post.count({ where: { userId } }),
     ]);
 
+    // Count likes with imageIndex = null for each post
+    const postsWithLikes = await Promise.all(
+      posts.map(async (post) => {
+        const postLikesCount = await this.prisma.like.count({
+          where: {
+            postId: post.id,
+            imageIndex: null,
+          },
+        });
+
+        return {
+          ...post,
+          _count: {
+            ...post._count,
+            likes: postLikesCount,
+          },
+        };
+      }),
+    );
+
     return {
-      posts,
+      posts: postsWithLikes,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -164,7 +210,7 @@ export class PostsService {
   }
 
   async findOne(id: string) {
-    return this.prisma.post.findUnique({
+    const post = await this.prisma.post.findUnique({
       where: { id },
       include: {
         user: {
@@ -217,12 +263,31 @@ export class PostsService {
         _count: {
           select: {
             comments: true,
-            likes: true,
             shares: true,
           },
         },
       },
     });
+
+    if (!post) {
+      return null;
+    }
+
+    // Count likes with imageIndex = null
+    const postLikesCount = await this.prisma.like.count({
+      where: {
+        postId: post.id,
+        imageIndex: null,
+      },
+    });
+
+    return {
+      ...post,
+      _count: {
+        ...post._count,
+        likes: postLikesCount,
+      },
+    };
   }
 
   async checkIfUserLiked(
@@ -290,32 +355,65 @@ export class PostsService {
     return likes;
   }
 
+  async getLikeList(postId: string, imageIndex?: number) {
+    const whereClause: any = { postId };
+    
+    if (imageIndex !== undefined && imageIndex !== null) {
+      whereClause.imageIndex = imageIndex;
+    } else {
+      whereClause.imageIndex = null;
+    }
+
+    const likes = await this.prisma.like.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return likes.map((like) => ({
+      id: like.user.id,
+      name: like.user.name,
+      username: like.user.username,
+      avatar: like.user.avatar,
+      type: like.type,
+    }));
+  }
+
   async toggleLike(
     postId: string,
     userId: string,
     type: string = 'like',
     imageIndex?: number,
   ) {
-    // Build unique constraint - imageIndex can be a number or null
-    const actualImageIndex = imageIndex !== undefined ? imageIndex : null;
+    // Build where clause for findFirst (supports null in composite key)
+    const whereClause: any = { postId, userId };
+    
+    if (imageIndex !== undefined && imageIndex !== null) {
+      whereClause.imageIndex = imageIndex;
+    } else {
+      whereClause.imageIndex = null;
+    }
 
-    const uniqueWhere: any = {
-      postId_userId_imageIndex: {
-        postId,
-        userId,
-        imageIndex: actualImageIndex,
-      },
-    };
-
-    const existingLike = await this.prisma.like.findUnique({
-      where: uniqueWhere,
+    const existingLike = await this.prisma.like.findFirst({
+      where: whereClause,
     });
 
     if (existingLike) {
       // If same reaction type, unlike
       if (existingLike.type === type) {
         await this.prisma.like.delete({
-          where: uniqueWhere,
+          where: { id: existingLike.id },
         });
         return {
           liked: false,
@@ -325,7 +423,7 @@ export class PostsService {
       } else {
         // Update to new reaction type
         const updated = await this.prisma.like.update({
-          where: uniqueWhere,
+          where: { id: existingLike.id },
           data: {
             type,
           },
@@ -343,7 +441,7 @@ export class PostsService {
           postId,
           userId,
           type,
-          imageIndex: actualImageIndex,
+          imageIndex: imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
         },
       });
 
@@ -448,7 +546,7 @@ export class PostsService {
     console.log('Final updateData:', updateData);
     console.log('================================');
 
-    return this.prisma.post.update({
+    const updatedPost = await this.prisma.post.update({
       where: { id },
       data: updateData,
       include: {
@@ -463,11 +561,26 @@ export class PostsService {
         _count: {
           select: {
             comments: true,
-            likes: true,
           },
         },
       },
     });
+
+    // Count likes with imageIndex = null
+    const postLikesCount = await this.prisma.like.count({
+      where: {
+        postId: updatedPost.id,
+        imageIndex: null,
+      },
+    });
+
+    return {
+      ...updatedPost,
+      _count: {
+        ...updatedPost._count,
+        likes: postLikesCount,
+      },
+    };
   }
 
   async getUserPhotos(userId: string, page = 1, limit = 9) {
@@ -607,12 +720,27 @@ export class PostsService {
         _count: {
           select: {
             comments: true,
-            likes: true,
             shares: true,
           },
         },
       },
     });
+
+    // Count likes with imageIndex = null
+    const postLikesCount = await this.prisma.like.count({
+      where: {
+        postId: sharedPost.id,
+        imageIndex: null,
+      },
+    });
+
+    const sharedPostWithLikes = {
+      ...sharedPost,
+      _count: {
+        ...sharedPost._count,
+        likes: postLikesCount,
+      },
+    };
 
     // Tạo bản ghi share (luôn lưu là share bài gốc)
     await this.prisma.share.create({
@@ -648,7 +776,7 @@ export class PostsService {
       }
     }
 
-    return sharedPost;
+    return sharedPostWithLikes;
   }
 
   async toggleSavePost(postId: string, userId: string) {
@@ -726,7 +854,6 @@ export class PostsService {
               _count: {
                 select: {
                   comments: true,
-                  likes: true,
                   shares: true,
                 },
               },
@@ -737,18 +864,28 @@ export class PostsService {
       this.prisma.savedPost.count({ where: { userId } }),
     ]);
 
-    // Extract posts from savedPosts and check if user liked/saved them
+    // Extract posts from savedPosts and check if user liked/saved them, count post likes
     const posts = await Promise.all(
       savedPosts.map(async (savedPost) => {
-        const reactionInfo = await this.checkIfUserLiked(
-          savedPost.post.id,
-          userId,
-        );
+        const [reactionInfo, postLikesCount] = await Promise.all([
+          this.checkIfUserLiked(savedPost.post.id, userId),
+          this.prisma.like.count({
+            where: {
+              postId: savedPost.post.id,
+              imageIndex: null,
+            },
+          }),
+        ]);
+
         return {
           ...savedPost.post,
           isLiked: reactionInfo.liked,
           reactionType: reactionInfo.type,
           isSaved: true, // Always true for saved posts
+          _count: {
+            ...savedPost.post._count,
+            likes: postLikesCount,
+          },
         };
       }),
     );

@@ -42,6 +42,7 @@ export const CommentForm = ({ postId, onCommentAdded }: CommentFormProps) => {
       />
       <div className="flex-1 relative">
         <input
+          id={`comment-input-${postId}`}
           type="text"
           value={content}
           onChange={(e) => setContent(e.target.value)}

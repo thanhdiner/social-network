@@ -5,6 +5,7 @@ import postService, { type Post } from '@/services/postService'
 import type { Comment } from '@/types'
 import { ReactionPicker, type ReactionType } from './ReactionPicker'
 import { SharePostModal } from './SharePostModal'
+import { LikeListModal } from './LikeListModal'
 
 // Like state for each image
 interface ImageLikeState {
@@ -37,6 +38,7 @@ export const ImageGalleryModal = ({
   const [submitting, setSubmitting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [sharingPost, setSharingPost] = useState(false)
+  const [showLikeList, setShowLikeList] = useState(false)
   
   // Track like state for each image separately
   const [imageLikes, setImageLikes] = useState<Record<number, ImageLikeState>>({})
@@ -315,9 +317,14 @@ export const ImageGalleryModal = ({
                     </span>
                   )}
                 </div>
-                <span>{currentImageLike.count} {currentImageLike.count === 1 ? 'person' : 'people'}</span>
+                <button
+                  onClick={() => setShowLikeList(true)}
+                  className="hover:underline cursor-pointer"
+                >
+                  {currentImageLike.count} {currentImageLike.count === 1 ? 'người' : 'người'}
+                </button>
                 {comments.length > 0 && (
-                  <span className="ml-auto">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</span>
+                  <span className="ml-auto">{comments.length} {comments.length === 1 ? 'bình luận' : 'bình luận'}</span>
                 )}
               </div>
             </div>
@@ -441,6 +448,15 @@ export const ImageGalleryModal = ({
           }}
           currentUserName={post.user?.name || 'User'}
           currentUserAvatar={post.user?.avatar || undefined}
+        />
+      )}
+
+      {showLikeList && (
+        <LikeListModal
+          postId={postId}
+          imageIndex={currentIndex}
+          totalLikes={currentImageLike.count}
+          onClose={() => setShowLikeList(false)}
         />
       )}
     </div>
