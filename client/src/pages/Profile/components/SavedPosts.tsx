@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { MoreHorizontal, Bookmark, MessageCircle, Share2, Link as LinkIcon } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
-import { ImageViewer } from '@/components/shared/ImageViewer'
+import { ImageGalleryModal } from '@/components/shared/ImageGalleryModal'
 import { ReactionPicker } from '@/components/shared/ReactionPicker'
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
@@ -23,6 +23,9 @@ export const SavedPosts = () => {
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerPostId, setViewerPostId] = useState<string | undefined>(undefined)
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
+  
+  // Save original URL when modal opens
+  const originalUrlRef = useRef<string | null>(null)
 
   const loadSavedPosts = async (pageNum = 1) => {
     try {
@@ -85,10 +88,23 @@ export const SavedPosts = () => {
   }
 
   const handleImageClick = (images: string[], index: number, postId: string) => {
+    // Save current URL before opening modal
+    originalUrlRef.current = window.location.pathname
+    
     setViewerImages(images)
     setViewerIndex(index)
     setViewerPostId(postId)
     setViewerOpen(true)
+  }
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false)
+    
+    // Restore original URL if it was changed
+    if (originalUrlRef.current && originalUrlRef.current !== window.location.pathname) {
+      window.history.replaceState(null, '', originalUrlRef.current)
+    }
+    originalUrlRef.current = null
   }
 
   const handleCommentAdded = (postId: string) => {
@@ -364,14 +380,16 @@ export const SavedPosts = () => {
         </button>
       )}
 
-      <ImageViewer
-        images={viewerImages}
-        initialIndex={viewerIndex}
-        open={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        postId={viewerPostId}
-        updateUrl={true}
-      />
+      {viewerOpen && viewerPostId && (
+        <ImageGalleryModal
+          images={viewerImages}
+          initialIndex={viewerIndex}
+          postId={viewerPostId}
+          post={posts.find(p => p.id === viewerPostId)!}
+          onClose={handleCloseViewer}
+          onShare={(post) => setSharingPost(post)}
+        />
+      )}
 
       {sharingPost && (
         <SharePostModal

@@ -73,6 +73,7 @@ export interface Comment {
   content: string;
   postId: string;
   userId: string;
+  imageIndex?: number; // Index của ảnh trong post (null = comment chung)
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -81,6 +82,7 @@ export interface Comment {
 export interface CreateCommentData {
   content: string;
   postId: string;
+  imageIndex?: number;
 }
 
 // Like Types

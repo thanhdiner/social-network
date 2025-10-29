@@ -85,6 +85,17 @@ function App() {
           />
 
           <Route
+            path="/post/:postId/photo/:photoIndex"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <PostDetail />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/chat"
             element={
               <ProtectedRoute>

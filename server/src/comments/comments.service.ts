@@ -34,6 +34,7 @@ export class CommentsService {
     const comment = await this.prisma.comment.create({
       data: {
         content: createCommentDto.content,
+        imageIndex: createCommentDto.imageIndex,
         postId,
         userId,
       },
@@ -68,12 +69,22 @@ export class CommentsService {
     return comment;
   }
 
-  async findByPostId(postId: string, page = 1, limit = 20) {
+  async findByPostId(postId: string, page = 1, limit = 20, imageIndex?: number) {
     const skip = (page - 1) * limit;
+
+    const where: any = { postId };
+    
+    // Nếu imageIndex được cung cấp, lọc theo imageIndex đó
+    // Nếu không, chỉ lấy comments không có imageIndex (comments chung)
+    if (imageIndex !== undefined) {
+      where.imageIndex = imageIndex;
+    } else {
+      where.imageIndex = null;
+    }
 
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
-        where: { postId },
+        where,
         skip,
         take: limit,
         orderBy: {
@@ -90,7 +101,7 @@ export class CommentsService {
           },
         },
       }),
-      this.prisma.comment.count({ where: { postId } }),
+      this.prisma.comment.count({ where }),
     ]);
 
     return {

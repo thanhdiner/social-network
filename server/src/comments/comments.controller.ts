@@ -37,11 +37,13 @@ export class CommentsController {
     @Param('postId') postId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('imageIndex') imageIndex?: string,
   ) {
     return this.commentsService.findByPostId(
       postId,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
+      imageIndex !== undefined ? parseInt(imageIndex) : undefined,
     );
   }
 

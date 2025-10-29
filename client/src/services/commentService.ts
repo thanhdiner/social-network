@@ -3,6 +3,7 @@ import type { Comment } from '../types';
 
 export interface CreateCommentData {
   content: string;
+  imageIndex?: number; // Index của ảnh trong post (optional)
 }
 
 export interface CommentResponse {
@@ -19,11 +20,18 @@ export const commentService = {
     return response.data;
   },
 
-  // Lấy danh sách comments của post
-  async getCommentsByPostId(postId: string, page = 1, limit = 20): Promise<CommentResponse> {
-    const response = await api.get(`/comments/post/${postId}`, {
-      params: { page, limit },
-    });
+  // Lấy danh sách comments của post (hoặc của một ảnh cụ thể)
+  async getCommentsByPostId(
+    postId: string,
+    page = 1,
+    limit = 20,
+    imageIndex?: number
+  ): Promise<CommentResponse> {
+    const params: any = { page, limit };
+    if (imageIndex !== undefined) {
+      params.imageIndex = imageIndex;
+    }
+    const response = await api.get(`/comments/post/${postId}`, { params });
     return response.data;
   },
 

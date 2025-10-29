@@ -92,10 +92,31 @@ class PostService {
   }
 
   /**
-   * Toggle like on a post
+   * Toggle like on a post or specific image
    */
-  async toggleLike(postId: string, type: string = 'like'): Promise<{ liked: boolean; type: string | null; message: string }> {
-    const response = await api.post<{ liked: boolean; type: string | null; message: string }>(`/posts/${postId}/like`, { type });
+  async toggleLike(
+    postId: string,
+    type: string = 'like',
+    imageIndex?: number,
+  ): Promise<{ liked: boolean; type: string | null; message: string }> {
+    const response = await api.post<{ liked: boolean; type: string | null; message: string }>(
+      `/posts/${postId}/like`,
+      { type, imageIndex },
+    );
+    return response.data;
+  }
+
+  /**
+   * Get likes for all images in a post
+   */
+  async getImageLikes(
+    postId: string,
+    imageCount: number,
+  ): Promise<Record<number, { isLiked: boolean; reactionType: string | null; count: number }>> {
+    const response = await api.get<Record<number, { isLiked: boolean; reactionType: string | null; count: number }>>(
+      `/posts/${postId}/image-likes`,
+      { params: { imageCount } },
+    );
     return response.data;
   }
 

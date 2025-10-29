@@ -228,14 +228,24 @@ export class PostsService {
   async checkIfUserLiked(
     postId: string,
     userId: string,
+    imageIndex?: number,
   ): Promise<{ liked: boolean; type: string | null }> {
-    const like = await this.prisma.like.findUnique({
-      where: {
-        postId_userId: {
-          postId,
-          userId,
-        },
-      },
+    // Build where clause based on whether imageIndex is provided
+    const whereClause: any = {
+      postId,
+      userId,
+    };
+
+    // Only add imageIndex to where clause if it's a valid number
+    if (imageIndex !== undefined && imageIndex !== null) {
+      whereClause.imageIndex = imageIndex;
+    } else {
+      // For post likes (not image likes), imageIndex should be null
+      whereClause.imageIndex = null;
+    }
+
+    const like = await this.prisma.like.findFirst({
+      where: whereClause,
     });
 
     return {
@@ -244,42 +254,87 @@ export class PostsService {
     };
   }
 
-  async toggleLike(postId: string, userId: string, type: string = 'like') {
-    const existingLike = await this.prisma.like.findUnique({
-      where: {
-        postId_userId: {
+  async getImageLikes(postId: string, userId: string, imageCount: number) {
+    const likes: Record<
+      number,
+      { isLiked: boolean; reactionType: string | null; count: number }
+    > = {};
+
+    for (let i = 0; i < imageCount; i++) {
+      // Get user's like for this image
+      const userLike = await this.prisma.like.findUnique({
+        where: {
+          postId_userId_imageIndex: {
+            postId,
+            userId,
+            imageIndex: i,
+          },
+        } as any,
+      });
+
+      // Count total likes for this image
+      const count = await this.prisma.like.count({
+        where: {
           postId,
-          userId,
+          imageIndex: i,
         },
+      });
+
+      likes[i] = {
+        isLiked: !!userLike,
+        reactionType: userLike?.type || null,
+        count,
+      };
+    }
+
+    return likes;
+  }
+
+  async toggleLike(
+    postId: string,
+    userId: string,
+    type: string = 'like',
+    imageIndex?: number,
+  ) {
+    // Build unique constraint - imageIndex can be a number or null
+    const actualImageIndex = imageIndex !== undefined ? imageIndex : null;
+
+    const uniqueWhere: any = {
+      postId_userId_imageIndex: {
+        postId,
+        userId,
+        imageIndex: actualImageIndex,
       },
+    };
+
+    const existingLike = await this.prisma.like.findUnique({
+      where: uniqueWhere,
     });
 
     if (existingLike) {
       // If same reaction type, unlike
       if (existingLike.type === type) {
         await this.prisma.like.delete({
-          where: {
-            postId_userId: {
-              postId,
-              userId,
-            },
-          },
+          where: uniqueWhere,
         });
-        return { liked: false, type: null as string | null, message: 'Post unliked' };
+        return {
+          liked: false,
+          type: null as string | null,
+          message: 'Unliked',
+        };
       } else {
         // Update to new reaction type
         const updated = await this.prisma.like.update({
-          where: {
-            postId_userId: {
-              postId,
-              userId,
-            },
-          },
+          where: uniqueWhere,
           data: {
             type,
           },
         });
-        return { liked: true, type: updated.type as string, message: 'Reaction updated' };
+        return {
+          liked: true,
+          type: updated.type,
+          message: 'Reaction updated',
+        };
       }
     } else {
       // Create new reaction
@@ -288,6 +343,7 @@ export class PostsService {
           postId,
           userId,
           type,
+          imageIndex: actualImageIndex,
         },
       });
 

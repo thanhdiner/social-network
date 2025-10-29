@@ -68,33 +68,37 @@ model Post {
 }
 
 model Comment {
-  id        String   @id @default(uuid())
-  content   String
-  postId    String
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  content    String
+  postId     String
+  userId     String
+  imageIndex Int?     // Index của ảnh trong post (null = comment chung cho post)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([userId])
+  @@index([postId, imageIndex])
 }
 
 model Like {
-  id        String   @id @default(uuid())
-  postId    String
-  userId    String
-  type      String   @default("like") // 'like', 'love', 'haha', 'wow', 'sad', 'angry'
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  postId     String
+  userId     String
+  type       String   @default("like") // 'like', 'love', 'haha', 'wow', 'sad', 'angry'
+  imageIndex Int?     // null = like post, number = like specific image
+  createdAt  DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([postId, userId])
+  @@unique([postId, userId, imageIndex])
   @@index([postId])
   @@index([userId])
+  @@index([postId, imageIndex])
 }
 
 model Follow {

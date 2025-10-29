@@ -6,14 +6,14 @@ import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from '@/components/shared/EditPostModal'
 import { SharePostModal } from '@/components/shared/SharePostModal'
-import { ImageViewer } from '@/components/shared/ImageViewer'
+import { ImageGalleryModal } from '@/components/shared/ImageGalleryModal'
 import { useTitle } from '@/hooks/useTitle'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
 
 export const PostDetail = () => {
-  const { postId } = useParams<{ postId: string }>()
+  const { postId, photoIndex } = useParams<{ postId: string; photoIndex?: string }>()
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
   const [post, setPost] = useState<Post | null>(null)
@@ -31,12 +31,14 @@ export const PostDetail = () => {
   const loadPost = useCallback(async () => {
     if (!postId) return
     
+    console.log('[PostDetail] Loading post:', postId)
     setIsLoading(true)
     try {
       const data = await postService.getPost(postId)
+      console.log('[PostDetail] Post loaded successfully:', data)
       setPost(data)
     } catch (error) {
-      console.error('Failed to load post:', error)
+      console.error('[PostDetail] Failed to load post:', error)
       setPost(null)
     } finally {
       setIsLoading(false)
@@ -46,6 +48,31 @@ export const PostDetail = () => {
   useEffect(() => {
     loadPost()
   }, [loadPost])
+
+  // Handle opening image gallery when photoIndex is in URL
+  useEffect(() => {
+    if (photoIndex && post?.imageUrl) {
+      const images = post.imageUrl.split(',').filter((url: string) => url.trim())
+      const index = parseInt(photoIndex, 10) - 1 // Convert to 0-based index
+      
+      console.log('[PostDetail] Opening image gallery:', {
+        photoIndex,
+        index,
+        totalImages: images.length,
+        willOpen: index >= 0 && index < images.length
+      })
+      
+      if (index >= 0 && index < images.length) {
+        setViewerImages(images)
+        setViewerIndex(index)
+        setViewerOpen(true)
+      } else {
+        console.warn('[PostDetail] Image index out of range, redirecting to post')
+        // If image doesn't exist, redirect to post without photo
+        window.history.replaceState(null, '', `/post/${post.id}`)
+      }
+    }
+  }, [photoIndex, post])
 
   const handleToggleLike = async (type: ReactionType = 'like') => {
     if (!post) return
@@ -458,16 +485,20 @@ export const PostDetail = () => {
         />
       )}
 
-      <ImageViewer
-        images={viewerImages}
-        initialIndex={viewerIndex}
-        open={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        postId={postId}
-        updateUrl={true}
-        onDeleteImage={handleDeleteImage}
-        canDelete={post?.userId === currentUser?.id}
-      />
+      {viewerOpen && postId && post && (
+        <ImageGalleryModal
+          images={viewerImages}
+          initialIndex={viewerIndex}
+          postId={postId}
+          post={post}
+          onClose={() => {
+            setViewerOpen(false)
+            // Restore URL to post without photo index
+            navigate(`/post/${postId}`, { replace: true })
+          }}
+          onShare={(p) => setSharingPost(p)}
+        />
+      )}
 
       {sharingPost && currentUser && (
         <SharePostModal

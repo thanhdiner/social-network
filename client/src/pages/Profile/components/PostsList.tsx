@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from '@/components/shared/EditPostModal'
-import { ImageViewer } from '@/components/shared/ImageViewer'
+import { ImageGalleryModal } from '@/components/shared/ImageGalleryModal'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
@@ -30,6 +30,9 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
   const [commentRefresh, setCommentRefresh] = useState<Record<string, number>>({})
   const [sharingPost, setSharingPost] = useState<Post | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  
+  // Save original URL when modal opens
+  const originalUrlRef = useRef<string | null>(null)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -159,10 +162,23 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
   }
 
   const handleImageClick = (images: string[], index: number, postId: string) => {
+    // Save current URL before opening modal
+    originalUrlRef.current = window.location.pathname
+    
     setViewerImages(images)
     setViewerIndex(index)
     setViewerPostId(postId)
     setViewerOpen(true)
+  }
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false)
+    
+    // Restore original URL if it was changed
+    if (originalUrlRef.current && originalUrlRef.current !== window.location.pathname) {
+      window.history.replaceState(null, '', originalUrlRef.current)
+    }
+    originalUrlRef.current = null
   }
 
   const handleDeleteImage = async (postId: string, imageIndex: number) => {
@@ -502,16 +518,16 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
         />
       )}
 
-      <ImageViewer
-        images={viewerImages}
-        initialIndex={viewerIndex}
-        open={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        postId={viewerPostId}
-        updateUrl={true}
-        onDeleteImage={viewerPostId ? (index) => handleDeleteImage(viewerPostId, index) : undefined}
-        canDelete={viewerPostId ? posts.find(p => p.id === viewerPostId)?.userId === currentUser?.id : false}
-      />
+      {viewerOpen && viewerPostId && (
+        <ImageGalleryModal
+          images={viewerImages}
+          initialIndex={viewerIndex}
+          postId={viewerPostId}
+          post={posts.find(p => p.id === viewerPostId)!}
+          onClose={handleCloseViewer}
+          onShare={(post) => setSharingPost(post)}
+        />
+      )}
 
       {sharingPost && currentUser && (
         <SharePostModal

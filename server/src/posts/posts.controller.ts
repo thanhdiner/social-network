@@ -156,8 +156,23 @@ export class PostsController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserData,
     @Body('type') type?: string,
+    @Body('imageIndex') imageIndex?: number,
   ) {
-    return this.postsService.toggleLike(id, user.userId, type);
+    return this.postsService.toggleLike(id, user.userId, type, imageIndex);
+  }
+
+  @Get(':id/image-likes')
+  @UseGuards(JwtAuthGuard)
+  getImageLikes(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserData,
+    @Query('imageCount') imageCount?: string,
+  ) {
+    return this.postsService.getImageLikes(
+      id,
+      user.userId,
+      imageCount ? parseInt(imageCount, 10) : 1,
+    );
   }
 
   @Patch(':id')
