@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle } from 'lucide-react'
+import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle, Image as ImageIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { commentService } from '@/services/commentService'
 import type { Comment, ReactionType } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from './Avatar'
 import { ReactionPicker } from './ReactionPicker'
+import uploadService from '@/services/uploadService'
 
 interface CommentListProps {
   postId: string
@@ -29,9 +30,13 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null)
   const [replyContent, setReplyContent] = useState('')
+  const [replyImage, setReplyImage] = useState<File | null>(null)
+  const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
+  const [isUploadingReplyImage, setIsUploadingReplyImage] = useState(false)
   const [commentLikes, setCommentLikes] = useState<Record<string, { liked: boolean; type: ReactionType | null; count: number }>>({})
   const menuRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
+  const replyImageInputRef = useRef<HTMLInputElement>(null)
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -191,18 +196,47 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
     }
   }
 
+  const handleReplyImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setReplyImage(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setReplyImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveReplyImage = () => {
+    setReplyImage(null)
+    setReplyImagePreview(null)
+    if (replyImageInputRef.current) {
+      replyImageInputRef.current.value = ''
+    }
+  }
+
   const handleReplySubmit = async (parentId: string) => {
-    if (!replyContent.trim()) return
+    if (!replyContent.trim() && !replyImage) return
 
     try {
+      let imageUrl: string | undefined
+
+      // Upload image if exists
+      if (replyImage) {
+        setIsUploadingReplyImage(true)
+        imageUrl = await uploadService.uploadImage(replyImage)
+      }
+
       // Nếu reply to reply, thêm @tag vào đầu content
       const content = replyingToUser 
         ? `@${replyingToUser.name} ${replyContent.trim()}`
         : replyContent.trim()
 
       const newReply = await commentService.createComment(postId, {
-        content,
+        content: content || '',
         parentId,
+        imageUrl,
       })
       
       // Add reply to parent comment
@@ -219,8 +253,12 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
       setReplyingTo(null)
       setReplyingToUser(null)
       setReplyContent('')
+      setReplyImage(null)
+      setReplyImagePreview(null)
     } catch (error) {
       console.error('Failed to create reply:', error)
+    } finally {
+      setIsUploadingReplyImage(false)
     }
   }
 
@@ -348,6 +386,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                       setReplyingTo(null);
                       setReplyingToUser(null);
                       setReplyContent('');
+                      handleRemoveReplyImage();
                     }}
                     className="text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
@@ -360,27 +399,59 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                     name={currentUser?.name || 'User'}
                     size="sm"
                   />
-                  <div className="flex-1 flex gap-2">
-                    <input
-                      ref={replyingTo === comment.id ? replyInputRef : null}
-                      type="text"
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder={`Phản hồi ${replyingToUser?.name}...`}
-                      className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && replyContent.trim()) {
-                          handleReplySubmit(comment.id);
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={() => handleReplySubmit(comment.id)}
-                      disabled={!replyContent.trim()}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      Gửi
-                    </button>
+                  <div className="flex-1">
+                    {/* Image preview */}
+                    {replyImagePreview && (
+                      <div className="relative mb-2 inline-block">
+                        <img
+                          src={replyImagePreview}
+                          alt="Preview"
+                          className="max-h-40 rounded-lg object-cover"
+                        />
+                        <button
+                          onClick={handleRemoveReplyImage}
+                          className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white rounded-full p-1 hover:bg-opacity-90 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        ref={replyingTo === comment.id ? replyInputRef : null}
+                        type="text"
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                        className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
+                            handleReplySubmit(comment.id);
+                          }
+                        }}
+                      />
+                      <input
+                        ref={replyImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleReplyImageSelect}
+                        className="hidden"
+                      />
+                      <button
+                        onClick={() => replyImageInputRef.current?.click()}
+                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
+                        title="Thêm ảnh"
+                      >
+                        <ImageIcon className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleReplySubmit(comment.id)}
+                        disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
+                        className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -488,6 +559,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           setReplyingTo(null);
                           setReplyingToUser(null);
                           setReplyContent('');
+                          handleRemoveReplyImage();
                         }}
                         className="text-gray-400 hover:text-gray-600 cursor-pointer"
                       >
@@ -500,27 +572,59 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         name={currentUser?.name || 'User'}
                         size="sm"
                       />
-                      <div className="flex-1 flex gap-2">
-                        <input
-                          ref={replyingTo?.startsWith('reply-') ? replyInputRef : null}
-                          type="text"
-                          value={replyContent}
-                          onChange={(e) => setReplyContent(e.target.value)}
-                          placeholder={`Phản hồi ${replyingToUser?.name}...`}
-                          className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter' && replyContent.trim()) {
-                              handleReplySubmit(comment.id);
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={() => handleReplySubmit(comment.id)}
-                          disabled={!replyContent.trim()}
-                          className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          Gửi
-                        </button>
+                      <div className="flex-1">
+                        {/* Image preview */}
+                        {replyImagePreview && (
+                          <div className="relative mb-2 inline-block">
+                            <img
+                              src={replyImagePreview}
+                              alt="Preview"
+                              className="max-h-40 rounded-lg object-cover"
+                            />
+                            <button
+                              onClick={handleRemoveReplyImage}
+                              className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white rounded-full p-1 hover:bg-opacity-90 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <input
+                            ref={replyingTo?.startsWith('reply-') ? replyInputRef : null}
+                            type="text"
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                            placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                            className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
+                                handleReplySubmit(comment.id);
+                              }
+                            }}
+                          />
+                          <input
+                            ref={replyImageInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleReplyImageSelect}
+                            className="hidden"
+                          />
+                          <button
+                            onClick={() => replyImageInputRef.current?.click()}
+                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
+                            title="Thêm ảnh"
+                          >
+                            <ImageIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleReplySubmit(comment.id)}
+                            disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
+                            className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
