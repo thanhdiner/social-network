@@ -11,6 +11,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { UploadModule } from './upload/upload.module';
 import { LifeEventsModule } from './life-events/life-events.module';
 import { CommentsModule } from './comments/comments.module';
+import { StoriesModule } from './stories/stories.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CommentsModule } from './comments/comments.module';
     UploadModule,
     LifeEventsModule,
     CommentsModule,
+    StoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

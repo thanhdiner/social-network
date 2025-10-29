@@ -41,6 +41,7 @@ model User {
   lifeEvents     LifeEvent[]
   sharedPosts    Share[]
   savedPosts     SavedPost[]
+  stories        Story[]
 }
 
 model Post {
@@ -189,4 +190,33 @@ model SavedPost {
   @@unique([postId, userId])
   @@index([userId])
   @@index([postId])
+}
+
+model Story {
+  id        String   @id @default(uuid())
+  userId    String
+  imageUrl  String?
+  videoUrl  String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Stories expire after 24 hours
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  views StoryView[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model StoryView {
+  id        String   @id @default(uuid())
+  storyId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, userId])
+  @@index([storyId])
+  @@index([userId])
 }

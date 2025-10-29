@@ -10,6 +10,7 @@ import Profile from '@/pages/Profile'
 import Chat from '@/pages/Chat'
 import EditProfile from '@/pages/Profile/EditProfile'
 import Suggestions from '@/pages/Suggestions'
+import Stories from '@/pages/Stories'
 import NotFound from '@/pages/NotFound'
 import UserNotFound from '@/pages/UserNotFound'
 import { PostDetail } from '@/pages/PostDetail'
@@ -99,6 +100,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Suggestions />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/stories"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Stories />
                 </MainLayout>
               </ProtectedRoute>
             }
