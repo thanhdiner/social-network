@@ -59,10 +59,23 @@ export class PostsService {
               avatar: true,
             },
           },
+          sharedPost: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               comments: true,
               likes: true,
+              shares: true,
             },
           },
         },
@@ -98,10 +111,23 @@ export class PostsService {
               avatar: true,
             },
           },
+          sharedPost: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+            },
+          },
           _count: {
             select: {
               comments: true,
               likes: true,
+              shares: true,
             },
           },
         },
@@ -127,6 +153,18 @@ export class PostsService {
             name: true,
             username: true,
             avatar: true,
+          },
+        },
+        sharedPost: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
           },
         },
         comments: {
@@ -160,6 +198,7 @@ export class PostsService {
           select: {
             comments: true,
             likes: true,
+            shares: true,
           },
         },
       },
@@ -419,5 +458,120 @@ export class PostsService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async sharePost(postId: string, userId: string, content?: string) {
+    // Kiểm tra xem post có tồn tại không
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        sharedPost: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Lấy ID của bài gốc (nếu đang share bài đã share thì lấy bài gốc)
+    const originalPostId = post.sharedPostId || postId;
+    const originalPost = post.sharedPostId ? post.sharedPost : post;
+
+    if (!originalPost) {
+      throw new Error('Original post not found');
+    }
+
+    // Tạo shared post mới (luôn trỏ về bài gốc)
+    const sharedPost = await this.prisma.post.create({
+      data: {
+        content: content || '',
+        userId,
+        sharedPostId: originalPostId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+        sharedPost: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            likes: true,
+            shares: true,
+          },
+        },
+      },
+    });
+
+    // Tạo bản ghi share (luôn lưu là share bài gốc)
+    await this.prisma.share.create({
+      data: {
+        postId: originalPostId,
+        userId,
+      },
+    });
+
+    // Tạo thông báo cho chủ bài gốc (nếu không phải chính mình share)
+    if (originalPost.userId !== userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          name: true,
+          avatar: true,
+        },
+      });
+
+      if (user) {
+        const notification = await this.notificationsService.create({
+          type: 'share',
+          content: `shared your post`,
+          userId: originalPost.userId,
+          actorId: userId,
+          actorName: user.name,
+          actorAvatar: user.avatar || undefined,
+          relatedId: originalPostId,
+        });
+
+        // Emit realtime notification
+        this.chatGateway.notifyUser(originalPost.userId, notification);
+      }
+    }
+
+    return sharedPost;
   }
 }

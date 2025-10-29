@@ -150,4 +150,15 @@ export class PostsController {
   remove(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
     return this.postsService.remove(id, user.userId);
   }
+
+  @Post(':id/share')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  sharePost(
+    @Param('id') postId: string,
+    @CurrentUser() user: CurrentUserData,
+    @Body() body: { content?: string },
+  ) {
+    return this.postsService.sharePost(postId, user.userId, body.content);
+  }
 }

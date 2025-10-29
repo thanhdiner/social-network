@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 export interface CreateNotificationDto {
-  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message';
+  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message' | 'share';
   content: string;
   userId: string;
   actorId?: string;

@@ -39,6 +39,7 @@ model User {
   sentMessages   Message[] @relation("SentMessages")
   notifications  Notification[]
   lifeEvents     LifeEvent[]
+  sharedPosts    Share[]
 }
 
 model Post {
@@ -47,15 +48,20 @@ model Post {
   imageUrl  String?
   videoUrl  String?
   userId    String
+  sharedPostId String? // ID của post được share (nếu đây là shared post)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments Comment[]
-  likes    Like[]
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments     Comment[]
+  likes        Like[]
+  shares       Share[]
+  sharedPost   Post?     @relation("SharedPosts", fields: [sharedPostId], references: [id], onDelete: Cascade)
+  sharedBy     Post[]    @relation("SharedPosts")
 
   @@index([userId])
   @@index([createdAt])
+  @@index([sharedPostId])
 }
 
 model Comment {
@@ -153,4 +159,18 @@ model LifeEvent {
 
   @@index([userId])
   @@index([date])
+}
+
+model Share {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([userId])
+  @@index([userId, postId])
 }

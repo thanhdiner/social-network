@@ -9,6 +9,7 @@ import { ImageViewer } from './ImageViewer'
 import { ReactionPicker, type ReactionType } from './ReactionPicker'
 import { CommentList } from './CommentList'
 import { CommentForm } from './CommentForm'
+import { SharePostModal } from './SharePostModal'
 
 interface FeedPostsProps {
   refresh?: number
@@ -26,6 +27,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   const [viewerPostId, setViewerPostId] = useState<string | undefined>(undefined)
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set())
   const [commentRefresh, setCommentRefresh] = useState<Record<string, number>>({})
+  const [sharingPost, setSharingPost] = useState<Post | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close menu when clicking outside
@@ -277,6 +279,59 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
           {/* Post Content */}
           <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
 
+          {/* Shared Post */}
+          {post.sharedPost && (
+            <div className="border border-gray-200 rounded-xl p-4 mb-4">
+              <div className="flex gap-3 mb-3">
+                <Link to={`/profile/${post.sharedPost.user.username}`} className="cursor-pointer">
+                  <img
+                    src={post.sharedPost.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.sharedPost.user.name)}&background=fb923c&color=fff`}
+                    alt={post.sharedPost.user.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                </Link>
+                <div>
+                  <Link to={`/profile/${post.sharedPost.user.username}`} className="font-semibold text-gray-800 hover:text-orange-600 transition cursor-pointer">
+                    {post.sharedPost.user.name}
+                  </Link>
+                  <p className="text-xs text-gray-500">
+                    {formatDistanceToNow(new Date(post.sharedPost.createdAt), { addSuffix: true })}
+                  </p>
+                </div>
+              </div>
+              <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.sharedPost.content}</p>
+              {post.sharedPost.imageUrl && (() => {
+                const imageUrls = post.sharedPost.imageUrl.split(',').filter(url => url.trim())
+                if (imageUrls.length === 0) return null
+                
+                return (
+                  <div className={imageUrls.length === 1 ? '' : 'grid grid-cols-2 gap-1'}>
+                    {imageUrls.slice(0, 4).map((url, index) => (
+                      <div 
+                        key={index} 
+                        className={`rounded-lg overflow-hidden ${imageUrls.length === 1 ? '' : 'aspect-square'} cursor-pointer`}
+                        onClick={() => handleImageClick(imageUrls, index, post.sharedPost!.id)}
+                      >
+                        <img
+                          src={url.trim()}
+                          alt=""
+                          className={`w-full ${imageUrls.length === 1 ? 'max-h-[400px]' : 'h-full'} object-cover`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+              {post.sharedPost.videoUrl && (
+                <video
+                  src={post.sharedPost.videoUrl}
+                  controls
+                  className="w-full rounded-lg max-h-[400px]"
+                />
+              )}
+            </div>
+          )}
+
           {/* Post Images */}
           {post.imageUrl && (() => {
             const imageUrls = post.imageUrl.split(',').filter(url => url.trim())
@@ -327,22 +382,29 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
             <button className="hover:underline cursor-pointer">
               {post._count.likes} {post._count.likes === 1 ? 'Like' : 'Likes'}
             </button>
-            <button 
-              onClick={() => {
-                setExpandedComments(prev => {
-                  const newSet = new Set(prev)
-                  if (newSet.has(post.id)) {
-                    newSet.delete(post.id)
-                  } else {
-                    newSet.add(post.id)
-                  }
-                  return newSet
-                })
-              }}
-              className="hover:underline cursor-pointer"
-            >
-              {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => {
+                  setExpandedComments(prev => {
+                    const newSet = new Set(prev)
+                    if (newSet.has(post.id)) {
+                      newSet.delete(post.id)
+                    } else {
+                      newSet.add(post.id)
+                    }
+                    return newSet
+                  })
+                }}
+                className="hover:underline cursor-pointer"
+              >
+                {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
+              </button>
+              {post._count.shares !== undefined && post._count.shares > 0 && (
+                <span>
+                  {post._count.shares} {post._count.shares === 1 ? 'Share' : 'Shares'}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Post Actions */}
@@ -368,7 +430,10 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
               <MessageCircle className="w-5 h-5" />
               <span className="font-medium">Comment</span>
             </button>
-            <button className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+            <button 
+              onClick={() => setSharingPost(post)}
+              className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+            >
               <Share2 className="w-5 h-5" />
               <span className="font-medium">Share</span>
             </button>
@@ -423,6 +488,20 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
         onDeleteImage={viewerPostId ? (index) => handleDeleteImage(viewerPostId, index) : undefined}
         canDelete={viewerPostId ? posts.find(p => p.id === viewerPostId)?.userId === currentUser?.id : false}
       />
+
+      {sharingPost && currentUser && (
+        <SharePostModal
+          post={sharingPost}
+          open={!!sharingPost}
+          onClose={() => setSharingPost(null)}
+          onShared={() => {
+            setSharingPost(null)
+            loadPosts()
+          }}
+          currentUserName={currentUser.name}
+          currentUserAvatar={currentUser.avatar}
+        />
+      )}
     </div>
   )
 }

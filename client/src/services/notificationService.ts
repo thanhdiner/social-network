@@ -2,7 +2,7 @@ import api from './api'
 
 export interface Notification {
   id: string
-  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message'
+  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message' | 'share'
   content: string
   userId: string
   actorId?: string

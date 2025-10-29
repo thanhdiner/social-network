@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bell, X, UserPlus, Heart, MessageCircle, UserMinus } from 'lucide-react'
+import { Bell, X, UserPlus, Heart, MessageCircle, UserMinus, Share2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import socketService from '@/services/socketService'
 import notificationService from '@/services/notificationService'
@@ -139,6 +139,8 @@ export const NotificationsDropdown = () => {
         return <Heart className="text-red-500" size={20} />
       case 'comment':
         return <MessageCircle className="text-blue-500" size={20} />
+      case 'share':
+        return <Share2 className="text-green-500" size={20} />
       default:
         return <Bell className="text-gray-500" size={20} />
     }
@@ -170,14 +172,20 @@ export const NotificationsDropdown = () => {
             <span className="font-semibold">{notification.actorName}</span> {notification.content}
           </>
         )
+      case 'share':
+        return (
+          <>
+            <span className="font-semibold">{notification.actorName}</span> {notification.content}
+          </>
+        )
       default:
         return notification.content
     }
   }
 
   const handleNotificationClick = (notification: Notification) => {
-    // Navigate to related post if it's a like or comment notification
-    if ((notification.type === 'like' || notification.type === 'comment') && notification.relatedId) {
+    // Navigate to related post if it's a like, comment, or share notification
+    if ((notification.type === 'like' || notification.type === 'comment' || notification.type === 'share') && notification.relatedId) {
       setIsOpen(false)
       navigate(`/post/${notification.relatedId}`)
     }
@@ -230,7 +238,7 @@ export const NotificationsDropdown = () => {
                   onClick={() => handleNotificationClick(notification)}
                   className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                     !notification.read ? 'bg-orange-50' : ''
-                  } ${notification.type === 'like' || notification.type === 'comment' ? 'cursor-pointer' : ''}`}
+                  } ${notification.type === 'like' || notification.type === 'comment' || notification.type === 'share' ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="shrink-0">{getIcon(notification.type)}</div>

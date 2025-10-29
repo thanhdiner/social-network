@@ -6,6 +6,7 @@ export interface Post {
   imageUrl?: string;
   videoUrl?: string;
   userId: string;
+  sharedPostId?: string;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -14,9 +15,11 @@ export interface Post {
     username: string;
     avatar: string | null;
   };
+  sharedPost?: Post;
   _count: {
     comments: number;
     likes: number;
+    shares?: number;
   };
   isLiked?: boolean;
   reactionType?: string | null;
@@ -117,6 +120,14 @@ class PostService {
     const response = await api.get<PhotosResponse>(`/posts/user/${userId}/photos`, {
       params: { page, limit },
     });
+    return response.data;
+  }
+
+  /**
+   * Share a post
+   */
+  async sharePost(postId: string, content?: string): Promise<Post> {
+    const response = await api.post<Post>(`/posts/${postId}/share`, { content });
     return response.data;
   }
 }

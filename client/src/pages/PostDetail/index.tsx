@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from '@/components/shared/EditPostModal'
+import { SharePostModal } from '@/components/shared/SharePostModal'
 import { ImageViewer } from '@/components/shared/ImageViewer'
 import { useTitle } from '@/hooks/useTitle'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
@@ -19,6 +20,7 @@ export const PostDetail = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [editingPost, setEditingPost] = useState<Post | null>(null)
+  const [sharingPost, setSharingPost] = useState<Post | null>(null)
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [viewerOpen, setViewerOpen] = useState(false)
@@ -264,6 +266,59 @@ export const PostDetail = () => {
         {/* Post Content */}
         <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
 
+        {/* Shared Post */}
+        {post.sharedPost && (
+          <div className="border border-gray-200 rounded-xl p-4 mb-4">
+            <div className="flex gap-3 mb-3">
+              <Link to={`/profile/${post.sharedPost.user.username}`} className="cursor-pointer">
+                <img
+                  src={post.sharedPost.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.sharedPost.user.name)}&background=fb923c&color=fff`}
+                  alt={post.sharedPost.user.name}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              </Link>
+              <div>
+                <Link to={`/profile/${post.sharedPost.user.username}`} className="font-semibold text-gray-800 hover:text-orange-600 transition cursor-pointer">
+                  {post.sharedPost.user.name}
+                </Link>
+                <p className="text-xs text-gray-500">
+                  {formatDistanceToNow(new Date(post.sharedPost.createdAt), { addSuffix: true })}
+                </p>
+              </div>
+            </div>
+            <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.sharedPost.content}</p>
+            {post.sharedPost.imageUrl && (() => {
+              const imageUrls = post.sharedPost.imageUrl.split(',').filter(url => url.trim())
+              if (imageUrls.length === 0) return null
+              
+              return (
+                <div className={imageUrls.length === 1 ? '' : 'grid grid-cols-2 gap-1'}>
+                  {imageUrls.slice(0, 4).map((url, index) => (
+                    <div 
+                      key={index} 
+                      className={`rounded-lg overflow-hidden ${imageUrls.length === 1 ? '' : 'aspect-square'} cursor-pointer`}
+                      onClick={() => handleImageClick(imageUrls, index)}
+                    >
+                      <img
+                        src={url.trim()}
+                        alt=""
+                        className={`w-full ${imageUrls.length === 1 ? 'max-h-[400px]' : 'h-full'} object-cover`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            {post.sharedPost.videoUrl && (
+              <video
+                src={post.sharedPost.videoUrl}
+                controls
+                className="w-full rounded-lg max-h-[400px]"
+              />
+            )}
+          </div>
+        )}
+
         {/* Post Images */}
         {post.imageUrl && (() => {
           const imageUrls = post.imageUrl.split(',').filter(url => url.trim())
@@ -314,9 +369,16 @@ export const PostDetail = () => {
           <button className="hover:underline cursor-pointer">
             {post._count.likes} {post._count.likes === 1 ? 'Like' : 'Likes'}
           </button>
-          <button className="hover:underline cursor-pointer">
-            {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button className="hover:underline cursor-pointer">
+              {post._count.comments} {post._count.comments === 1 ? 'Comment' : 'Comments'}
+            </button>
+            {post._count.shares !== undefined && post._count.shares > 0 && (
+              <span>
+                {post._count.shares} {post._count.shares === 1 ? 'Share' : 'Shares'}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Post Actions */}
@@ -329,7 +391,10 @@ export const PostDetail = () => {
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Comment</span>
           </button>
-          <button className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+          <button
+            onClick={() => setSharingPost(post)}
+            className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+          >
             <Share2 className="w-5 h-5" />
             <span className="font-medium">Share</span>
           </button>
@@ -384,6 +449,20 @@ export const PostDetail = () => {
         onDeleteImage={handleDeleteImage}
         canDelete={post?.userId === currentUser?.id}
       />
+
+      {sharingPost && currentUser && (
+        <SharePostModal
+          post={sharingPost}
+          open={!!sharingPost}
+          onClose={() => setSharingPost(null)}
+          onShared={() => {
+            setSharingPost(null);
+            loadPost();
+          }}
+          currentUserName={currentUser.name}
+          currentUserAvatar={currentUser.avatar}
+        />
+      )}
     </div>
   )
 }
