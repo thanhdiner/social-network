@@ -172,6 +172,7 @@ export class UsersController {
         userId: userId,
         actorId: follower.id,
         actorName: follower.name,
+        actorUsername: follower.username,
         actorAvatar: follower.avatar || undefined,
       });
 
@@ -196,20 +197,7 @@ export class UsersController {
   ) {
     await this.usersService.unfollowUser(currentUser.userId, userId);
 
-    // Get user data
-    const follower = await this.usersService.findById(currentUser.userId);
-    if (follower) {
-      // Create notification in database
-      await this.notificationsService.create({
-        type: 'unfollow',
-        content: `${follower.name} unfollowed you`,
-        userId: userId,
-        actorId: follower.id,
-        actorName: follower.name,
-        actorAvatar: follower.avatar || undefined,
-      });
-    }
-
+    // No notification for unfollow
     // Notify via Socket.IO
     this.chatGateway.notifyUnfollow(currentUser.userId, userId);
 

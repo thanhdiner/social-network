@@ -7,6 +7,7 @@ export interface CreateNotificationDto {
   userId: string;
   actorId?: string;
   actorName?: string;
+  actorUsername?: string;
   actorAvatar?: string;
   relatedId?: string;
 }

@@ -127,16 +127,17 @@ model Message {
 }
 
 model Notification {
-  id          String   @id @default(uuid())
-  type        String   // 'like', 'comment', 'follow', 'unfollow', 'message'
-  content     String
-  userId      String   // Người nhận thông báo
-  actorId     String?  // Người thực hiện hành động
-  actorName   String?  // Tên người thực hiện
-  actorAvatar String?  // Avatar người thực hiện
-  relatedId   String?  // ID liên quan (postId, commentId, etc)
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  type          String   // 'like', 'comment', 'follow', 'unfollow', 'message'
+  content       String
+  userId        String   // Người nhận thông báo
+  actorId       String?  // Người thực hiện hành động
+  actorName     String?  // Tên người thực hiện
+  actorUsername String?  // Username người thực hiện
+  actorAvatar   String?  // Avatar người thực hiện
+  relatedId     String?  // ID liên quan (postId, commentId, etc)
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -184,9 +184,14 @@ export const NotificationsDropdown = () => {
   }
 
   const handleNotificationClick = (notification: Notification) => {
-    // Navigate to related post if it's a like, comment, or share notification
-    if ((notification.type === 'like' || notification.type === 'comment' || notification.type === 'share') && notification.relatedId) {
-      setIsOpen(false)
+    setIsOpen(false)
+    
+    // Navigate based on notification type
+    if (notification.type === 'follow' && notification.actorUsername) {
+      // For follow notifications, navigate to the follower's profile
+      navigate(`/profile/${notification.actorUsername}`)
+    } else if ((notification.type === 'like' || notification.type === 'comment' || notification.type === 'share') && notification.relatedId) {
+      // Navigate to related post
       navigate(`/post/${notification.relatedId}`)
     }
   }
@@ -238,7 +243,7 @@ export const NotificationsDropdown = () => {
                   onClick={() => handleNotificationClick(notification)}
                   className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                     !notification.read ? 'bg-orange-50' : ''
-                  } ${notification.type === 'like' || notification.type === 'comment' || notification.type === 'share' ? 'cursor-pointer' : ''}`}
+                  } ${notification.type === 'follow' || notification.type === 'like' || notification.type === 'comment' || notification.type === 'share' ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="shrink-0">{getIcon(notification.type)}</div>
