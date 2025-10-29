@@ -51,10 +51,15 @@ export class PostsController {
           post.id,
           user.userId,
         );
+        const isSaved = await this.postsService.checkIfPostSaved(
+          post.id,
+          user.userId,
+        );
         return {
           ...post,
           isLiked: reactionInfo.liked,
           reactionType: reactionInfo.type,
+          isSaved,
         };
       }),
     );
@@ -86,13 +91,36 @@ export class PostsController {
             post.id,
             currentUserId,
           );
-          return { ...post, isLiked: reactionInfo.liked, reactionType: reactionInfo.type };
+          const isSaved = await this.postsService.checkIfPostSaved(
+            post.id,
+            currentUserId,
+          );
+          return {
+            ...post,
+            isLiked: reactionInfo.liked,
+            reactionType: reactionInfo.type,
+            isSaved,
+          };
         }),
       );
       return { ...result, posts: postsWithLikes };
     }
 
     return result;
+  }
+
+  @Get('saved')
+  @UseGuards(JwtAuthGuard)
+  getSavedPosts(
+    @CurrentUser() user: CurrentUserData,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.postsService.getSavedPosts(
+      user.userId,
+      page ? parseInt(page) : undefined,
+      limit ? parseInt(limit) : undefined,
+    );
   }
 
   @Get(':id')
@@ -103,12 +131,17 @@ export class PostsController {
       return { error: 'Post not found' };
     }
 
-    const reactionInfo = await this.postsService.checkIfUserLiked(id, user.userId);
+    const reactionInfo = await this.postsService.checkIfUserLiked(
+      id,
+      user.userId,
+    );
+    const isSaved = await this.postsService.checkIfPostSaved(id, user.userId);
 
     return {
       ...post,
       isLiked: reactionInfo.liked,
       reactionType: reactionInfo.type,
+      isSaved,
     };
   }
 
@@ -160,5 +193,15 @@ export class PostsController {
     @Body() body: { content?: string },
   ) {
     return this.postsService.sharePost(postId, user.userId, body.content);
+  }
+
+  @Post(':id/save')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  toggleSavePost(
+    @Param('id') postId: string,
+    @CurrentUser() user: CurrentUserData,
+  ) {
+    return this.postsService.toggleSavePost(postId, user.userId);
   }
 }

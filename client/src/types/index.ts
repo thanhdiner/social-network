@@ -43,15 +43,22 @@ export interface Post {
   id: string;
   content: string;
   imageUrl?: string;
+  videoUrl?: string;
   userId: string;
   createdAt: string;
   updatedAt: string;
   user?: User;
   comments?: Comment[];
   likes?: Like[];
+  sharedPostId?: string;
+  sharedPost?: Post;
+  isLiked?: boolean;
+  reactionType?: ReactionType | null;
+  isSaved?: boolean;
   _count?: {
     comments: number;
     likes: number;
+    shares: number;
   };
 }
 

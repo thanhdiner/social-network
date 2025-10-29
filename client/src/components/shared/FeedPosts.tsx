@@ -104,6 +104,24 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
     }
   }
 
+  const handleSave = async (postId: string) => {
+    try {
+      // Optimistic update
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, isSaved: !post.isSaved }
+          : post
+      ))
+
+      // Call API
+      await postService.toggleSavePost(postId)
+    } catch (error) {
+      console.error('Failed to toggle save:', error)
+      // Reload posts on error
+      loadPosts()
+    }
+  }
+
   const handleDelete = async (postId: string) => {
     if (!confirm('Are you sure you want to delete this post?')) return
 
@@ -437,8 +455,11 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
               <Share2 className="w-5 h-5" />
               <span className="font-medium">Share</span>
             </button>
-            <button className="cursor-pointer p-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
-              <Bookmark className="w-5 h-5" />
+            <button 
+              onClick={() => handleSave(post.id)}
+              className="cursor-pointer p-2 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+            >
+              <Bookmark className={`w-5 h-5 ${post.isSaved ? 'fill-orange-500 text-orange-500' : ''}`} />
             </button>
           </div>
 

@@ -23,6 +23,7 @@ export interface Post {
   };
   isLiked?: boolean;
   reactionType?: string | null;
+  isSaved?: boolean;
 }
 
 export interface CreatePostData {
@@ -128,6 +129,24 @@ class PostService {
    */
   async sharePost(postId: string, content?: string): Promise<Post> {
     const response = await api.post<Post>(`/posts/${postId}/share`, { content });
+    return response.data;
+  }
+
+  /**
+   * Toggle save post
+   */
+  async toggleSavePost(postId: string): Promise<{ saved: boolean; message: string }> {
+    const response = await api.post<{ saved: boolean; message: string }>(`/posts/${postId}/save`);
+    return response.data;
+  }
+
+  /**
+   * Get saved posts
+   */
+  async getSavedPosts(page = 1, limit = 10): Promise<{ posts: Post[]; total: number; page: number; totalPages: number }> {
+    const response = await api.get<{ posts: Post[]; total: number; page: number; totalPages: number }>('/posts/saved', {
+      params: { page, limit },
+    });
     return response.data;
   }
 }

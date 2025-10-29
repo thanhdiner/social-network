@@ -85,6 +85,22 @@ export const PostDetail = () => {
     }
   }
 
+  const handleSave = async () => {
+    if (!post) return
+
+    try {
+      // Optimistic update
+      setPost(prev => prev ? { ...prev, isSaved: !prev.isSaved } : prev)
+
+      // Call API
+      await postService.toggleSavePost(post.id)
+    } catch (error) {
+      console.error('Failed to toggle save:', error)
+      // Reload on error
+      loadPost()
+    }
+  }
+
   const handleDelete = async () => {
     if (!post || !window.confirm('Are you sure you want to delete this post?')) return
 
@@ -398,8 +414,11 @@ export const PostDetail = () => {
             <Share2 className="w-5 h-5" />
             <span className="font-medium">Share</span>
           </button>
-          <button className="cursor-pointer p-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
-            <Bookmark className="w-5 h-5" />
+          <button 
+            onClick={handleSave}
+            className="cursor-pointer p-2 rounded-lg hover:bg-gray-50 text-gray-600 transition"
+          >
+            <Bookmark className={`w-5 h-5 ${post.isSaved ? 'fill-orange-500 text-orange-500' : ''}`} />
           </button>
         </div>
 

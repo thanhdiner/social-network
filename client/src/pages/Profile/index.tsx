@@ -8,6 +8,7 @@ import { ProfileTimeline } from './components/ProfileTimeline'
 import { ProfileAbout } from './components/ProfileAbout'
 import { ProfileConnections } from './components/ProfileConnections'
 import { ProfilePhotos } from './components/ProfilePhotos'
+import { SavedPosts } from './components/SavedPosts'
 
 export default function MyProfilePage() {
   const { username } = useParams()
@@ -16,9 +17,9 @@ export default function MyProfilePage() {
   const { user: currentUser } = useAuth()
   
   // Get tab from URL params or default to 'timeline'
-  const tabFromUrl = searchParams.get('tab') as 'timeline' | 'about' | 'connections' | 'photos' | null
-  const [activeTab, setActiveTab] = useState<'timeline' | 'about' | 'connections' | 'photos'>(
-    tabFromUrl && ['timeline', 'about', 'connections', 'photos'].includes(tabFromUrl) 
+  const tabFromUrl = searchParams.get('tab') as 'timeline' | 'about' | 'connections' | 'photos' | 'saved' | null
+  const [activeTab, setActiveTab] = useState<'timeline' | 'about' | 'connections' | 'photos' | 'saved'>(
+    tabFromUrl && ['timeline', 'about', 'connections', 'photos', 'saved'].includes(tabFromUrl) 
       ? tabFromUrl 
       : 'timeline'
   )
@@ -44,7 +45,7 @@ export default function MyProfilePage() {
 
   // Sync activeTab with URL params
   useEffect(() => {
-    if (tabFromUrl && ['timeline', 'about', 'connections', 'photos'].includes(tabFromUrl)) {
+    if (tabFromUrl && ['timeline', 'about', 'connections', 'photos', 'saved'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl)
     } else {
       setActiveTab('timeline')
@@ -65,7 +66,7 @@ export default function MyProfilePage() {
       <ProfileHeader username={profileUsername} isOwnProfile={isOwnProfile} />
 
       {/* Tabs */}
-      <ProfileTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+      <ProfileTabs activeTab={activeTab} setActiveTab={setActiveTab} isOwnProfile={isOwnProfile} />
 
       {/* Tab Content */}
       <div className="max-w-4xl w-full mt-6 space-y-6">
@@ -73,6 +74,7 @@ export default function MyProfilePage() {
         {activeTab === 'about' && <ProfileAbout username={profileUsername} />}
         {activeTab === 'connections' && <ProfileConnections username={profileUsername} />}
         {activeTab === 'photos' && <ProfilePhotos userId={profileUser.id} />}
+        {activeTab === 'saved' && isOwnProfile && <SavedPosts />}
       </div>
     </div>
   )

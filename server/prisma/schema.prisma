@@ -40,6 +40,7 @@ model User {
   notifications  Notification[]
   lifeEvents     LifeEvent[]
   sharedPosts    Share[]
+  savedPosts     SavedPost[]
 }
 
 model Post {
@@ -56,6 +57,7 @@ model Post {
   comments     Comment[]
   likes        Like[]
   shares       Share[]
+  savedPosts   SavedPost[]
   sharedPost   Post?     @relation("SharedPosts", fields: [sharedPostId], references: [id], onDelete: Cascade)
   sharedBy     Post[]    @relation("SharedPosts")
 
@@ -173,4 +175,18 @@ model Share {
   @@index([postId])
   @@index([userId])
   @@index([userId, postId])
+}
+
+model SavedPost {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+  @@index([postId])
 }

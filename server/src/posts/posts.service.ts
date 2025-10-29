@@ -574,4 +574,126 @@ export class PostsService {
 
     return sharedPost;
   }
+
+  async toggleSavePost(postId: string, userId: string) {
+    // Check if post exists
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw new Error('Post not found');
+    }
+
+    // Check if already saved
+    const existingSave = await this.prisma.savedPost.findUnique({
+      where: {
+        postId_userId: {
+          postId,
+          userId,
+        },
+      },
+    });
+
+    if (existingSave) {
+      // Unsave
+      await this.prisma.savedPost.delete({
+        where: { id: existingSave.id },
+      });
+      return { saved: false, message: 'Post unsaved' };
+    } else {
+      // Save
+      await this.prisma.savedPost.create({
+        data: {
+          postId,
+          userId,
+        },
+      });
+      return { saved: true, message: 'Post saved' };
+    }
+  }
+
+  async getSavedPosts(userId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const [savedPosts, total] = await Promise.all([
+      this.prisma.savedPost.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: {
+          post: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+              sharedPost: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      username: true,
+                      avatar: true,
+                    },
+                  },
+                },
+              },
+              _count: {
+                select: {
+                  comments: true,
+                  likes: true,
+                  shares: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.savedPost.count({ where: { userId } }),
+    ]);
+
+    // Extract posts from savedPosts and check if user liked/saved them
+    const posts = await Promise.all(
+      savedPosts.map(async (savedPost) => {
+        const reactionInfo = await this.checkIfUserLiked(
+          savedPost.post.id,
+          userId,
+        );
+        return {
+          ...savedPost.post,
+          isLiked: reactionInfo.liked,
+          reactionType: reactionInfo.type,
+          isSaved: true, // Always true for saved posts
+        };
+      }),
+    );
+
+    return {
+      posts,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async checkIfPostSaved(postId: string, userId: string): Promise<boolean> {
+    const savedPost = await this.prisma.savedPost.findUnique({
+      where: {
+        postId_userId: {
+          postId,
+          userId,
+        },
+      },
+    });
+    return !!savedPost;
+  }
 }
