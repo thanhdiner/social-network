@@ -14,6 +14,7 @@ import Stories from '@/pages/Stories'
 import NotFound from '@/pages/NotFound'
 import UserNotFound from '@/pages/UserNotFound'
 import { PostDetail } from '@/pages/PostDetail'
+import { SearchResults } from '@/pages/Search'
 
 function App() {
   return (
@@ -111,6 +112,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <Stories />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <SearchResults />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -1,9 +1,10 @@
-import { Mail, TextAlignJustify, Search, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
+import { Mail, TextAlignJustify, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { NotificationsDropdown } from '../shared/NotificationsDropdown'
+import { SearchDropdown } from '../shared/SearchDropdown'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
@@ -64,13 +65,8 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
       </div>
 
       {/* Middle search */}
-      <div className="hidden md:block w-1/3 relative">
-        <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-        <input
-          type="text"
-          placeholder="Search here..."
-          className="w-full rounded-full border pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring focus:ring-orange-200"
-        />
+      <div className="hidden md:block w-1/3">
+        <SearchDropdown />
       </div>
 
       {/* Right section */}

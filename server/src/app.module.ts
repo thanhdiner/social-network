@@ -12,6 +12,7 @@ import { UploadModule } from './upload/upload.module';
 import { LifeEventsModule } from './life-events/life-events.module';
 import { CommentsModule } from './comments/comments.module';
 import { StoriesModule } from './stories/stories.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StoriesModule } from './stories/stories.module';
     LifeEventsModule,
     CommentsModule,
     StoriesModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
