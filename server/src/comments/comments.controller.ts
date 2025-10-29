@@ -12,6 +12,7 @@ import {
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
+import { CreateCommentLikeDto } from './dto/create-comment-like.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import {
   CurrentUser,
@@ -64,5 +65,26 @@ export class CommentsController {
   @Delete(':id')
   remove(@CurrentUser() user: CurrentUserData, @Param('id') id: string) {
     return this.commentsService.remove(id, user.userId);
+  }
+
+  @Post(':id/like')
+  toggleLike(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') id: string,
+    @Body() createCommentLikeDto: CreateCommentLikeDto,
+  ) {
+    return this.commentsService.toggleLike(
+      id,
+      user.userId,
+      createCommentLikeDto.type,
+    );
+  }
+
+  @Get(':id/likes')
+  getCommentLikes(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') id: string,
+  ) {
+    return this.commentsService.getCommentLikes(id, user.userId);
   }
 }

@@ -13,4 +13,8 @@ export class CreateCommentDto {
   @IsInt()
   @Min(0)
   imageIndex?: number; // Index của ảnh trong post (null = comment chung)
+
+  @IsOptional()
+  @IsString()
+  parentId?: string; // ID của comment cha (null = comment gốc, có giá trị = reply)
 }

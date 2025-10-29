@@ -31,6 +31,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   const [commentRefresh, setCommentRefresh] = useState<Record<string, number>>({})
   const [sharingPost, setSharingPost] = useState<Post | null>(null)
   const [likeListPost, setLikeListPost] = useState<Post | null>(null)
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set())
   const menuRef = useRef<HTMLDivElement>(null)
   
   // Save original URL when modal opens
@@ -316,7 +317,28 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
           </div>
 
           {/* Post Content */}
-          <p className="text-gray-800 mb-4 whitespace-pre-wrap">{post.content}</p>
+          <p className="text-gray-800 mb-4 whitespace-pre-wrap">
+            {post.content.length > 300 && !expandedPosts.has(post.id) 
+              ? post.content.slice(0, 300) + '...'
+              : post.content
+            }
+          </p>
+          {post.content.length > 300 && (
+            <button
+              onClick={() => {
+                const newExpanded = new Set(expandedPosts)
+                if (expandedPosts.has(post.id)) {
+                  newExpanded.delete(post.id)
+                } else {
+                  newExpanded.add(post.id)
+                }
+                setExpandedPosts(newExpanded)
+              }}
+              className="text-orange-500 hover:text-orange-600 font-medium mb-4 cursor-pointer"
+            >
+              {expandedPosts.has(post.id) ? 'Read less' : 'Read more'}
+            </button>
+          )}
 
           {/* Shared Post */}
           {post.sharedPost && (

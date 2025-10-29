@@ -36,6 +36,7 @@ export class CommentsService {
         content: createCommentDto.content,
         imageUrl: createCommentDto.imageUrl,
         imageIndex: createCommentDto.imageIndex,
+        parentId: createCommentDto.parentId,
         postId,
         userId,
       },
@@ -73,7 +74,10 @@ export class CommentsService {
   async findByPostId(postId: string, page = 1, limit = 20, imageIndex?: number) {
     const skip = (page - 1) * limit;
 
-    const where: any = { postId };
+    const where: any = { 
+      postId,
+      parentId: null, // Chỉ lấy comment gốc, không lấy replies
+    };
     
     // Nếu imageIndex được cung cấp, lọc theo imageIndex đó
     // Nếu không, chỉ lấy comments không có imageIndex (comments chung)
@@ -100,9 +104,35 @@ export class CommentsService {
               avatar: true,
             },
           },
+          replies: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  username: true,
+                  avatar: true,
+                },
+              },
+              _count: {
+                select: {
+                  likes: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+          _count: {
+            select: {
+              likes: true,
+              replies: true,
+            },
+          },
         },
       }),
-      this.prisma.comment.count({ where }),
+      this.prisma.comment.count({ where: { ...where, parentId: null } }),
     ]);
 
     return {
@@ -183,4 +213,82 @@ export class CommentsService {
 
     return { message: 'Comment deleted successfully' };
   }
+
+  // Like/Unlike comment
+  async toggleLike(
+    commentId: string,
+    userId: string,
+    type: string = 'like',
+  ) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const existingLike = await this.prisma.commentLike.findUnique({
+      where: {
+        commentId_userId: {
+          commentId,
+          userId,
+        },
+      },
+    });
+
+    if (existingLike) {
+      if (existingLike.type === type) {
+        // Unlike
+        await this.prisma.commentLike.delete({
+          where: { id: existingLike.id },
+        });
+        return { liked: false, type: null };
+      } else {
+        // Change reaction type
+        await this.prisma.commentLike.update({
+          where: { id: existingLike.id },
+          data: { type },
+        });
+        return { liked: true, type };
+      }
+    }
+
+    // Create new like
+    await this.prisma.commentLike.create({
+      data: {
+        commentId,
+        userId,
+        type,
+      },
+    });
+
+    return { liked: true, type };
+  }
+
+  // Get comment likes count and user's like status
+  async getCommentLikes(commentId: string, userId?: string) {
+    const likes = await this.prisma.commentLike.groupBy({
+      by: ['type'],
+      where: { commentId },
+      _count: true,
+    });
+
+    const userLike = userId
+      ? await this.prisma.commentLike.findUnique({
+          where: {
+            commentId_userId: {
+              commentId,
+              userId,
+            },
+          },
+        })
+      : null;
+
+    return {
+      likes: likes.map((l) => ({ type: l.type, count: l._count })),
+      userLike: userLike?.type || null,
+    };
+  }
 }
+
