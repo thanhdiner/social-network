@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, ChevronLeft, ChevronRight, MessageCircle, Send, Loader2, Link2, Check, Download, Share2, Image } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, MessageCircle, Send, Loader2, Link2, Check, Download, Share2, Image, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { commentService, type CreateCommentData } from '@/services/commentService'
 import postService, { type Post } from '@/services/postService'
 import type { Comment } from '@/types'
@@ -8,6 +9,7 @@ import { SharePostModal } from './SharePostModal'
 import { LikeListModal } from './LikeListModal'
 import uploadService from '@/services/uploadService'
 import { Avatar } from './Avatar'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Like state for each image
 interface ImageLikeState {
@@ -26,6 +28,7 @@ interface ImageGalleryModalProps {
 }
 
 export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onClose, onShare }: ImageGalleryModalProps) => {
+  const { user: currentUser } = useAuth()
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -37,7 +40,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
   const [sharingPost, setSharingPost] = useState(false)
   const [showLikeList, setShowLikeList] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
+
   // Reply states
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null)
@@ -97,13 +100,13 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
       try {
         const response = await commentService.getCommentsByPostId(postId, 1, 50, currentIndex)
         setComments(response.comments)
-        
+
         // Load like information for all comments and replies
         const allCommentIds = response.comments.flatMap(c => [c.id, ...(c.replies?.map(r => r.id) || [])])
         const likesData: Record<string, { liked: boolean; type: ReactionType | null; count: number }> = {}
-        
+
         await Promise.all(
-          allCommentIds.map(async (commentId) => {
+          allCommentIds.map(async commentId => {
             try {
               const likeInfo = await commentService.getCommentLikes(commentId)
               likesData[commentId] = {
@@ -116,7 +119,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
             }
           })
         )
-        
+
         setCommentLikes(likesData)
       } catch (error) {
         console.error('Error loading comments:', error)
@@ -179,7 +182,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
       }
       const newComment = await commentService.createComment(postId, data)
       setComments(prev => [newComment, ...prev])
-      
+
       // Initialize like state for new comment
       setCommentLikes(prev => ({
         ...prev,
@@ -189,7 +192,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
           count: 0
         }
       }))
-      
+
       setCommentText('')
       setCommentImageUrl(null)
     } catch (error) {
@@ -234,19 +237,32 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
     }
   }
 
-  const handleDeleteComment = async (commentId: string) => {
+  const handleDeleteComment = async (commentId: string, isReply = false) => {
+    if (!confirm('Bạn có chắc muốn xóa bình luận này?')) return
+    
     try {
       await commentService.deleteComment(commentId)
-      setComments(prev => prev.filter(c => c.id !== commentId))
+      
+      if (isReply) {
+        // Xóa reply khỏi comment cha
+        setComments(prev => prev.map(c => ({
+          ...c,
+          replies: c.replies?.filter(r => r.id !== commentId)
+        })))
+      } else {
+        // Xóa comment
+        setComments(prev => prev.filter(c => c.id !== commentId))
+      }
     } catch (error) {
       console.error('Error deleting comment:', error)
+      alert('Không thể xóa bình luận. Vui lòng thử lại.')
     }
   }
 
   const handleLikeComment = async (commentId: string, type: ReactionType = 'like') => {
     try {
       const result = await commentService.toggleLike(commentId, type)
-      
+
       setCommentLikes(prev => ({
         ...prev,
         [commentId]: {
@@ -291,27 +307,27 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
         imageUrl = await uploadService.uploadImage(replyImage)
       }
 
-      const content = replyingToUser 
-        ? `@${replyingToUser.name} ${replyContent.trim()}`
-        : replyContent.trim()
+      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim()
 
       const newReply = await commentService.createComment(postId, {
         content: content || '',
         parentId,
         imageUrl,
-        imageIndex: currentIndex,
+        imageIndex: currentIndex
       })
-      
-      setComments(prev => prev.map(c => {
-        if (c.id === parentId) {
-          return {
-            ...c,
-            replies: [...(c.replies || []), newReply]
+
+      setComments(prev =>
+        prev.map(c => {
+          if (c.id === parentId) {
+            return {
+              ...c,
+              replies: [...(c.replies || []), newReply]
+            }
           }
-        }
-        return c
-      }))
-      
+          return c
+        })
+      )
+
       // Initialize like state for new reply
       setCommentLikes(prev => ({
         ...prev,
@@ -321,7 +337,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
           count: 0
         }
       }))
-      
+
       setReplyingTo(null)
       setReplyingToUser(null)
       setReplyContent('')
@@ -549,10 +565,17 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
               comments.map(comment => (
                 <div key={comment.id} className="space-y-2">
                   <div className="flex gap-2 md:gap-3 group">
-                    <Avatar src={comment.user?.avatar} name={comment.user?.name || 'User'} size="sm" />
+                    <Link to={`/profile/${comment.user?.username}`} className="cursor-pointer">
+                      <Avatar src={comment.user?.avatar} name={comment.user?.name || 'User'} size="sm" />
+                    </Link>
                     <div className="flex-1 min-w-0">
                       <div className="bg-gray-100 rounded-2xl px-3 md:px-4 py-2">
-                        <p className="font-semibold text-xs md:text-sm text-gray-800">{comment.user?.name || 'Unknown User'}</p>
+                        <Link
+                          to={`/profile/${comment.user?.username}`}
+                          className="font-semibold text-xs md:text-sm text-gray-800 hover:text-orange-600 transition cursor-pointer"
+                        >
+                          {comment.user?.name || 'Unknown User'}
+                        </Link>
                         <p className="text-sm md:text-base text-gray-700 wrap-break-word">{comment.content}</p>
 
                         {comment.imageUrl && (
@@ -564,13 +587,13 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                           />
                         )}
                       </div>
-                      
+
                       <div className="flex items-center gap-2 mt-1 px-3 text-xs text-gray-500">
                         <span>{new Date(comment.createdAt).toLocaleString()}</span>
-                        
+
                         {/* Like button with ReactionPicker */}
                         <ReactionPicker
-                          onReact={(type) => handleLikeComment(comment.id, type)}
+                          onReact={type => handleLikeComment(comment.id, type)}
                           currentReaction={commentLikes[comment.id]?.type || null}
                         />
 
@@ -578,13 +601,13 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                         <button
                           onClick={() => {
                             if (replyingTo === comment.id) {
-                              setReplyingTo(null);
-                              setReplyingToUser(null);
-                              setReplyContent('');
-                              handleRemoveReplyImage();
+                              setReplyingTo(null)
+                              setReplyingToUser(null)
+                              setReplyContent('')
+                              handleRemoveReplyImage()
                             } else {
-                              setReplyingTo(comment.id);
-                              setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+                              setReplyingTo(comment.id)
+                              setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' })
                             }
                           }}
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
@@ -593,18 +616,20 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                           Phản hồi
                         </button>
 
-                        {commentLikes[comment.id]?.count > 0 && (
-                          <span className="text-gray-600">
-                            {commentLikes[comment.id]?.count} lượt thích
-                          </span>
+                        {/* Delete button - only show if current user is the author */}
+                        {currentUser?.id === comment.userId && (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="hover:underline font-semibold cursor-pointer flex items-center gap-1 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </button>
                         )}
 
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="ml-auto text-red-500 hover:text-red-600 cursor-pointer"
-                        >
-                          Delete
-                        </button>
+                        {commentLikes[comment.id]?.count > 0 && (
+                          <span className="text-gray-600">{commentLikes[comment.id]?.count} lượt thích</span>
+                        )}
                       </div>
 
                       {/* Reply form */}
@@ -615,10 +640,10 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                             <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                             <button
                               onClick={() => {
-                                setReplyingTo(null);
-                                setReplyingToUser(null);
-                                setReplyContent('');
-                                handleRemoveReplyImage();
+                                setReplyingTo(null)
+                                setReplyingToUser(null)
+                                setReplyContent('')
+                                handleRemoveReplyImage()
                               }}
                               className="text-gray-400 hover:text-gray-600 cursor-pointer"
                             >
@@ -626,19 +651,11 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                             </button>
                           </div>
                           <div className="flex gap-2">
-                            <Avatar 
-                              src={comment.user?.avatar}
-                              name={comment.user?.name || 'User'}
-                              size="sm"
-                            />
+                            <Avatar src={comment.user?.avatar} name={comment.user?.name || 'User'} size="sm" />
                             <div className="flex-1">
                               {replyImagePreview && (
                                 <div className="relative mb-2 inline-block">
-                                  <img
-                                    src={replyImagePreview}
-                                    alt="Preview"
-                                    className="max-h-40 rounded-lg object-cover"
-                                  />
+                                  <img src={replyImagePreview} alt="Preview" className="max-h-40 rounded-lg object-cover" />
                                   <button
                                     onClick={handleRemoveReplyImage}
                                     className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white rounded-full p-1 hover:bg-opacity-90 cursor-pointer"
@@ -652,12 +669,12 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   ref={replyingTo === comment.id ? replyInputRef : null}
                                   type="text"
                                   value={replyContent}
-                                  onChange={(e) => setReplyContent(e.target.value)}
+                                  onChange={e => setReplyContent(e.target.value)}
                                   placeholder={`Phản hồi ${replyingToUser?.name}...`}
                                   className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                  onKeyPress={(e) => {
+                                  onKeyPress={e => {
                                     if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
-                                      handleReplySubmit(comment.id);
+                                      handleReplySubmit(comment.id)
                                     }
                                   }}
                                 />
@@ -691,35 +708,47 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                       {/* Nested replies */}
                       {comment.replies && comment.replies.length > 0 && (
                         <div className="mt-2 ml-8 space-y-2">
-                          {comment.replies.map((reply) => (
+                          {comment.replies.map(reply => (
                             <div key={reply.id} className="flex gap-2 group">
-                              <Avatar 
-                                src={reply.user?.avatar}
-                                name={reply.user?.name || 'User'}
-                                size="sm"
-                              />
+                              <Link to={`/profile/${reply.user?.username}`} className="cursor-pointer">
+                                <Avatar src={reply.user?.avatar} name={reply.user?.name || 'User'} size="sm" />
+                              </Link>
                               <div className="flex-1">
                                 <div className="bg-gray-100 rounded-2xl px-3 py-2">
-                                  <p className="font-semibold text-xs md:text-sm text-gray-800">
+                                  <Link
+                                    to={`/profile/${reply.user?.username}`}
+                                    className="font-semibold text-xs md:text-sm text-gray-800 hover:text-orange-600 transition cursor-pointer"
+                                  >
                                     {reply.user?.name || 'Unknown User'}
-                                  </p>
+                                  </Link>
                                   <p className="text-sm text-gray-800 wrap-break-word">
                                     {reply.content.startsWith('@') ? (
                                       <>
                                         {(() => {
-                                          const match = reply.content.match(/^@([^\s]+)\s(.*)$/);
+                                          const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s)
                                           if (match) {
-                                            const [, taggedName, remainingContent] = match;
+                                            const [, taggedName, remainingContent] = match
+                                            const taggedUser =
+                                              comment.user?.name === taggedName
+                                                ? comment.user
+                                                : comment.replies?.find(r => r.user?.name === taggedName)?.user
                                             return (
                                               <>
-                                                <span className="font-semibold text-orange-500">
-                                                  @{taggedName}
-                                                </span>
-                                                {' ' + remainingContent}
+                                                {taggedUser ? (
+                                                  <Link
+                                                    to={`/profile/${taggedUser.username}`}
+                                                    className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
+                                                  >
+                                                    @{taggedName}
+                                                  </Link>
+                                                ) : (
+                                                  <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
+                                                )}
+                                                {remainingContent}
                                               </>
-                                            );
+                                            )
                                           }
-                                          return reply.content;
+                                          return reply.content
                                         })()}
                                       </>
                                     ) : (
@@ -737,22 +766,22 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                 </div>
                                 <div className="flex items-center gap-2 mt-1 px-3 text-xs text-gray-500">
                                   <span>{new Date(reply.createdAt).toLocaleString()}</span>
-                                  
+
                                   <ReactionPicker
-                                    onReact={(type) => handleLikeComment(reply.id, type)}
+                                    onReact={type => handleLikeComment(reply.id, type)}
                                     currentReaction={commentLikes[reply.id]?.type || null}
                                   />
 
                                   <button
                                     onClick={() => {
                                       if (replyingTo === `reply-${reply.id}`) {
-                                        setReplyingTo(null);
-                                        setReplyingToUser(null);
-                                        setReplyContent('');
-                                        handleRemoveReplyImage();
+                                        setReplyingTo(null)
+                                        setReplyingToUser(null)
+                                        setReplyContent('')
+                                        handleRemoveReplyImage()
                                       } else {
-                                        setReplyingTo(`reply-${reply.id}`);
-                                        setReplyingToUser({ id: reply.userId, name: reply.user?.name || 'User' });
+                                        setReplyingTo(`reply-${reply.id}`)
+                                        setReplyingToUser({ id: reply.userId, name: reply.user?.name || 'User' })
                                       }
                                     }}
                                     className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
@@ -761,16 +790,25 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     Phản hồi
                                   </button>
 
+                                  {/* Delete button for reply - only show if current user is the author */}
+                                  {currentUser?.id === reply.userId && (
+                                    <button
+                                      onClick={() => handleDeleteComment(reply.id, true)}
+                                      className="hover:underline font-semibold cursor-pointer flex items-center gap-1 text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Delete
+                                    </button>
+                                  )}
+
                                   {commentLikes[reply.id]?.count > 0 && (
-                                    <span className="text-gray-600">
-                                      {commentLikes[reply.id]?.count} lượt thích
-                                    </span>
+                                    <span className="text-gray-600">{commentLikes[reply.id]?.count} lượt thích</span>
                                   )}
                                 </div>
                               </div>
                             </div>
                           ))}
-                          
+
                           {/* Reply to reply form */}
                           {replyingTo?.startsWith('reply-') && (
                             <div className="mt-2">
@@ -779,10 +817,10 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                 <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                                 <button
                                   onClick={() => {
-                                    setReplyingTo(null);
-                                    setReplyingToUser(null);
-                                    setReplyContent('');
-                                    handleRemoveReplyImage();
+                                    setReplyingTo(null)
+                                    setReplyingToUser(null)
+                                    setReplyContent('')
+                                    handleRemoveReplyImage()
                                   }}
                                   className="text-gray-400 hover:text-gray-600 cursor-pointer"
                                 >
@@ -790,19 +828,11 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                 </button>
                               </div>
                               <div className="flex gap-2">
-                                <Avatar 
-                                  src={comment.user?.avatar}
-                                  name={comment.user?.name || 'User'}
-                                  size="sm"
-                                />
+                                <Avatar src={comment.user?.avatar} name={comment.user?.name || 'User'} size="sm" />
                                 <div className="flex-1">
                                   {replyImagePreview && (
                                     <div className="relative mb-2 inline-block">
-                                      <img
-                                        src={replyImagePreview}
-                                        alt="Preview"
-                                        className="max-h-40 rounded-lg object-cover"
-                                      />
+                                      <img src={replyImagePreview} alt="Preview" className="max-h-40 rounded-lg object-cover" />
                                       <button
                                         onClick={handleRemoveReplyImage}
                                         className="absolute top-1 right-1 bg-gray-800 bg-opacity-70 text-white rounded-full p-1 hover:bg-opacity-90 cursor-pointer"
@@ -816,12 +846,12 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                       ref={replyingTo?.startsWith('reply-') ? replyInputRef : null}
                                       type="text"
                                       value={replyContent}
-                                      onChange={(e) => setReplyContent(e.target.value)}
+                                      onChange={e => setReplyContent(e.target.value)}
                                       placeholder={`Phản hồi ${replyingToUser?.name}...`}
                                       className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                                      onKeyPress={(e) => {
+                                      onKeyPress={e => {
                                         if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
-                                          handleReplySubmit(comment.id);
+                                          handleReplySubmit(comment.id)
                                         }
                                       }}
                                     />

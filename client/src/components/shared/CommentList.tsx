@@ -142,16 +142,27 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
     loadComments()
   }, [postId, refresh, loadComments])
 
-  const handleDelete = async (commentId: string) => {
-    if (!confirm('Are you sure you want to delete this comment?')) return
+  const handleDelete = async (commentId: string, isReply = false) => {
+    if (!confirm('Bạn có chắc muốn xóa bình luận này?')) return
 
     try {
       await commentService.deleteComment(commentId)
-      setComments(prev => prev.filter(c => c.id !== commentId))
+      
+      if (isReply) {
+        // Xóa reply khỏi comment cha
+        setComments(prev => prev.map(c => ({
+          ...c,
+          replies: c.replies?.filter(r => r.id !== commentId)
+        })))
+      } else {
+        // Xóa comment
+        setComments(prev => prev.filter(c => c.id !== commentId))
+      }
+      
       setMenuOpen(null)
     } catch (error) {
       console.error('Failed to delete comment:', error)
-      alert('Failed to delete comment. Please try again.')
+      alert('Không thể xóa bình luận. Vui lòng thử lại.')
     }
   }
 
@@ -469,26 +480,31 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                     />
                     <div className="flex-1">
                       <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block max-w-full">
-                        <Link to={`/profile/${reply.userId}`} className="font-semibold text-sm hover:underline">
+                        <Link to={`/profile/${reply.user?.username}`} className="font-semibold text-sm hover:underline cursor-pointer">
                           {reply.user?.name}
                         </Link>
                         <p className="text-sm text-gray-800 wrap-break-word">
                           {reply.content.startsWith('@') ? (
                             <>
-                              {/* Hiển thị tag nếu content bắt đầu bằng @ */}
                               {(() => {
-                                const match = reply.content.match(/^@([^\s]+)\s(.*)$/);
+                                const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);
                                 if (match) {
                                   const [, taggedName, remainingContent] = match;
-                                  // Tìm user được tag trong comment gốc hoặc replies
                                   const taggedUser = comment.user?.name === taggedName ? comment.user : 
                                     comment.replies?.find(r => r.user?.name === taggedName)?.user;
                                   return (
                                     <>
-                                      {taggedUser && (
-                                        <Link to={`/profile/${taggedUser.id}`} className="font-semibold text-orange-500 hover:underline mr-1">
+                                      {taggedUser ? (
+                                        <Link 
+                                          to={`/profile/${taggedUser.username}`}
+                                          className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
+                                        >
                                           @{taggedName}
                                         </Link>
+                                      ) : (
+                                        <span className="font-semibold text-orange-500 mr-1">
+                                          @{taggedName}
+                                        </span>
                                       )}
                                       {remainingContent}
                                     </>
@@ -536,6 +552,17 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           <MessageCircle className="w-3 h-3" />
                           Phản hồi
                         </button>
+
+                        {/* Delete button for reply - only show if current user is the author */}
+                        {currentUser?.id === reply.userId && (
+                          <button
+                            onClick={() => handleDelete(reply.id, true)}
+                            className="hover:underline font-semibold cursor-pointer flex items-center gap-1 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Delete
+                          </button>
+                        )}
 
                         {/* Like count for reply */}
                         {commentLikes[reply.id]?.count > 0 && (
