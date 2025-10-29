@@ -42,7 +42,11 @@ export class PostsController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    const result = await this.postsService.findAll(pageNum, limitNum);
+    const result = await this.postsService.findAll(
+      pageNum,
+      limitNum,
+      user.userId,
+    );
 
     // Add reaction info for each post
     const postsWithReactions = await Promise.all(

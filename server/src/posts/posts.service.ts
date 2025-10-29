@@ -40,11 +40,31 @@ export class PostsService {
     });
   }
 
-  async findAll(page = 1, limit = 10) {
+  async findAll(page = 1, limit = 10, userId?: string) {
     const skip = (page - 1) * limit;
+
+    // Build where clause: posts from user or people they follow
+    let whereClause = {};
+    if (userId) {
+      // Get list of users that current user is following
+      const following = await this.prisma.follow.findMany({
+        where: { followerId: userId },
+        select: { followingId: true },
+      });
+      
+      const followingIds = following.map(f => f.followingId);
+      
+      // Include posts from user and people they follow
+      whereClause = {
+        userId: {
+          in: [userId, ...followingIds],
+        },
+      };
+    }
 
     const [posts, total] = await Promise.all([
       this.prisma.post.findMany({
+        where: whereClause,
         skip,
         take: limit,
         orderBy: {
@@ -80,7 +100,7 @@ export class PostsService {
           },
         },
       }),
-      this.prisma.post.count(),
+      this.prisma.post.count({ where: whereClause }),
     ]);
 
     return {
