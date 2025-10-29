@@ -71,6 +71,7 @@ export interface CreatePostData {
 export interface Comment {
   id: string;
   content: string;
+  imageUrl?: string; // URL của ảnh đính kèm
   postId: string;
   userId: string;
   imageIndex?: number; // Index của ảnh trong post (null = comment chung)
@@ -81,6 +82,7 @@ export interface Comment {
 
 export interface CreateCommentData {
   content: string;
+  imageUrl?: string;
   postId: string;
   imageIndex?: number;
 }

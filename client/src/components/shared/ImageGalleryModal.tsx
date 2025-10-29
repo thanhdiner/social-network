@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
-import { X, ChevronLeft, ChevronRight, MessageCircle, Send, Loader2, Link2, Check, Download, Share2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { X, ChevronLeft, ChevronRight, MessageCircle, Send, Loader2, Link2, Check, Download, Share2, Image } from 'lucide-react'
 import { commentService, type CreateCommentData } from '@/services/commentService'
 import postService, { type Post } from '@/services/postService'
 import type { Comment } from '@/types'
 import { ReactionPicker, type ReactionType } from './ReactionPicker'
 import { SharePostModal } from './SharePostModal'
 import { LikeListModal } from './LikeListModal'
+import uploadService from '@/services/uploadService'
 
 // Like state for each image
 interface ImageLikeState {
@@ -34,11 +35,14 @@ export const ImageGalleryModal = ({
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
+  const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [copied, setCopied] = useState(false)
   const [sharingPost, setSharingPost] = useState(false)
   const [showLikeList, setShowLikeList] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Track like state for each image separately
   const [imageLikes, setImageLikes] = useState<Record<number, ImageLikeState>>({})
@@ -129,21 +133,58 @@ export const ImageGalleryModal = ({
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!commentText.trim() || submitting) return
+    if ((!commentText.trim() && !commentImageUrl) || submitting) return
 
     setSubmitting(true)
     try {
       const data: CreateCommentData = {
         content: commentText.trim(),
         imageIndex: currentIndex,
+        imageUrl: commentImageUrl || undefined,
       }
       const newComment = await commentService.createComment(postId, data)
       setComments((prev) => [newComment, ...prev])
       setCommentText('')
+      setCommentImageUrl(null)
     } catch (error) {
       console.error('Error creating comment:', error)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB')
+      return
+    }
+
+    setUploadingImage(true)
+    try {
+      const uploadedUrl = await uploadService.uploadImage(file)
+      setCommentImageUrl(uploadedUrl)
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('Failed to upload image')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setCommentImageUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -385,6 +426,16 @@ export const ImageGalleryModal = ({
                         {comment.user?.name || 'Unknown User'}
                       </p>
                       <p className="text-sm md:text-base text-gray-700 wrap-break-word">{comment.content}</p>
+                      
+                      {/* Display comment image if exists */}
+                      {comment.imageUrl && (
+                        <img
+                          src={comment.imageUrl}
+                          alt="Comment attachment"
+                          className="mt-2 max-w-xs max-h-60 rounded-lg cursor-pointer"
+                          onClick={() => window.open(comment.imageUrl, '_blank')}
+                        />
+                      )}
                     </div>
                     <div className="flex items-center gap-2 md:gap-3 mt-1 px-3 md:px-4">
                       <span className="text-xs text-gray-500">
@@ -412,6 +463,25 @@ export const ImageGalleryModal = ({
 
           {/* Comment Input - Sticky at bottom */}
           <form onSubmit={handleSubmitComment} className="p-3 md:p-4 border-t bg-white">
+            {/* Image Preview */}
+            {commentImageUrl && (
+              <div className="mb-2 relative inline-block">
+                <img
+                  src={commentImageUrl}
+                  alt="Preview"
+                  className="max-h-32 rounded-lg border cursor-pointer"
+                  onClick={() => window.open(commentImageUrl, '_blank')}
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-1 hover:bg-gray-900 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            
             <div className="flex gap-2">
               <input
                 id="comment-input"
@@ -422,9 +492,31 @@ export const ImageGalleryModal = ({
                 className="flex-1 rounded-full border px-3 md:px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 disabled={submitting}
               />
+              
+              {/* Image Upload Button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage || submitting}
+                className="p-2 text-gray-600 hover:text-orange-500 hover:bg-orange-50 rounded-full transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {uploadingImage ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Image className="w-5 h-5" />
+                )}
+              </button>
+              
               <button
                 type="submit"
-                disabled={!commentText.trim() || submitting}
+                disabled={(!commentText.trim() && !commentImageUrl) || submitting}
                 className="p-2 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {submitting ? (

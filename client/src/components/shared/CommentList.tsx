@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { commentService } from '@/services/commentService'
 import type { Comment } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { Avatar } from './Avatar'
 
 interface CommentListProps {
   postId: string
@@ -147,10 +148,11 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
         {comments.map(comment => (
         <div key={comment.id} className="flex gap-2 group">
           <Link to={`/profile/${comment.user?.username}`} className="cursor-pointer">
-            <img
-              src={comment.user?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user?.name || 'User')}&background=fb923c&color=fff`}
-              alt={comment.user?.name}
-              className="w-8 h-8 rounded-full object-cover shrink-0"
+            <Avatar
+              src={comment.user?.avatar}
+              name={comment.user?.name || 'User'}
+              size="sm"
+              className="shrink-0"
             />
           </Link>
           <div className="flex-1 min-w-0">
@@ -181,7 +183,17 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                   </button>
                 </div>
               ) : (
-                <p className="text-sm text-gray-800 wrap-break-word">{comment.content}</p>
+                <>
+                  <p className="text-sm text-gray-800 wrap-break-word">{comment.content}</p>
+                  {comment.imageUrl && (
+                    <img
+                      src={comment.imageUrl}
+                      alt="Comment attachment"
+                      className="mt-2 max-w-xs max-h-60 rounded-lg object-cover cursor-pointer"
+                      onClick={() => window.open(comment.imageUrl, '_blank')}
+                    />
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">

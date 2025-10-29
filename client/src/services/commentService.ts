@@ -3,6 +3,7 @@ import type { Comment } from '../types';
 
 export interface CreateCommentData {
   content: string;
+  imageUrl?: string; // URL của ảnh đính kèm
   imageIndex?: number; // Index của ảnh trong post (optional)
 }
 

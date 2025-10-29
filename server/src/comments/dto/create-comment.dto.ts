@@ -6,6 +6,10 @@ export class CreateCommentDto {
   content: string;
 
   @IsOptional()
+  @IsString()
+  imageUrl?: string; // URL của ảnh đính kèm trong comment
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   imageIndex?: number; // Index của ảnh trong post (null = comment chung)

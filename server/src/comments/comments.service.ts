@@ -34,6 +34,7 @@ export class CommentsService {
     const comment = await this.prisma.comment.create({
       data: {
         content: createCommentDto.content,
+        imageUrl: createCommentDto.imageUrl,
         imageIndex: createCommentDto.imageIndex,
         postId,
         userId,

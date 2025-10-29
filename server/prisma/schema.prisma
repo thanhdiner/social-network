@@ -70,6 +70,7 @@ model Post {
 model Comment {
   id         String   @id @default(uuid())
   content    String
+  imageUrl   String?  // URL của ảnh trong comment
   postId     String
   userId     String
   imageIndex Int?     // Index của ảnh trong post (null = comment chung cho post)
