@@ -19,6 +19,7 @@ export interface Post {
     likes: number;
   };
   isLiked?: boolean;
+  reactionType?: string | null;
 }
 
 export interface CreatePostData {
@@ -89,8 +90,8 @@ class PostService {
   /**
    * Toggle like on a post
    */
-  async toggleLike(postId: string): Promise<{ liked: boolean; message: string }> {
-    const response = await api.post<{ liked: boolean; message: string }>(`/posts/${postId}/like`);
+  async toggleLike(postId: string, type: string = 'like'): Promise<{ liked: boolean; type: string | null; message: string }> {
+    const response = await api.post<{ liked: boolean; type: string | null; message: string }>(`/posts/${postId}/like`, { type });
     return response.data;
   }
 

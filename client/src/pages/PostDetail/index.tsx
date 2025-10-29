@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Bookmark, Trash2, Pencil, Link as LinkIcon, ArrowLeft } from 'lucide-react'
+import { MessageCircle, Share2, MoreHorizontal, Bookmark, Trash2, Pencil, Link as LinkIcon, ArrowLeft } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from '@/components/shared/EditPostModal'
 import { ImageViewer } from '@/components/shared/ImageViewer'
 import { useTitle } from '@/hooks/useTitle'
+import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
 
 export const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>()
@@ -41,39 +42,41 @@ export const PostDetail = () => {
     loadPost()
   }, [loadPost])
 
-  const handleToggleLike = async () => {
+  const handleToggleLike = async (type: ReactionType = 'like') => {
     if (!post) return
 
     try {
       // Optimistic update
       setPost(prev => {
         if (!prev) return prev
+        const isSameReaction = prev.reactionType === type
         return {
           ...prev,
-          isLiked: !prev.isLiked,
+          isLiked: !isSameReaction,
+          reactionType: isSameReaction ? null : type,
           _count: {
             ...prev._count,
-            likes: prev.isLiked ? prev._count.likes - 1 : prev._count.likes + 1
+            likes: isSameReaction ? prev._count.likes - 1 : (prev.isLiked ? prev._count.likes : prev._count.likes + 1)
           }
         }
       })
 
       // Call API
-      await postService.toggleLike(post.id)
-    } catch (error) {
-      console.error('Failed to toggle like:', error)
-      // Revert on error
+      const result = await postService.toggleLike(post.id, type)
+
+      // Update with server response
       setPost(prev => {
         if (!prev) return prev
         return {
           ...prev,
-          isLiked: !prev.isLiked,
-          _count: {
-            ...prev._count,
-            likes: prev.isLiked ? prev._count.likes + 1 : prev._count.likes - 1
-          }
+          isLiked: result.liked,
+          reactionType: result.type,
         }
       })
+    } catch (error) {
+      console.error('Failed to toggle like:', error)
+      // Reload on error
+      loadPost()
     }
   }
 
@@ -315,15 +318,10 @@ export const PostDetail = () => {
 
         {/* Post Actions */}
         <div className="flex items-center gap-1">
-          <button 
-            onClick={handleToggleLike}
-            className={`cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 transition ${
-              post.isLiked ? 'text-orange-500' : 'text-gray-600'
-            }`}
-          >
-            <Heart className={`w-5 h-5 ${post.isLiked ? 'fill-orange-500' : ''}`} />
-            <span className="font-medium">Like</span>
-          </button>
+          <ReactionPicker 
+            onReact={handleToggleLike}
+            currentReaction={post.reactionType}
+          />
           <button className="cursor-pointer flex-1 flex items-center justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600 transition">
             <MessageCircle className="w-5 h-5" />
             <span className="font-medium">Comment</span>

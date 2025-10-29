@@ -160,7 +160,10 @@ export class PostsService {
     });
   }
 
-  async checkIfUserLiked(postId: string, userId: string): Promise<boolean> {
+  async checkIfUserLiked(
+    postId: string,
+    userId: string,
+  ): Promise<{ liked: boolean; type: string | null }> {
     const like = await this.prisma.like.findUnique({
       where: {
         postId_userId: {
@@ -170,10 +173,13 @@ export class PostsService {
       },
     });
 
-    return !!like;
+    return {
+      liked: !!like,
+      type: (like?.type as string) || null,
+    };
   }
 
-  async toggleLike(postId: string, userId: string) {
+  async toggleLike(postId: string, userId: string, type: string = 'like') {
     const existingLike = await this.prisma.like.findUnique({
       where: {
         postId_userId: {
@@ -184,25 +190,42 @@ export class PostsService {
     });
 
     if (existingLike) {
-      // Unlike
-      await this.prisma.like.delete({
-        where: {
-          postId_userId: {
-            postId,
-            userId,
+      // If same reaction type, unlike
+      if (existingLike.type === type) {
+        await this.prisma.like.delete({
+          where: {
+            postId_userId: {
+              postId,
+              userId,
+            },
           },
-        },
-      });
-      return { liked: false, message: 'Post unliked' };
+        });
+        return { liked: false, type: null as string | null, message: 'Post unliked' };
+      } else {
+        // Update to new reaction type
+        const updated = await this.prisma.like.update({
+          where: {
+            postId_userId: {
+              postId,
+              userId,
+            },
+          },
+          data: {
+            type,
+          },
+        });
+        return { liked: true, type: updated.type as string, message: 'Reaction updated' };
+      }
     } else {
-      // Like
-      await this.prisma.like.create({
+      // Create new reaction
+      const created = await this.prisma.like.create({
         data: {
           postId,
           userId,
+          type,
         },
       });
-      return { liked: true, message: 'Post liked' };
+      return { liked: true, type: created.type as string, message: 'Post liked' };
     }
   }
 

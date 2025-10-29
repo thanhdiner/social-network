@@ -77,6 +77,7 @@ model Like {
   id        String   @id @default(uuid())
   postId    String
   userId    String
+  type      String   @default("like") // 'like', 'love', 'haha', 'wow', 'sad', 'angry'
   createdAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)

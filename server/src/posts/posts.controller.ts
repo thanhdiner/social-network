@@ -35,10 +35,31 @@ export class PostsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+  async findAll(
+    @CurrentUser() user: CurrentUserData,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.postsService.findAll(pageNum, limitNum);
+    const result = await this.postsService.findAll(pageNum, limitNum);
+
+    // Add reaction info for each post
+    const postsWithReactions = await Promise.all(
+      result.posts.map(async (post) => {
+        const reactionInfo = await this.postsService.checkIfUserLiked(
+          post.id,
+          user.userId,
+        );
+        return {
+          ...post,
+          isLiked: reactionInfo.liked,
+          reactionType: reactionInfo.type,
+        };
+      }),
+    );
+
+    return { ...result, posts: postsWithReactions };
   }
 
   @Get('user/:userId')
@@ -61,11 +82,11 @@ export class PostsController {
     if (currentUserId) {
       const postsWithLikes = await Promise.all(
         result.posts.map(async (post) => {
-          const isLiked = await this.postsService.checkIfUserLiked(
+          const reactionInfo = await this.postsService.checkIfUserLiked(
             post.id,
             currentUserId,
           );
-          return { ...post, isLiked };
+          return { ...post, isLiked: reactionInfo.liked, reactionType: reactionInfo.type };
         }),
       );
       return { ...result, posts: postsWithLikes };
@@ -82,19 +103,24 @@ export class PostsController {
       return { error: 'Post not found' };
     }
 
-    const isLiked = await this.postsService.checkIfUserLiked(id, user.userId);
+    const reactionInfo = await this.postsService.checkIfUserLiked(id, user.userId);
 
     return {
       ...post,
-      isLiked,
+      isLiked: reactionInfo.liked,
+      reactionType: reactionInfo.type,
     };
   }
 
   @Post(':id/like')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  toggleLike(@Param('id') id: string, @CurrentUser() user: CurrentUserData) {
-    return this.postsService.toggleLike(id, user.userId);
+  toggleLike(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserData,
+    @Body('type') type?: string,
+  ) {
+    return this.postsService.toggleLike(id, user.userId, type);
   }
 
   @Patch(':id')

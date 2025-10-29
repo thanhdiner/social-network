@@ -76,10 +76,13 @@ export interface CreateCommentData {
 }
 
 // Like Types
+export type ReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry';
+
 export interface Like {
   id: string;
   postId: string;
   userId: string;
+  type: ReactionType;
   createdAt: string;
   user?: User;
 }
