@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import authService from '../services/authService'
 import socketService from '../services/socketService'
 import type { User, LoginData, RegisterData } from '../services/authService'
+import { clearAllChatCache } from '../utils/chatCache'
 
 export interface AuthContextType {
   user: User | null
@@ -76,6 +77,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       // Disconnect socket on logout
       socketService.disconnect()
+
+      // Xóa cache chat khi logout
+      clearAllChatCache()
     } catch (error) {
       console.error('Logout error:', error)
     } finally {

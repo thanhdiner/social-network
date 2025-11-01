@@ -1,4 +1,4 @@
-import api from './api';
+﻿import api from './api';
 
 class UploadService {
   /**
@@ -52,6 +52,22 @@ class UploadService {
   }
 
   /**
+   * Upload audio to Cloudinary via backend
+   */
+  async uploadAudio(file: Blob): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file, 'audio.webm');
+
+    const response = await api.post<{ url: string }>('/upload/audio', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data.url;
+  }
+
+  /**
    * Validate image file
    */
   validateImage(file: File): { valid: boolean; error?: string } {
@@ -60,7 +76,7 @@ class UploadService {
     if (!validTypes.includes(file.type)) {
       return {
         valid: false,
-        error: 'Chỉ chấp nhận file ảnh (JPEG, PNG, GIF, WebP)'
+        error: 'Only image files are allowed (JPEG, PNG, GIF, WebP)'
       };
     }
 
@@ -69,7 +85,7 @@ class UploadService {
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: 'Kích thước file không được vượt quá 5MB'
+        error: 'File size must not exceed 5MB'
       };
     }
 
@@ -85,7 +101,7 @@ class UploadService {
     if (!validTypes.includes(file.type)) {
       return {
         valid: false,
-        error: 'Chỉ chấp nhận file video (MP4, WebM, OGG, MOV)'
+        error: 'Only video files are allowed (MP4, WebM, OGG, MOV)'
       };
     }
 
@@ -94,7 +110,7 @@ class UploadService {
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: 'Kích thước video không được vượt quá 50MB'
+        error: 'Video size must not exceed 50MB'
       };
     }
 
@@ -103,3 +119,5 @@ class UploadService {
 }
 
 export default new UploadService();
+
+

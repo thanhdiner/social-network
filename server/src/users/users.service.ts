@@ -371,4 +371,89 @@ export class UsersService {
       },
     });
   }
+
+  async blockUser(blockerId: string, blockedId: string) {
+    if (blockerId === blockedId) {
+      throw new ConflictException('Không thể block chính mình');
+    }
+
+    const existingBlock = await this.prisma.block.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId,
+          blockedId,
+        },
+      },
+    });
+
+    if (existingBlock) {
+      throw new ConflictException('Đã block người dùng này');
+    }
+
+    // Unfollow if following
+    const existingFollow = await this.prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId: blockerId,
+          followingId: blockedId,
+        },
+      },
+    });
+
+    if (existingFollow) {
+      await this.prisma.follow.delete({
+        where: {
+          followerId_followingId: {
+            followerId: blockerId,
+            followingId: blockedId,
+          },
+        },
+      });
+    }
+
+    // Create block
+    await this.prisma.block.create({
+      data: {
+        blockerId,
+        blockedId,
+      },
+    });
+  }
+
+  async unblockUser(blockerId: string, blockedId: string) {
+    const existingBlock = await this.prisma.block.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId,
+          blockedId,
+        },
+      },
+    });
+
+    if (!existingBlock) {
+      throw new NotFoundException('Chưa block người dùng này');
+    }
+
+    await this.prisma.block.delete({
+      where: {
+        blockerId_blockedId: {
+          blockerId,
+          blockedId,
+        },
+      },
+    });
+  }
+
+  async isBlocked(blockerId: string, blockedId: string): Promise<boolean> {
+    const block = await this.prisma.block.findUnique({
+      where: {
+        blockerId_blockedId: {
+          blockerId,
+          blockedId,
+        },
+      },
+    });
+
+    return !!block;
+  }
 }

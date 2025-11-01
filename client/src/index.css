@@ -158,3 +158,56 @@ a:hover {
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Smooth scrolling cho chat */
+.chat-messages {
+  scroll-behavior: smooth;
+}
+
+/* Ẩn thanh cuộn ngang trong khu chat (giữ nội dung tràn nếu có) */
+.chat-messages::-webkit-scrollbar:horizontal {
+  height: 0 !important;
+  display: none;
+}
+/* Firefox */
+.chat-messages {
+  scrollbar-width: thin;
+}
+
+/* Highlight message animation */
+@keyframes highlightPulse {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(251, 146, 60, 0.2); /* orange-400 with opacity */
+  }
+}
+
+.highlight-message {
+  animation: highlightPulse 1s ease-in-out 2;
+  border-radius: 0.75rem;
+}
+
+/* Chat: ensure long words/links don't overflow message bubble */
+.wrap-break-word {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}

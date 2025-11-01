@@ -118,7 +118,30 @@ class UserService {
     const response = await api.get<ActiveUser[]>(`/users/${userId}/following`);
     return response.data;
   }
+
+  /**
+   * Block a user
+   */
+  async blockUser(userId: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>(`/users/${userId}/block`);
+    return response.data;
+  }
+
+  /**
+   * Unblock a user
+   */
+  async unblockUser(userId: string): Promise<{ message: string }> {
+    const response = await api.delete<{ message: string }>(`/users/${userId}/block`);
+    return response.data;
+  }
+
+  /**
+   * Check if user is blocked
+   */
+  async checkBlockStatus(userId: string): Promise<{ isBlocked: boolean; hasBlocked: boolean }> {
+    const response = await api.get<{ isBlocked: boolean; hasBlocked: boolean }>(`/users/${userId}/block-status`);
+    return response.data;
+  }
 }
 
 export default new UserService()
-

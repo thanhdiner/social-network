@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { X, ChevronLeft, ChevronRight, MessageCircle, Send, Loader2, Link2, Check, Download, Share2, Image, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { commentService, type CreateCommentData } from '@/services/commentService'
@@ -142,18 +142,18 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Không xử lý keyboard navigation khi đang focus vào input/textarea
+      // KhÃ´ng xá»­ lÃ½ keyboard navigation khi Ä‘ang focus vÃ o input/textarea
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        // Chỉ xử lý ESC khi đang ở input
+        // Chá»‰ xá»­ lÃ½ ESC khi Ä‘ang á»Ÿ input
         if (e.key === 'Escape') {
-          target.blur() // Blur input trước
+          target.blur() // Blur input trÆ°á»›c
           onClose()
         }
         return
       }
 
-      // Xử lý keyboard navigation khi KHÔNG focus vào input
+      // Xá»­ lÃ½ keyboard navigation khi KHÃ”NG focus vÃ o input
       if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
@@ -238,24 +238,26 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
   }
 
   const handleDeleteComment = async (commentId: string, isReply = false) => {
-    if (!confirm('Bạn có chắc muốn xóa bình luận này?')) return
-    
+    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a bÃ¬nh luáº­n nÃ y?')) return
+
     try {
       await commentService.deleteComment(commentId)
-      
+
       if (isReply) {
-        // Xóa reply khỏi comment cha
-        setComments(prev => prev.map(c => ({
-          ...c,
-          replies: c.replies?.filter(r => r.id !== commentId)
-        })))
+        // XÃ³a reply khá»i comment cha
+        setComments(prev =>
+          prev.map(c => ({
+            ...c,
+            replies: c.replies?.filter(r => r.id !== commentId)
+          }))
+        )
       } else {
-        // Xóa comment
+        // XÃ³a comment
         setComments(prev => prev.filter(c => c.id !== commentId))
       }
     } catch (error) {
       console.error('Error deleting comment:', error)
-      alert('Không thể xóa bình luận. Vui lòng thử lại.')
+      alert('KhÃ´ng thá»ƒ xÃ³a bÃ¬nh luáº­n. Vui lÃ²ng thá»­ láº¡i.')
     }
   }
 
@@ -485,7 +487,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
             <div className="flex-1">
               <h3 className="font-semibold text-gray-800">{post.user?.name || 'Unknown User'}</h3>
               <p className="text-xs text-gray-500">
-                {new Date(post.createdAt).toLocaleDateString()} • Image {currentIndex + 1} of {images.length}
+                {new Date(post.createdAt).toLocaleDateString()} â€¢ Image {currentIndex + 1} of {images.length}
               </p>
             </div>
           </div>
@@ -498,25 +500,25 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                   {currentImageLike.reactionType && (
                     <span className="text-lg">
                       {currentImageLike.reactionType === 'like'
-                        ? '👍'
+                        ? 'ðŸ‘'
                         : currentImageLike.reactionType === 'love'
-                        ? '❤️'
+                        ? 'â¤ï¸'
                         : currentImageLike.reactionType === 'haha'
-                        ? '😂'
+                        ? 'ðŸ˜‚'
                         : currentImageLike.reactionType === 'wow'
-                        ? '😮'
+                        ? 'ðŸ˜®'
                         : currentImageLike.reactionType === 'sad'
-                        ? '😢'
-                        : '😠'}
+                        ? 'ðŸ˜¢'
+                        : 'ðŸ˜ '}
                     </span>
                   )}
                 </div>
                 <button onClick={() => setShowLikeList(true)} className="hover:underline cursor-pointer">
-                  {currentImageLike.count} {currentImageLike.count === 1 ? 'người' : 'người'}
+                  {currentImageLike.count} {currentImageLike.count === 1 ? 'ngÆ°á»i' : 'ngÆ°á»i'}
                 </button>
                 {comments.length > 0 && (
                   <span className="ml-auto">
-                    {comments.length} {comments.length === 1 ? 'bình luận' : 'bình luận'}
+                    {comments.length} {comments.length === 1 ? 'bÃ¬nh luáº­n' : 'bÃ¬nh luáº­n'}
                   </span>
                 )}
               </div>
@@ -615,7 +617,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          Phản hồi
+                          Pháº£n há»“i
                         </button>
 
                         {/* Delete button - only show if current user is the author */}
@@ -630,7 +632,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                         )}
 
                         {commentLikes[comment.id]?.count > 0 && (
-                          <span className="text-gray-600">{commentLikes[comment.id]?.count} lượt thích</span>
+                          <span className="text-gray-600">{commentLikes[comment.id]?.count} lÆ°á»£t thÃ­ch</span>
                         )}
                       </div>
 
@@ -638,7 +640,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                       {replyingTo === comment.id && (
                         <div className="mt-2 ml-3">
                           <div className="flex items-center gap-2 mb-2 px-3">
-                            <span className="text-xs text-gray-500">Đang phản hồi</span>
+                            <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
                             <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                             <button
                               onClick={() => {
@@ -672,7 +674,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   type="text"
                                   value={replyContent}
                                   onChange={e => setReplyContent(e.target.value)}
-                                  placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                                  placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
                                   className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                                   onKeyPress={e => {
                                     if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -690,7 +692,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                 <button
                                   onClick={() => replyImageInputRef.current?.click()}
                                   className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                                  title="Thêm ảnh"
+                                  title="ThÃªm áº£nh"
                                 >
                                   <Image className="w-5 h-5" />
                                 </button>
@@ -699,7 +701,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                                   className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                  {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                                  {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
                                 </button>
                               </div>
                             </div>
@@ -789,7 +791,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                                   >
                                     <MessageCircle className="w-3 h-3" />
-                                    Phản hồi
+                                    Pháº£n há»“i
                                   </button>
 
                                   {/* Delete button for reply - only show if current user is the author */}
@@ -804,7 +806,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   )}
 
                                   {commentLikes[reply.id]?.count > 0 && (
-                                    <span className="text-gray-600">{commentLikes[reply.id]?.count} lượt thích</span>
+                                    <span className="text-gray-600">{commentLikes[reply.id]?.count} lÆ°á»£t thÃ­ch</span>
                                   )}
                                 </div>
                               </div>
@@ -815,7 +817,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                           {replyingTo?.startsWith('reply-') && (
                             <div className="mt-2">
                               <div className="flex items-center gap-2 mb-2 px-3">
-                                <span className="text-xs text-gray-500">Đang phản hồi</span>
+                                <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
                                 <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                                 <button
                                   onClick={() => {
@@ -849,7 +851,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                       type="text"
                                       value={replyContent}
                                       onChange={e => setReplyContent(e.target.value)}
-                                      placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                                      placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
                                       className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                                       onKeyPress={e => {
                                         if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -867,7 +869,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     <button
                                       onClick={() => replyImageInputRef.current?.click()}
                                       className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                                      title="Thêm ảnh"
+                                      title="ThÃªm áº£nh"
                                     >
                                       <Image className="w-5 h-5" />
                                     </button>
@@ -876,7 +878,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                       disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                                       className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                      {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                                      {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
                                     </button>
                                   </div>
                                 </div>
@@ -977,3 +979,4 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
     </div>
   )
 }
+

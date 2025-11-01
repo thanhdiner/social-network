@@ -1,3 +1,4 @@
+﻿import { useState } from 'react'
 import { getInitials, getAvatarColor } from '@/utils/avatarUtils'
 
 interface AvatarProps {
@@ -17,12 +18,14 @@ const sizeClasses = {
 
 export const Avatar = ({ src, name, size = 'md', className = '' }: AvatarProps) => {
   const sizeClass = sizeClasses[size]
+  const [imgError, setImgError] = useState(false)
   
-  if (src) {
+  if (src && !imgError) {
     return (
       <img
         src={src}
         alt={name}
+        onError={() => setImgError(true)}
         className={`rounded-full object-cover ${sizeClass} ${className}`}
       />
     )

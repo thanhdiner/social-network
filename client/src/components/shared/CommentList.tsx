@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+﻿import { useEffect, useState, useRef, useCallback } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle, Image as ImageIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -143,26 +143,26 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   }, [postId, refresh, loadComments])
 
   const handleDelete = async (commentId: string, isReply = false) => {
-    if (!confirm('Bạn có chắc muốn xóa bình luận này?')) return
+    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a bÃ¬nh luáº­n nÃ y?')) return
 
     try {
       await commentService.deleteComment(commentId)
       
       if (isReply) {
-        // Xóa reply khỏi comment cha
+        // XÃ³a reply khá»i comment cha
         setComments(prev => prev.map(c => ({
           ...c,
           replies: c.replies?.filter(r => r.id !== commentId)
         })))
       } else {
-        // Xóa comment
+        // XÃ³a comment
         setComments(prev => prev.filter(c => c.id !== commentId))
       }
       
       setMenuOpen(null)
     } catch (error) {
       console.error('Failed to delete comment:', error)
-      alert('Không thể xóa bình luận. Vui lòng thử lại.')
+      alert('KhÃ´ng thá»ƒ xÃ³a bÃ¬nh luáº­n. Vui lÃ²ng thá»­ láº¡i.')
     }
   }
 
@@ -239,7 +239,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
         imageUrl = await uploadService.uploadImage(replyImage)
       }
 
-      // Nếu reply to reply, thêm @tag vào đầu content
+      // Náº¿u reply to reply, thÃªm @tag vÃ o Ä‘áº§u content
       const content = replyingToUser 
         ? `@${replyingToUser.name} ${replyContent.trim()}`
         : replyContent.trim()
@@ -375,13 +375,13 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
               >
                 <MessageCircle className="w-3 h-3" />
-                Phản hồi
+                Pháº£n há»“i
               </button>
 
               {/* Like count */}
               {commentLikes[comment.id]?.count > 0 && (
                 <span className="text-gray-600">
-                  {commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'lượt thích' : 'lượt thích'}
+                  {commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'lÆ°á»£t thÃ­ch' : 'lÆ°á»£t thÃ­ch'}
                 </span>
               )}
             </div>
@@ -390,7 +390,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
             {replyingTo === comment.id && (
               <div className="mt-2 ml-3">
                 <div className="flex items-center gap-2 mb-2 px-3">
-                  <span className="text-xs text-gray-500">Đang phản hồi</span>
+                  <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
                   <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                   <button
                     onClick={() => {
@@ -433,7 +433,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         type="text"
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                        placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
                         className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -451,7 +451,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                       <button
                         onClick={() => replyImageInputRef.current?.click()}
                         className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                        title="Thêm ảnh"
+                        title="ThÃªm áº£nh"
                       >
                         <ImageIcon className="w-5 h-5" />
                       </button>
@@ -460,7 +460,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                         className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                        {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
                       </button>
                     </div>
                   </div>
@@ -550,7 +550,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          Phản hồi
+                          Pháº£n há»“i
                         </button>
 
                         {/* Delete button for reply - only show if current user is the author */}
@@ -567,7 +567,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         {/* Like count for reply */}
                         {commentLikes[reply.id]?.count > 0 && (
                           <span className="text-gray-600">
-                            {commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'lượt thích' : 'lượt thích'}
+                            {commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'lÆ°á»£t thÃ­ch' : 'lÆ°á»£t thÃ­ch'}
                           </span>
                         )}
                       </div>
@@ -579,7 +579,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 {replyingTo?.startsWith('reply-') && (
                   <div className="mt-2">
                     <div className="flex items-center gap-2 mb-2 px-3">
-                      <span className="text-xs text-gray-500">Đang phản hồi</span>
+                      <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
                       <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                       <button
                         onClick={() => {
@@ -622,7 +622,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             type="text"
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
-                            placeholder={`Phản hồi ${replyingToUser?.name}...`}
+                            placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
                             className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                             onKeyPress={(e) => {
                               if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -640,7 +640,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           <button
                             onClick={() => replyImageInputRef.current?.click()}
                             className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                            title="Thêm ảnh"
+                            title="ThÃªm áº£nh"
                           >
                             <ImageIcon className="w-5 h-5" />
                           </button>
@@ -649,7 +649,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                             className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                           >
-                            {isUploadingReplyImage ? 'Đang gửi...' : 'Gửi'}
+                            {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
                           </button>
                         </div>
                       </div>
@@ -706,3 +706,4 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
     </div>
   )
 }
+

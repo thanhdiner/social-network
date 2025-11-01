@@ -41,6 +41,17 @@ export class UploadController {
     return { url };
   }
 
+  @Post('audio')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAudio(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new Error('No file uploaded');
+    }
+
+    const url = await this.uploadService.uploadToCloudinary(file);
+    return { url };
+  }
+
   @Delete('image')
   async deleteImage(@Body('imageUrl') imageUrl: string) {
     if (!imageUrl) {

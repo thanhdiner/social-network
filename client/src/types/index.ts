@@ -1,4 +1,4 @@
-// API Error Response
+﻿// API Error Response
 export interface ApiError {
   message: string;
   statusCode: number;
@@ -15,6 +15,7 @@ export interface User {
   bio?: string;
   createdAt: string;
   updatedAt: string;
+  isOnline?: boolean;
 }
 
 // Auth Types
@@ -71,16 +72,16 @@ export interface CreatePostData {
 export interface Comment {
   id: string;
   content: string;
-  imageUrl?: string; // URL của ảnh đính kèm
+  imageUrl?: string; // URL cá»§a áº£nh Ä‘Ã­nh kÃ¨m
   postId: string;
   userId: string;
-  imageIndex?: number; // Index của ảnh trong post (null = comment chung)
-  parentId?: string; // ID của comment cha (null = comment gốc)
+  imageIndex?: number; // Index cá»§a áº£nh trong post (null = comment chung)
+  parentId?: string; // ID cá»§a comment cha (null = comment gá»‘c)
   createdAt: string;
   updatedAt: string;
   user?: User;
-  replies?: Comment[]; // Danh sách reply
-  likes?: CommentLike[]; // Danh sách likes
+  replies?: Comment[]; // Danh sÃ¡ch reply
+  likes?: CommentLike[]; // Danh sÃ¡ch likes
   _count?: {
     likes: number;
     replies: number;
@@ -92,7 +93,7 @@ export interface CreateCommentData {
   imageUrl?: string;
   postId?: string;
   imageIndex?: number;
-  parentId?: string; // ID của comment cha nếu là reply
+  parentId?: string; // ID cá»§a comment cha náº¿u lÃ  reply
 }
 
 export interface CommentLike {
@@ -127,19 +128,62 @@ export interface Follow {
 }
 
 // Message Types
+export interface MessageReaction {
+  id: string;
+  userId: string;
+  emoji: string;
+  createdAt: string;
+}
+
 export interface Message {
   id: string;
   content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
   senderId: string;
   receiverId: string;
+  replyToId?: string;
   read: boolean;
+  deliveredAt?: string;
+  readAt?: string;
+  unsent?: boolean;
   createdAt: string;
   sender?: User;
+  receiver?: User;
+  reactions?: MessageReaction[];
+  replyTo?: {
+    id: string;
+    content: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    audioUrl?: string;
+    senderId: string;
+    sender?: {
+      id: string;
+      name: string;
+      username: string;
+    };
+  };
 }
 
 export interface SendMessageData {
   content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  audioUrl?: string;
   receiverId: string;
+  replyToId?: string;
+}
+
+// Conversation Types
+export interface Conversation {
+  id: string;
+  participantId: string;
+  participant: User;
+  lastMessage?: Message;
+  unreadCount: number;
+  updatedAt: string;
 }
 
 // Notification Types
@@ -153,3 +197,4 @@ export interface Notification {
   read: boolean;
   createdAt: string;
 }
+

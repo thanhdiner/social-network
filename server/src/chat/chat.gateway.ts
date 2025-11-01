@@ -67,6 +67,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return 'Hello world!';
   }
 
+  @SubscribeMessage('message_received')
+  handleMessageReceived(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { messageId: string },
+  ) {
+    // Client acknowledges they received the message
+    // This will be handled by ChatService to update deliveredAt
+    return { success: true };
+  }
+
+  @SubscribeMessage('typing')
+  handleTyping(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { receiverId: string; isTyping: boolean },
+  ) {
+    const receiverSocketId = this.userSockets.get(data.receiverId);
+    if (receiverSocketId && client.userId) {
+      this.server.to(receiverSocketId).emit('typing', {
+        senderId: client.userId,
+        isTyping: data.isTyping,
+      });
+    }
+  }
+
   // Follow events
   notifyFollow(
     followerId: string,
@@ -103,6 +127,120 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const socketId = this.userSockets.get(userId);
     if (socketId) {
       this.server.to(socketId).emit('new_notification', notification);
+    }
+  }
+
+  // Chat events
+  sendMessage(
+    receiverId: string,
+    message: { senderId: string; [key: string]: any },
+  ) {
+    let delivered = false;
+    
+    // Send to receiver if online
+    const socketId = this.userSockets.get(receiverId);
+    if (socketId) {
+      this.server.to(socketId).emit('new_message', message);
+      delivered = true; // Receiver is online and will get the message
+    }
+    
+    // Always send to sender for multi-device support and real-time UI update
+    const senderSocketId = this.userSockets.get(message.senderId);
+    if (senderSocketId) {
+      this.server.to(senderSocketId).emit('new_message', message);
+    }
+    
+    return delivered;
+  }
+
+  // Notify message delivered status update
+  notifyMessagesDelivered(
+    senderId: string,
+    messageIds: string[],
+    deliveredAt: Date,
+  ) {
+    console.log(
+      `[ChatGateway] notifyMessagesDelivered: senderId=${senderId}, messageIds=${messageIds.length}`,
+    );
+    const socketId = this.userSockets.get(senderId);
+    console.log(`[ChatGateway] Socket ID for ${senderId}: ${socketId}`);
+    
+    const payload = {
+      messageIds,
+      deliveredAt: deliveredAt.toISOString(),
+    };
+    
+    if (socketId) {
+      this.server.to(socketId).emit('messages_delivered', payload);
+      console.log(`[ChatGateway] Emitted messages_delivered to ${socketId}`, payload);
+    } else {
+      console.log(`[ChatGateway] No socket found for sender ${senderId}`);
+    }
+  }
+
+  // Notify message read status update
+  notifyMessagesRead(senderId: string, messageIds: string[], readAt: Date) {
+    console.log(
+      `[ChatGateway] notifyMessagesRead: senderId=${senderId}, messageIds=${messageIds.length}`,
+    );
+    const socketId = this.userSockets.get(senderId);
+    console.log(`[ChatGateway] Socket ID for ${senderId}: ${socketId}`);
+    if (socketId) {
+      this.server.to(socketId).emit('messages_read', {
+        messageIds,
+        readAt: readAt.toISOString(),
+      });
+      console.log(`[ChatGateway] Emitted messages_read to ${socketId}`);
+    } else {
+      console.log(`[ChatGateway] No socket found for sender ${senderId}`);
+    }
+  }
+
+  // Notify reaction added
+  notifyReactionAdded(
+    messageId: string,
+    reaction: { id: string; userId: string; emoji: string; createdAt: Date },
+    receiverIds: string[],
+  ) {
+    const payload = {
+      messageId,
+      reaction: {
+        ...reaction,
+        createdAt: reaction.createdAt.toISOString(),
+      },
+    };
+
+    receiverIds.forEach((receiverId) => {
+      const socketId = this.userSockets.get(receiverId);
+      if (socketId) {
+        this.server.to(socketId).emit('reaction_added', payload);
+      }
+    });
+  }
+
+  // Notify reaction removed
+  notifyReactionRemoved(
+    messageId: string,
+    userId: string,
+    receiverIds: string[],
+  ) {
+    const payload = { messageId, userId };
+
+    receiverIds.forEach((receiverId) => {
+      const socketId = this.userSockets.get(receiverId);
+      if (socketId) {
+        this.server.to(socketId).emit('reaction_removed', payload);
+      }
+    });
+  }
+
+  // Notify message unsent
+  notifyMessageUnsent(messageId: string, receiverId: string) {
+    const payload = { messageId };
+
+    const socketId = this.userSockets.get(receiverId);
+    if (socketId) {
+      this.server.to(socketId).emit('message_unsent', payload);
     }
   }
 }

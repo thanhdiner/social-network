@@ -1,11 +1,11 @@
-import { Plus } from 'lucide-react'
+﻿import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import userService, { type ActiveUser } from '../../services/userService'
 import storyService, { type GroupedStories } from '../../services/storyService'
 import socketService from '../../services/socketService'
 import { Link } from 'react-router-dom'
 import { CreateStoryModal } from '../shared/CreateStoryModal'
-import { StoryViewer } from '../shared/StoryViewer'
+import { Avatar } from '../shared/Avatar'
 import { formatDistanceToNow } from 'date-fns'
 
 export const RightSidebar = () => {
@@ -113,15 +113,11 @@ export const RightSidebar = () => {
                 className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 cursor-pointer transition"
               >
                 <div className="relative">
-                  <img 
-                    src={group.user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.user.name)}&background=fb923c&color=fff`} 
-                    alt={group.user.name} 
-                    className={`w-12 h-12 rounded-full object-cover ${
-                      group.hasUnviewed 
-                        ? 'ring-2 ring-orange-400 ring-offset-2' 
-                        : 'ring-2 ring-gray-300 ring-offset-2'
-                    }`}
-                  />
+                  <Avatar
+  src={group.user.avatar || undefined}
+  name={group.user.name}
+  className={group.hasUnviewed ? 'w-12 h-12 ring-2 ring-orange-400 ring-offset-2' : 'w-12 h-12 ring-2 ring-gray-300 ring-offset-2'}
+/>
                 </div>
                 <div className="flex flex-col">
                   <span className="font-medium text-gray-800">{group.user.name}</span>
@@ -167,11 +163,11 @@ export const RightSidebar = () => {
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50 transition cursor-pointer"
                 >
                   <div className="relative">
-                    <img 
-                      src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=fb923c&color=fff`} 
-                      alt={user.name} 
-                      className="w-9 h-9 rounded-full border border-gray-200 object-cover" 
-                    />
+                    <Avatar
+  src={user.avatar || undefined}
+  name={user.name}
+  className="w-9 h-9 border border-gray-200"
+/>
                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                   </div>
                   <span className="text-gray-800 font-medium truncate">{user.name}</span>
@@ -200,3 +196,6 @@ export const RightSidebar = () => {
     </aside>
   )
 }
+
+
+

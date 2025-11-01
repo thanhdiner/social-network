@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ChatProvider } from '@/contexts/ChatContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { GuestRoute } from '@/components/GuestRoute'
 import { MainLayout } from '@/Layout/MainLayout'
@@ -20,6 +21,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <ChatProvider>
         <Routes>
           {/* Guest routes - redirect to home if authenticated */}
           <Route 
@@ -99,9 +101,7 @@ function App() {
             path="/chat"
             element={
               <ProtectedRoute>
-                <MainLayout>
-                  <Chat />
-                </MainLayout>
+                <Chat />
               </ProtectedRoute>
             }
           />
@@ -146,6 +146,7 @@ function App() {
           {/* Redirect unknown routes to 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </ChatProvider>
       </AuthProvider>
     </Router>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import userService from '@/services/userService'
@@ -20,7 +20,7 @@ export default function EditProfile() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Form state - Khởi tạo từ user data
+  // Form state - Khá»Ÿi táº¡o tá»« user data
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -100,17 +100,17 @@ export default function EditProfile() {
     try {
       setUploadingAvatar(true)
       
-      // Xóa ảnh cũ trên Cloudinary (nếu có và khác với preview hiện tại)
+      // XÃ³a áº£nh cÅ© trÃªn Cloudinary (náº¿u cÃ³ vÃ  khÃ¡c vá»›i preview hiá»‡n táº¡i)
       if (user?.avatar && user.avatar !== avatarPreview) {
         await uploadService.deleteImage(user.avatar).catch(err => {
           console.warn('Failed to delete old avatar:', err)
         })
       }
       
-      // Upload ảnh mới
+      // Upload áº£nh má»›i
       const imageUrl = await uploadService.uploadImage(file)
       
-      // Update ngay lập tức
+      // Update ngay láº­p tá»©c
       await userService.updateProfile({ avatar: imageUrl })
       
       // Refresh user data
@@ -124,7 +124,7 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      setError('Upload ảnh thất bại')
+      setError('Upload áº£nh tháº¥t báº¡i')
     } finally {
       setUploadingAvatar(false)
     }
@@ -143,17 +143,17 @@ export default function EditProfile() {
     try {
       setUploadingCover(true)
       
-      // Xóa ảnh bìa cũ trên Cloudinary (nếu có và khác với preview hiện tại)
+      // XÃ³a áº£nh bÃ¬a cÅ© trÃªn Cloudinary (náº¿u cÃ³ vÃ  khÃ¡c vá»›i preview hiá»‡n táº¡i)
       if (user?.coverImage && user.coverImage !== coverPreview) {
         await uploadService.deleteImage(user.coverImage).catch(err => {
           console.warn('Failed to delete old cover:', err)
         })
       }
       
-      // Upload ảnh mới
+      // Upload áº£nh má»›i
       const imageUrl = await uploadService.uploadImage(file)
       
-      // Update ngay lập tức
+      // Update ngay láº­p tá»©c
       await userService.updateProfile({ coverImage: imageUrl })
       
       // Refresh user data
@@ -167,26 +167,26 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      setError('Upload ảnh thất bại')
+      setError('Upload áº£nh tháº¥t báº¡i')
     } finally {
       setUploadingCover(false)
     }
   }
 
   const handleRemoveAvatar = async () => {
-    if (!confirm('Bạn có chắc muốn xóa avatar?')) return
+    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a avatar?')) return
     
     try {
       setUploadingAvatar(true)
       
-      // Xóa ảnh trên Cloudinary trước
+      // XÃ³a áº£nh trÃªn Cloudinary trÆ°á»›c
       if (user?.avatar) {
         await uploadService.deleteImage(user.avatar).catch(err => {
           console.warn('Failed to delete avatar from Cloudinary:', err)
         })
       }
       
-      // Xóa trong database
+      // XÃ³a trong database
       await userService.updateProfile({ avatar: '' })
       await refreshUser()
       
@@ -196,26 +196,26 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Remove avatar error:', err)
-      setError('Xóa avatar thất bại')
+      setError('XÃ³a avatar tháº¥t báº¡i')
     } finally {
       setUploadingAvatar(false)
     }
   }
 
   const handleRemoveCover = async () => {
-    if (!confirm('Bạn có chắc muốn xóa ảnh bìa?')) return
+    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a áº£nh bÃ¬a?')) return
     
     try {
       setUploadingCover(true)
       
-      // Xóa ảnh trên Cloudinary trước
+      // XÃ³a áº£nh trÃªn Cloudinary trÆ°á»›c
       if (user?.coverImage) {
         await uploadService.deleteImage(user.coverImage).catch(err => {
           console.warn('Failed to delete cover from Cloudinary:', err)
         })
       }
       
-      // Xóa trong database
+      // XÃ³a trong database
       await userService.updateProfile({ coverImage: '' })
       await refreshUser()
       
@@ -225,7 +225,7 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Remove cover error:', err)
-      setError('Xóa ảnh bìa thất bại')
+      setError('XÃ³a áº£nh bÃ¬a tháº¥t báº¡i')
     } finally {
       setUploadingCover(false)
     }
@@ -238,13 +238,13 @@ export default function EditProfile() {
     try {
       // Validate
       if (!formData.firstName.trim()) {
-        setError('Vui lòng nhập tên')
+        setError('Vui lÃ²ng nháº­p tÃªn')
         return
       }
 
       const fullName = formData.lastName.trim() ? `${formData.lastName.trim()} ${formData.firstName.trim()}` : formData.firstName.trim()
 
-      // Call API to update profile (không cần update avatar và coverImage vì đã update ngay lập tức)
+      // Call API to update profile (khÃ´ng cáº§n update avatar vÃ  coverImage vÃ¬ Ä‘Ã£ update ngay láº­p tá»©c)
       await userService.updateProfile({
         name: fullName,
         bio: formData.bio.trim() || undefined,
@@ -262,12 +262,12 @@ export default function EditProfile() {
       // Refresh user data in context
       await refreshUser()
 
-      alert('Cập nhật profile thành công!')
+      alert('Cáº­p nháº­t profile thÃ nh cÃ´ng!')
       navigate(`/profile/${user?.username}`)
     } catch (err) {
       console.error('Update error:', err)
       const error = err as { response?: { data?: { message?: string } } }
-      setError(error.response?.data?.message || 'Cập nhật profile thất bại')
+      setError(error.response?.data?.message || 'Cáº­p nháº­t profile tháº¥t báº¡i')
     } finally {
       setIsLoading(false)
     }
@@ -280,27 +280,27 @@ export default function EditProfile() {
     try {
       // Validate
       if (!passwordData.currentPassword) {
-        setPasswordError('Vui lòng nhập mật khẩu hiện tại')
+        setPasswordError('Vui lÃ²ng nháº­p máº­t kháº©u hiá»‡n táº¡i')
         return
       }
 
       if (!passwordData.newPassword) {
-        setPasswordError('Vui lòng nhập mật khẩu mới')
+        setPasswordError('Vui lÃ²ng nháº­p máº­t kháº©u má»›i')
         return
       }
 
       if (passwordData.newPassword.length < 6) {
-        setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự')
+        setPasswordError('Máº­t kháº©u má»›i pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±')
         return
       }
 
       if (passwordData.newPassword !== passwordData.confirmPassword) {
-        setPasswordError('Mật khẩu xác nhận không khớp')
+        setPasswordError('Máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p')
         return
       }
 
       if (passwordData.currentPassword === passwordData.newPassword) {
-        setPasswordError('Mật khẩu mới phải khác mật khẩu hiện tại')
+        setPasswordError('Máº­t kháº©u má»›i pháº£i khÃ¡c máº­t kháº©u hiá»‡n táº¡i')
         return
       }
 
@@ -317,12 +317,12 @@ export default function EditProfile() {
         confirmPassword: ''
       })
 
-      alert('Đổi mật khẩu thành công!')
+      alert('Äá»•i máº­t kháº©u thÃ nh cÃ´ng!')
       setActiveTab('personal')
     } catch (err) {
       console.error('Change password error:', err)
       const error = err as { response?: { data?: { message?: string } } }
-      setPasswordError(error.response?.data?.message || 'Đổi mật khẩu thất bại')
+      setPasswordError(error.response?.data?.message || 'Äá»•i máº­t kháº©u tháº¥t báº¡i')
     } finally {
       setPasswordLoading(false)
     }
@@ -337,7 +337,7 @@ export default function EditProfile() {
         )}
         {uploadingCover && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="text-white">Đang upload...</div>
+            <div className="text-white">Äang upload...</div>
           </div>
         )}
         <div className="absolute bottom-3 right-3 flex gap-2">
@@ -352,7 +352,7 @@ export default function EditProfile() {
             onClick={() => coverInputRef.current?.click()}
             disabled={uploadingCover}
             className="p-2 bg-white rounded-full shadow hover:bg-gray-100 transition"
-            title="Thay đổi ảnh bìa"
+            title="Thay Ä‘á»•i áº£nh bÃ¬a"
           >
             <Camera className="text-gray-700" size={18} />
           </button>
@@ -360,7 +360,7 @@ export default function EditProfile() {
             <button
               onClick={handleRemoveCover}
               className="p-2 bg-white rounded-full shadow hover:bg-red-50 transition"
-              title="Xóa ảnh bìa"
+              title="XÃ³a áº£nh bÃ¬a"
             >
               <X className="text-red-500" size={18} />
             </button>
@@ -406,7 +406,7 @@ export default function EditProfile() {
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={uploadingAvatar}
                 className="p-2 bg-orange-500 text-white rounded-full shadow hover:bg-orange-600 transition"
-                title="Thay đổi avatar"
+                title="Thay Ä‘á»•i avatar"
               >
                 <Pencil size={14} />
               </button>
@@ -414,7 +414,7 @@ export default function EditProfile() {
                 <button
                   onClick={handleRemoveAvatar}
                   className="p-2 bg-red-500 text-white rounded-full shadow hover:bg-red-600 transition"
-                  title="Xóa avatar"
+                  title="XÃ³a avatar"
                 >
                   <X size={14} />
                 </button>
@@ -451,31 +451,31 @@ export default function EditProfile() {
           <h2 className="text-lg font-semibold text-gray-800">Personal Information</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label>Họ và tên đệm</Label>
-              <Input placeholder="VD: Huỳnh Văn" value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} />
-              <p className="text-xs text-gray-500 mt-1">Họ và tên đệm (có thể để trống nếu chỉ có tên)</p>
+              <Label>Há» vÃ  tÃªn Ä‘á»‡m</Label>
+              <Input placeholder="e.g. Huá»³nh VÄƒn" value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">Há» vÃ  tÃªn Ä‘á»‡m (cÃ³ thá»ƒ Ä‘á»ƒ trá»‘ng náº¿u chá»‰ cÃ³ tÃªn)</p>
             </div>
             <div className="col-span-2">
-              <Label>Tên *</Label>
+              <Label>TÃªn *</Label>
               <Input
-                placeholder="VD: Thành"
+                placeholder="e.g. ThÃ nh"
                 value={formData.firstName}
                 onChange={e => handleInputChange('firstName', e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Tên của bạn (bắt buộc)</p>
+              <p className="text-xs text-gray-500 mt-1">TÃªn cá»§a báº¡n (báº¯t buá»™c)</p>
             </div>
 
             <div className="col-span-2">
               <Label>Username</Label>
               <Input placeholder="Username" value={user?.username || ''} disabled className="bg-gray-100 cursor-not-allowed" />
-              <p className="text-xs text-gray-500 mt-1">Username không thể thay đổi</p>
+              <p className="text-xs text-gray-500 mt-1">Username khÃ´ng thá»ƒ thay Ä‘á»•i</p>
             </div>
 
             <div className="col-span-2">
               <Label>Email</Label>
               <Input type="email" placeholder="Email" value={user?.email || ''} disabled className="bg-gray-100 cursor-not-allowed" />
-              <p className="text-xs text-gray-500 mt-1">Email không thể thay đổi</p>
+              <p className="text-xs text-gray-500 mt-1">Email khÃ´ng thá»ƒ thay Ä‘á»•i</p>
             </div>
 
             <div className="col-span-2">
@@ -491,21 +491,21 @@ export default function EditProfile() {
             </div>
 
             <div className="col-span-2">
-              <Label>Giới tính</Label>
+              <Label>Giá»›i tÃ­nh</Label>
               <Select value={formData.gender} onValueChange={value => handleInputChange('gender', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Chọn giới tính" />
+                  <SelectValue placeholder="Chá»n giá»›i tÃ­nh" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Nam">Nam</SelectItem>
-                  <SelectItem value="Nữ">Nữ</SelectItem>
-                  <SelectItem value="Khác">Khác</SelectItem>
+                  <SelectItem value="Ná»¯">Ná»¯</SelectItem>
+                  <SelectItem value="KhÃ¡c">KhÃ¡c</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="col-span-2">
-              <Label>Ngày sinh</Label>
+              <Label>NgÃ y sinh</Label>
               <Input
                 type="date"
                 value={formData.dateOfBirth}
@@ -514,14 +514,14 @@ export default function EditProfile() {
             </div>
 
             <div className="col-span-2">
-              <Label>Địa chỉ</Label>
+              <Label>Äá»‹a chá»‰</Label>
               <Input
-                placeholder="VD: Hồ Chí Minh, Việt Nam"
+                placeholder="e.g. Há»“ ChÃ­ Minh, Viá»‡t Nam"
                 value={formData.address}
                 onChange={e => handleInputChange('address', e.target.value)}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500 mt-1">Địa chỉ hiện tại của bạn</p>
+              <p className="text-xs text-gray-500 mt-1">Äá»‹a chá»‰ hiá»‡n táº¡i cá»§a báº¡n</p>
             </div>
           </div>
 
@@ -641,36 +641,36 @@ export default function EditProfile() {
 
         {/* -------- Manage Contact -------- */}
         <TabsContent value="contact" className="space-y-6">
-          <h2 className="text-lg font-semibold text-gray-800">Quản lý liên hệ</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Quáº£n lÃ½ liÃªn há»‡</h2>
           <div className="space-y-4">
             <div>
-              <Label>Số điện thoại</Label>
+              <Label>Sá»‘ Ä‘iá»‡n thoáº¡i</Label>
               <Input
-                placeholder="VD: 0901234567"
+                placeholder="e.g. 0901234567"
                 value={formData.phone}
                 onChange={e => handleInputChange('phone', e.target.value)}
                 maxLength={20}
               />
-              <p className="text-xs text-gray-500 mt-1">Số điện thoại liên hệ của bạn</p>
+              <p className="text-xs text-gray-500 mt-1">Sá»‘ Ä‘iá»‡n thoáº¡i liÃªn há»‡ cá»§a báº¡n</p>
             </div>
             <div>
               <Label>Website</Label>
               <Input
-                placeholder="VD: https://yourwebsite.com"
+                placeholder="e.g. https://yourwebsite.com"
                 value={formData.website}
                 onChange={e => handleInputChange('website', e.target.value)}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500 mt-1">Website cá nhân hoặc công ty</p>
+              <p className="text-xs text-gray-500 mt-1">Website cÃ¡ nhÃ¢n hoáº·c cÃ´ng ty</p>
             </div>
 
             <div className="pt-4">
-              <h3 className="text-md font-semibold text-gray-800 mb-4">Mạng xã hội</h3>
+              <h3 className="text-md font-semibold text-gray-800 mb-4">Máº¡ng xÃ£ há»™i</h3>
               <div className="space-y-4">
                 <div>
                   <Label>Facebook</Label>
                   <Input
-                    placeholder="VD: https://facebook.com/yourprofile"
+                    placeholder="e.g. https://facebook.com/yourprofile"
                     value={formData.facebook}
                     onChange={e => handleInputChange('facebook', e.target.value)}
                     maxLength={200}
@@ -679,7 +679,7 @@ export default function EditProfile() {
                 <div>
                   <Label>Instagram</Label>
                   <Input
-                    placeholder="VD: https://instagram.com/yourprofile"
+                    placeholder="e.g. https://instagram.com/yourprofile"
                     value={formData.instagram}
                     onChange={e => handleInputChange('instagram', e.target.value)}
                     maxLength={200}
@@ -688,7 +688,7 @@ export default function EditProfile() {
                 <div>
                   <Label>X (Twitter)</Label>
                   <Input
-                    placeholder="VD: https://x.com/yourprofile"
+                    placeholder="e.g. https://x.com/yourprofile"
                     value={formData.twitter}
                     onChange={e => handleInputChange('twitter', e.target.value)}
                     maxLength={200}
@@ -697,7 +697,7 @@ export default function EditProfile() {
                 <div>
                   <Label>LinkedIn</Label>
                   <Input
-                    placeholder="VD: https://linkedin.com/in/yourprofile"
+                    placeholder="e.g. https://linkedin.com/in/yourprofile"
                     value={formData.linkedin}
                     onChange={e => handleInputChange('linkedin', e.target.value)}
                     maxLength={200}
@@ -721,3 +721,4 @@ export default function EditProfile() {
     </div>
   )
 }
+

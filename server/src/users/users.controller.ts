@@ -203,4 +203,37 @@ export class UsersController {
 
     return { message: 'Unfollowed successfully' };
   }
+
+  @Post(':userId/block')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async blockUser(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Param('userId') userId: string,
+  ) {
+    await this.usersService.blockUser(currentUser.userId, userId);
+    return { message: 'User blocked successfully' };
+  }
+
+  @Delete(':userId/block')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async unblockUser(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Param('userId') userId: string,
+  ) {
+    await this.usersService.unblockUser(currentUser.userId, userId);
+    return { message: 'User unblocked successfully' };
+  }
+
+  @Get(':userId/block-status')
+  @UseGuards(JwtAuthGuard)
+  async checkBlockStatus(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Param('userId') userId: string,
+  ) {
+    const isBlocked = await this.usersService.isBlocked(currentUser.userId, userId);
+    const hasBlocked = await this.usersService.isBlocked(userId, currentUser.userId);
+    return { isBlocked, hasBlocked };
+  }
 }

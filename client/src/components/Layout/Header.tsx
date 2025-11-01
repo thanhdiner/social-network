@@ -1,4 +1,4 @@
-import { Mail, TextAlignJustify, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
+﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
@@ -6,6 +6,8 @@ import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { NotificationsDropdown } from '../shared/NotificationsDropdown'
 import { SearchDropdown } from '../shared/SearchDropdown'
 import { Avatar } from '../shared/Avatar'
+import { useChat } from '../../contexts/ChatContext'
+import { ChatPopup } from '../shared/ChatPopup'
 
 interface HeaderProps {
   onToggleSidebar?: () => void
@@ -14,10 +16,12 @@ interface HeaderProps {
 export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const { user, logout } = useAuth()
   const { user: currentUser } = useCurrentUser()
+  const { isPopupOpen, togglePopup, unreadCount } = useChat()
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const chatButtonRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -50,6 +54,14 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const avatarUrl = currentUser?.avatar || user?.avatar
   const displayName = user?.name || 'User'
 
+  const handleChatIconClick = () => {
+    if (window.innerWidth < 768) {
+      navigate('/chat')
+      return
+    }
+    togglePopup()
+  }
+
   return (
     <header className="flex items-center justify-between px-6 py-3 border-b bg-white relative z-49">
       {/* Left section */}
@@ -75,9 +87,27 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         {/* Icons */}
         <span className="flex items-center mr-2">
           <NotificationsDropdown />
-          <Link to="/chat" className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition">
-            <Mail className="text-orange-400" />
-          </Link>
+          
+          {/* Chat Icon with Popup */}
+          <div ref={chatButtonRef} className="relative" data-chat-trigger>
+            <button data-chat-trigger
+              onClick={handleChatIconClick}
+              className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition relative"
+            >
+              <MessageCircle className="text-orange-400 w-[23px] h-[23px]" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {/* Only render popup on md+ screens */}
+            {isPopupOpen && (
+              <div className="hidden md:block">
+                <ChatPopup />
+              </div>
+            )}
+          </div>
         </span>
 
         {/* Avatar */}
@@ -151,7 +181,7 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
 
               {/* Logout */}
               <div className="px-5 py-3 bg-gray-50">
-                <button
+                <button data-chat-trigger
                   onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white py-2.5 rounded-xl hover:bg-orange-600 transition font-medium"
                 >
@@ -166,3 +196,4 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
     </header>
   )
 }
+

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, MoreHorizontal, Trash2 } from 'lucide-react'
 
 interface ImageViewerProps {
@@ -99,8 +100,9 @@ export const ImageViewer = ({ images, initialIndex, open, onClose, postId, updat
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 bg-black/95 z-100 flex items-center justify-center">
+  if (!open) return null
+  return createPortal(
+    <div className="fixed inset-0 bg-black/95 z-9999 flex items-center justify-center">
       {/* Header with counter and actions */}
       <div className="absolute top-4 left-0 right-0 flex items-center justify-between px-4 z-10">
         {/* Image counter */}
@@ -184,6 +186,7 @@ export const ImageViewer = ({ images, initialIndex, open, onClose, postId, updat
         className="absolute inset-0 -z-10"
         onClick={handleClose}
       />
-    </div>
+    </div>,
+    document.body
   )
 }
