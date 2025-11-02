@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef, useCallback, useTransition, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -38,13 +38,13 @@ import { ChatMessageSkeleton } from './ChatMessageSkeleton'
 import userService from '../../services/userService'
 import { MessageStatus } from './MessageStatus'
 
-// Custom Audio Player Component
+// Custom Audio Player Component - Memoized for performance
 interface AudioPlayerProps {
   audioUrl: string
   isOwn: boolean
 }
 
-const AudioPlayer = ({ audioUrl, isOwn }: AudioPlayerProps) => {
+const AudioPlayerBase = ({ audioUrl, isOwn }: AudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -78,17 +78,18 @@ const AudioPlayer = ({ audioUrl, isOwn }: AudioPlayerProps) => {
     }
   }, [])
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
 
     if (isPlaying) {
       audio.pause()
+      setIsPlaying(false)
     } else {
       audio.play()
+      setIsPlaying(true)
     }
-    setIsPlaying(!isPlaying)
-  }
+  }, [isPlaying])
 
   const formatTime = (time: number) => {
     if (isNaN(time)) return '0:00'
@@ -110,21 +111,14 @@ const AudioPlayer = ({ audioUrl, isOwn }: AudioPlayerProps) => {
           )}
         </button>
 
-        {/* Waveform visualization */}
-        <div className="flex-1 relative h-6 flex items-center gap-[1.5px]">
-          {[...Array(30)].map((_, i) => {
-            const height = Math.random() * 60 + 40 // Random height between 40-100%
-            const isPassed = (i / 30) * 100 < progress
-            return (
-              <div
-                key={i}
-                className={`w-[1.5px] rounded-full transition-all ${
-                  isPassed ? (isOwn ? 'bg-white' : 'bg-white') : isOwn ? 'bg-white/30' : 'bg-white/40'
-                }`}
-                style={{ height: `${height}%` }}
-              />
-            )
-          })}
+        {/* Simple progress bar instead of 30 divs */}
+        <div className="flex-1 relative h-6 flex items-center">
+          <div className="w-full h-1 bg-white/30 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-white transition-all ease-linear"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
 
         {/* Duration */}
@@ -132,11 +126,17 @@ const AudioPlayer = ({ audioUrl, isOwn }: AudioPlayerProps) => {
           {formatTime(currentTime > 0 ? currentTime : duration)}
         </span>
 
-        <audio ref={audioRef} src={audioUrl} />
+        <audio ref={audioRef} src={audioUrl} preload="metadata" />
       </div>
     </div>
   )
 }
+
+const AudioPlayer = memo(AudioPlayerBase, (prev, next) => {
+  return prev.audioUrl === next.audioUrl && prev.isOwn === next.isOwn
+})
+
+AudioPlayer.displayName = 'AudioPlayer'
 
 interface ChatWindowProps {
   user: User
@@ -156,6 +156,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const { user: currentUser } = useAuth()
   const { conversations, markAsRead, onlineUsers, typingUsers, setTyping, loadConversations } = useChat()
   const [messages, setMessages] = useState<Message[]>([])
+  const [, startTransition] = useTransition()
   const [newMessage, setNewMessage] = useState('')
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [loading, setLoading] = useState(true) // Bắt đầu với loading = true
@@ -174,11 +175,12 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const videoInputRef = useRef<HTMLInputElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<number | null>(null)
+  const isTypingRef = useRef(false)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
-  const MAX_CACHE = 100
-  const CHUNK = 20
+  const MAX_CACHE = 50
+  const CHUNK = 15
   const [visibleCount, setVisibleCount] = useState(CHUNK)
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const atBottomRef = useRef(true)
@@ -198,10 +200,12 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const isUserOnline = onlineUsers.has(user.id)
   const isUserTyping = user.id !== currentUser?.id && (typingUsers.get(user.id) || false)
 
-  // Handle typing indicator
-  const handleTypingChange = (typing: boolean) => {
+  // Handle typing indicator - optimized to reduce re-renders
+  const handleTypingChange = useCallback((typing: boolean) => {
+    if (isTypingRef.current === typing) return // Skip if state hasn't changed
+    isTypingRef.current = typing
     setTyping(user.id, typing)
-  }
+  }, [user.id, setTyping])
 
   // Reset initialLoadDone when switching to a different user
   useEffect(() => {
@@ -266,23 +270,25 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         (message.senderId === user.id && message.receiverId === currentUser?.id) ||
         (message.senderId === currentUser?.id && message.receiverId === user.id)
       ) {
-        setMessages(prev => {
-          // Avoid duplicates - check if message already exists
-          if (prev.some(m => m.id === message.id)) {
-            return prev
-          }
-          const next = [...prev, message]
-          // keep only last MAX_CACHE in RAM
-          const capped = next.slice(-MAX_CACHE)
+        startTransition(() => {
+          setMessages(prev => {
+            // Avoid duplicates - check if message already exists
+            if (prev.some(m => m.id === message.id)) {
+              return prev
+            }
+            const next = [...prev, message]
+            // keep only last MAX_CACHE in RAM
+            const capped = next.slice(-MAX_CACHE)
 
-          // Lưu vào cache
-          saveMessagesCache(user.id, capped)
+            // Lưu vào cache
+            saveMessagesCache(user.id, capped)
 
-          return capped
+            return capped
+          })
+
+          // Update visibleCount to show the new message
+          setVisibleCount(prev => prev + 1)
         })
-
-        // Update visibleCount to show the new message
-        setVisibleCount(prev => prev + 1)
 
         if (message.senderId === user.id && !isMinimized) {
           markAsRead(user.id)
@@ -294,10 +300,12 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageIds, deliveredAt } = customEvent.detail
 
-      setMessages(prev => {
-        const updated = prev.map(msg => (messageIds.includes(msg.id) ? { ...msg, deliveredAt } : msg))
-        saveMessagesCache(user.id, updated)
-        return updated
+      startTransition(() => {
+        setMessages(prev => {
+          const updated = prev.map(msg => (messageIds.includes(msg.id) ? { ...msg, deliveredAt } : msg))
+          saveMessagesCache(user.id, updated)
+          return updated
+        })
       })
     }
 
@@ -305,10 +313,12 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageIds, readAt } = customEvent.detail
 
-      setMessages(prev => {
-        const updated = prev.map(msg => (messageIds.includes(msg.id) ? { ...msg, readAt, read: true } : msg))
-        saveMessagesCache(user.id, updated)
-        return updated
+      startTransition(() => {
+        setMessages(prev => {
+          const updated = prev.map(msg => (messageIds.includes(msg.id) ? { ...msg, readAt, read: true } : msg))
+          saveMessagesCache(user.id, updated)
+          return updated
+        })
       })
     }
 
@@ -316,20 +326,22 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageId, reaction } = customEvent.detail
 
-      setMessages(prev => {
-        const updated = prev.map(msg => {
-          if (msg.id === messageId) {
-            // Remove existing reaction from this user (if changing emoji)
-            const filteredReactions = (msg.reactions || []).filter(r => r.userId !== reaction.userId)
-            return {
-              ...msg,
-              reactions: [...filteredReactions, reaction]
+      startTransition(() => {
+        setMessages(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === messageId) {
+              // Remove existing reaction from this user (if changing emoji)
+              const filteredReactions = (msg.reactions || []).filter(r => r.userId !== reaction.userId)
+              return {
+                ...msg,
+                reactions: [...filteredReactions, reaction]
+              }
             }
-          }
-          return msg
+            return msg
+          })
+          saveMessagesCache(user.id, updated)
+          return updated
         })
-        saveMessagesCache(user.id, updated)
-        return updated
       })
     }
 
@@ -337,18 +349,20 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageId, userId } = customEvent.detail
 
-      setMessages(prev => {
-        const updated = prev.map(msg => {
-          if (msg.id === messageId) {
-            return {
-              ...msg,
-              reactions: (msg.reactions || []).filter(r => r.userId !== userId)
+      startTransition(() => {
+        setMessages(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === messageId) {
+              return {
+                ...msg,
+                reactions: (msg.reactions || []).filter(r => r.userId !== userId)
+              }
             }
-          }
-          return msg
+            return msg
+          })
+          saveMessagesCache(user.id, updated)
+          return updated
         })
-        saveMessagesCache(user.id, updated)
-        return updated
       })
     }
 
@@ -356,18 +370,20 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageId } = customEvent.detail
 
-      setMessages(prev => {
-        const updated = prev.map(msg => {
-          if (msg.id === messageId) {
-            return {
-              ...msg,
-              unsent: true
+      startTransition(() => {
+        setMessages(prev => {
+          const updated = prev.map(msg => {
+            if (msg.id === messageId) {
+              return {
+                ...msg,
+                unsent: true
+              }
             }
-          }
-          return msg
+            return msg
+          })
+          saveMessagesCache(user.id, updated)
+          return updated
         })
-        saveMessagesCache(user.id, updated)
-        return updated
       })
     }
 
@@ -1590,10 +1606,13 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       ref={inputRef}
                       value={newMessage}
                       onChange={e => {
-                        setNewMessage(e.target.value)
+                        const value = e.target.value
+                        setNewMessage(value)
 
-                        // Send typing indicator
-                        handleTypingChange(true)
+                        // Send typing indicator only once
+                        if (value.length > 0 && !isTypingRef.current) {
+                          handleTypingChange(true)
+                        }
 
                         // Clear previous timeout
                         if (typingTimeoutRef.current) {

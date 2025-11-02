@@ -30,8 +30,8 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['Nam', 'Nữ', 'Khác'], {
-    message: 'Giới tính phải là Nam, Nữ hoặc Khác',
+  @IsIn(['Male', 'Female', 'Other'], {
+    message: 'Gender must be Male, Female or Other',
   })
   gender?: string;
 

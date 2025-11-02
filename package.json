@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",
-    "@types/cookie-parser": "^1.4.10"
+    "@types/cookie-parser": "^1.4.10",
+    "@types/lodash.debounce": "^4.0.9"
   }
 }

@@ -24,9 +24,9 @@ export default function MyProfilePage() {
       : 'timeline'
   )
 
-  // Kiểm tra xem có phải profile của mình không
+  // Check if this is the user's own profile
   const isOwnProfile = username === currentUser?.username
-  // Username thực tế để fetch data (ưu tiên username từ URL, fallback về currentUser.username)
+  // Actual username to fetch data (prefer username from URL, fallback to currentUser.username)
   const profileUsername = username || currentUser?.username
 
   // Fetch profile user data

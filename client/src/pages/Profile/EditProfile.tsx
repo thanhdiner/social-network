@@ -20,7 +20,7 @@ export default function EditProfile() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Form state - Khá»Ÿi táº¡o tá»« user data
+  // Form state - Initialize from user data
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -53,7 +53,7 @@ export default function EditProfile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
 
-  // Load user data khi component mount
+  // Load user data when component mounts
   useEffect(() => {
     if (user) {
       const nameParts = user.name?.split(' ') || []
@@ -100,17 +100,17 @@ export default function EditProfile() {
     try {
       setUploadingAvatar(true)
       
-      // XÃ³a áº£nh cÅ© trÃªn Cloudinary (náº¿u cÃ³ vÃ  khÃ¡c vá»›i preview hiá»‡n táº¡i)
+  // Delete old avatar on Cloudinary (if exists and different from current preview)
       if (user?.avatar && user.avatar !== avatarPreview) {
         await uploadService.deleteImage(user.avatar).catch(err => {
           console.warn('Failed to delete old avatar:', err)
         })
       }
       
-      // Upload áº£nh má»›i
+  // Upload new avatar
       const imageUrl = await uploadService.uploadImage(file)
       
-      // Update ngay láº­p tá»©c
+  // Update immediately
       await userService.updateProfile({ avatar: imageUrl })
       
       // Refresh user data
@@ -124,7 +124,7 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      setError('Upload áº£nh tháº¥t báº¡i')
+  setError('Failed to upload avatar')
     } finally {
       setUploadingAvatar(false)
     }
@@ -143,17 +143,17 @@ export default function EditProfile() {
     try {
       setUploadingCover(true)
       
-      // XÃ³a áº£nh bÃ¬a cÅ© trÃªn Cloudinary (náº¿u cÃ³ vÃ  khÃ¡c vá»›i preview hiá»‡n táº¡i)
+  // Delete old cover image on Cloudinary (if exists and different from current preview)
       if (user?.coverImage && user.coverImage !== coverPreview) {
         await uploadService.deleteImage(user.coverImage).catch(err => {
           console.warn('Failed to delete old cover:', err)
         })
       }
       
-      // Upload áº£nh má»›i
+  // Upload new cover image
       const imageUrl = await uploadService.uploadImage(file)
       
-      // Update ngay láº­p tá»©c
+  // Update immediately
       await userService.updateProfile({ coverImage: imageUrl })
       
       // Refresh user data
@@ -167,26 +167,26 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Upload error:', err)
-      setError('Upload áº£nh tháº¥t báº¡i')
+  setError('Failed to upload cover image')
     } finally {
       setUploadingCover(false)
     }
   }
 
   const handleRemoveAvatar = async () => {
-    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a avatar?')) return
+  if (!confirm('Are you sure you want to remove the avatar?')) return
     
     try {
       setUploadingAvatar(true)
       
-      // XÃ³a áº£nh trÃªn Cloudinary trÆ°á»›c
+  // Delete avatar on Cloudinary first
       if (user?.avatar) {
         await uploadService.deleteImage(user.avatar).catch(err => {
           console.warn('Failed to delete avatar from Cloudinary:', err)
         })
       }
       
-      // XÃ³a trong database
+  // Delete in database
       await userService.updateProfile({ avatar: '' })
       await refreshUser()
       
@@ -196,26 +196,26 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Remove avatar error:', err)
-      setError('XÃ³a avatar tháº¥t báº¡i')
+  setError('Failed to remove avatar')
     } finally {
       setUploadingAvatar(false)
     }
   }
 
   const handleRemoveCover = async () => {
-    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a áº£nh bÃ¬a?')) return
+  if (!confirm('Are you sure you want to remove the cover image?')) return
     
     try {
       setUploadingCover(true)
       
-      // XÃ³a áº£nh trÃªn Cloudinary trÆ°á»›c
+  // Delete cover image on Cloudinary first
       if (user?.coverImage) {
         await uploadService.deleteImage(user.coverImage).catch(err => {
           console.warn('Failed to delete cover from Cloudinary:', err)
         })
       }
       
-      // XÃ³a trong database
+  // Delete in database
       await userService.updateProfile({ coverImage: '' })
       await refreshUser()
       
@@ -225,7 +225,7 @@ export default function EditProfile() {
       }
     } catch (err) {
       console.error('Remove cover error:', err)
-      setError('XÃ³a áº£nh bÃ¬a tháº¥t báº¡i')
+  setError('Failed to remove cover image')
     } finally {
       setUploadingCover(false)
     }
@@ -238,13 +238,13 @@ export default function EditProfile() {
     try {
       // Validate
       if (!formData.firstName.trim()) {
-        setError('Vui lÃ²ng nháº­p tÃªn')
+        setError('Please enter your first name')
         return
       }
 
       const fullName = formData.lastName.trim() ? `${formData.lastName.trim()} ${formData.firstName.trim()}` : formData.firstName.trim()
 
-      // Call API to update profile (khÃ´ng cáº§n update avatar vÃ  coverImage vÃ¬ Ä‘Ã£ update ngay láº­p tá»©c)
+  // Call API to update profile (no need to update avatar and coverImage because they are updated immediately)
       await userService.updateProfile({
         name: fullName,
         bio: formData.bio.trim() || undefined,
@@ -262,12 +262,12 @@ export default function EditProfile() {
       // Refresh user data in context
       await refreshUser()
 
-      alert('Cáº­p nháº­t profile thÃ nh cÃ´ng!')
+  alert('Update profile successfully!')
       navigate(`/profile/${user?.username}`)
     } catch (err) {
       console.error('Update error:', err)
       const error = err as { response?: { data?: { message?: string } } }
-      setError(error.response?.data?.message || 'Cáº­p nháº­t profile tháº¥t báº¡i')
+  setError(error.response?.data?.message || 'Update profile failed')
     } finally {
       setIsLoading(false)
     }
@@ -280,27 +280,27 @@ export default function EditProfile() {
     try {
       // Validate
       if (!passwordData.currentPassword) {
-        setPasswordError('Vui lÃ²ng nháº­p máº­t kháº©u hiá»‡n táº¡i')
+        setPasswordError('Please enter your current password')
         return
       }
 
       if (!passwordData.newPassword) {
-        setPasswordError('Vui lÃ²ng nháº­p máº­t kháº©u má»›i')
+        setPasswordError('Please enter your new password')
         return
       }
 
       if (passwordData.newPassword.length < 6) {
-        setPasswordError('Máº­t kháº©u má»›i pháº£i cÃ³ Ã­t nháº¥t 6 kÃ½ tá»±')
+        setPasswordError('New password must be at least 6 characters')
         return
       }
 
       if (passwordData.newPassword !== passwordData.confirmPassword) {
-        setPasswordError('Máº­t kháº©u xÃ¡c nháº­n khÃ´ng khá»›p')
+        setPasswordError('Password confirmation does not match')
         return
       }
 
       if (passwordData.currentPassword === passwordData.newPassword) {
-        setPasswordError('Máº­t kháº©u má»›i pháº£i khÃ¡c máº­t kháº©u hiá»‡n táº¡i')
+        setPasswordError('New password must be different from current password')
         return
       }
 
@@ -317,12 +317,12 @@ export default function EditProfile() {
         confirmPassword: ''
       })
 
-      alert('Äá»•i máº­t kháº©u thÃ nh cÃ´ng!')
+  alert('Password changed successfully!')
       setActiveTab('personal')
     } catch (err) {
       console.error('Change password error:', err)
       const error = err as { response?: { data?: { message?: string } } }
-      setPasswordError(error.response?.data?.message || 'Äá»•i máº­t kháº©u tháº¥t báº¡i')
+  setPasswordError(error.response?.data?.message || 'Password change failed')
     } finally {
       setPasswordLoading(false)
     }
@@ -337,7 +337,7 @@ export default function EditProfile() {
         )}
         {uploadingCover && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="text-white">Äang upload...</div>
+            <div className="text-white">Uploading...</div>
           </div>
         )}
         <div className="absolute bottom-3 right-3 flex gap-2">
@@ -352,7 +352,7 @@ export default function EditProfile() {
             onClick={() => coverInputRef.current?.click()}
             disabled={uploadingCover}
             className="p-2 bg-white rounded-full shadow hover:bg-gray-100 transition"
-            title="Thay Ä‘á»•i áº£nh bÃ¬a"
+            title="Change cover image"
           >
             <Camera className="text-gray-700" size={18} />
           </button>
@@ -360,7 +360,7 @@ export default function EditProfile() {
             <button
               onClick={handleRemoveCover}
               className="p-2 bg-white rounded-full shadow hover:bg-red-50 transition"
-              title="XÃ³a áº£nh bÃ¬a"
+              title="Remove cover image"
             >
               <X className="text-red-500" size={18} />
             </button>
@@ -406,7 +406,7 @@ export default function EditProfile() {
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={uploadingAvatar}
                 className="p-2 bg-orange-500 text-white rounded-full shadow hover:bg-orange-600 transition"
-                title="Thay Ä‘á»•i avatar"
+                title="Change avatar"
               >
                 <Pencil size={14} />
               </button>
@@ -414,7 +414,7 @@ export default function EditProfile() {
                 <button
                   onClick={handleRemoveAvatar}
                   className="p-2 bg-red-500 text-white rounded-full shadow hover:bg-red-600 transition"
-                  title="XÃ³a avatar"
+                  title="Remove avatar"
                 >
                   <X size={14} />
                 </button>
@@ -451,31 +451,31 @@ export default function EditProfile() {
           <h2 className="text-lg font-semibold text-gray-800">Personal Information</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label>Há» vÃ  tÃªn Ä‘á»‡m</Label>
-              <Input placeholder="e.g. Huá»³nh VÄƒn" value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} />
-              <p className="text-xs text-gray-500 mt-1">Há» vÃ  tÃªn Ä‘á»‡m (cÃ³ thá»ƒ Ä‘á»ƒ trá»‘ng náº¿u chá»‰ cÃ³ tÃªn)</p>
+              <Label>Last Name</Label>
+              <Input placeholder="e.g. Huynh Van" value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">Last name (can be left blank if you only have a first name)</p>
             </div>
             <div className="col-span-2">
-              <Label>TÃªn *</Label>
+              <Label>First Name *</Label>
               <Input
-                placeholder="e.g. ThÃ nh"
+                placeholder="e.g. Thanh"
                 value={formData.firstName}
                 onChange={e => handleInputChange('firstName', e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">TÃªn cá»§a báº¡n (báº¯t buá»™c)</p>
+              <p className="text-xs text-gray-500 mt-1">Your first name (required)</p>
             </div>
 
             <div className="col-span-2">
               <Label>Username</Label>
               <Input placeholder="Username" value={user?.username || ''} disabled className="bg-gray-100 cursor-not-allowed" />
-              <p className="text-xs text-gray-500 mt-1">Username khÃ´ng thá»ƒ thay Ä‘á»•i</p>
+              <p className="text-xs text-gray-500 mt-1">Username cannot be changed</p>
             </div>
 
             <div className="col-span-2">
               <Label>Email</Label>
               <Input type="email" placeholder="Email" value={user?.email || ''} disabled className="bg-gray-100 cursor-not-allowed" />
-              <p className="text-xs text-gray-500 mt-1">Email khÃ´ng thá»ƒ thay Ä‘á»•i</p>
+              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
             </div>
 
             <div className="col-span-2">
@@ -491,21 +491,21 @@ export default function EditProfile() {
             </div>
 
             <div className="col-span-2">
-              <Label>Giá»›i tÃ­nh</Label>
+              <Label>Gender</Label>
               <Select value={formData.gender} onValueChange={value => handleInputChange('gender', value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Chá»n giá»›i tÃ­nh" />
+                  <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Nam">Nam</SelectItem>
-                  <SelectItem value="Ná»¯">Ná»¯</SelectItem>
-                  <SelectItem value="KhÃ¡c">KhÃ¡c</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="col-span-2">
-              <Label>NgÃ y sinh</Label>
+              <Label>Date of Birth</Label>
               <Input
                 type="date"
                 value={formData.dateOfBirth}
@@ -514,14 +514,14 @@ export default function EditProfile() {
             </div>
 
             <div className="col-span-2">
-              <Label>Äá»‹a chá»‰</Label>
+              <Label>Address</Label>
               <Input
-                placeholder="e.g. Há»“ ChÃ­ Minh, Viá»‡t Nam"
+                placeholder="e.g. Ho Chi Minh, Vietnam"
                 value={formData.address}
                 onChange={e => handleInputChange('address', e.target.value)}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500 mt-1">Äá»‹a chá»‰ hiá»‡n táº¡i cá»§a báº¡n</p>
+              <p className="text-xs text-gray-500 mt-1">Your current address</p>
             </div>
           </div>
 
@@ -641,17 +641,17 @@ export default function EditProfile() {
 
         {/* -------- Manage Contact -------- */}
         <TabsContent value="contact" className="space-y-6">
-          <h2 className="text-lg font-semibold text-gray-800">Quáº£n lÃ½ liÃªn há»‡</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Manage Contact</h2>
           <div className="space-y-4">
             <div>
-              <Label>Sá»‘ Ä‘iá»‡n thoáº¡i</Label>
+              <Label>Phone Number</Label>
               <Input
                 placeholder="e.g. 0901234567"
                 value={formData.phone}
                 onChange={e => handleInputChange('phone', e.target.value)}
                 maxLength={20}
               />
-              <p className="text-xs text-gray-500 mt-1">Sá»‘ Ä‘iá»‡n thoáº¡i liÃªn há»‡ cá»§a báº¡n</p>
+              <p className="text-xs text-gray-500 mt-1">Your contact phone number</p>
             </div>
             <div>
               <Label>Website</Label>
@@ -661,11 +661,11 @@ export default function EditProfile() {
                 onChange={e => handleInputChange('website', e.target.value)}
                 maxLength={200}
               />
-              <p className="text-xs text-gray-500 mt-1">Website cÃ¡ nhÃ¢n hoáº·c cÃ´ng ty</p>
+              <p className="text-xs text-gray-500 mt-1">Personal or company website</p>
             </div>
 
             <div className="pt-4">
-              <h3 className="text-md font-semibold text-gray-800 mb-4">Máº¡ng xÃ£ há»™i</h3>
+              <h3 className="text-md font-semibold text-gray-800 mb-4">Social Media</h3>
               <div className="space-y-4">
                 <div>
                   <Label>Facebook</Label>

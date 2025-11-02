@@ -44,7 +44,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
   if (!user) {
     return (
       <div className="bg-white rounded-2xl p-6 shadow">
-        <p className="text-gray-500">Không tìm thấy thông tin người dùng</p>
+  <p className="text-gray-500">User information not found</p>
       </div>
     )
   }
@@ -52,7 +52,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
   const formatDate = (dateString?: string) => {
     if (!dateString) return null
     const date = new Date(dateString)
-    return date.toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
   return (
@@ -60,13 +60,13 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
       {/* Bio */}
       {user.bio && (
         <>
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Giới thiệu</h2>
+          <h2 className="text-lg font-semibold mb-4 text-gray-800">Bio</h2>
           <p className="text-sm text-gray-700 mb-6">{user.bio}</p>
         </>
       )}
 
       {/* Contact Information */}
-      <h2 className="text-lg font-semibold mb-4 text-gray-800">Thông tin liên hệ</h2>
+  <h2 className="text-lg font-semibold mb-4 text-gray-800">Contact Information</h2>
       <div className="space-y-3 text-sm text-gray-700">
         <div className="flex items-center gap-3">
           <Mail className="w-4 h-4 text-orange-500" />
@@ -80,7 +80,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
           <div className="flex items-center gap-3">
             <Phone className="w-4 h-4 text-orange-500" />
             <div>
-              <span className="font-medium text-gray-500">Điện thoại: </span>
+              <span className="font-medium text-gray-500">Phone: </span>
               <span>{user.phone}</span>
             </div>
           </div>
@@ -90,7 +90,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
           <div className="flex items-center gap-3">
             <MapPin className="w-4 h-4 text-orange-500" />
             <div>
-              <span className="font-medium text-gray-500">Địa chỉ: </span>
+              <span className="font-medium text-gray-500">Address: </span>
               <span>{user.address}</span>
             </div>
           </div>
@@ -112,13 +112,13 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
       {/* Basic Information */}
       {(user.dateOfBirth || user.gender) && (
         <>
-          <h2 className="text-lg font-semibold mt-6 mb-4 text-gray-800">Thông tin cơ bản</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-4 text-gray-800">Basic Information</h2>
           <div className="space-y-3 text-sm text-gray-700">
             {user.dateOfBirth && (
               <div className="flex items-center gap-3">
                 <Calendar className="w-4 h-4 text-orange-500" />
                 <div>
-                  <span className="font-medium text-gray-500">Ngày sinh: </span>
+                  <span className="font-medium text-gray-500">Date of Birth: </span>
                   <span>{formatDate(user.dateOfBirth)}</span>
                 </div>
               </div>
@@ -128,7 +128,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
               <div className="flex items-center gap-3">
                 <UserIcon className="w-4 h-4 text-orange-500" />
                 <div>
-                  <span className="font-medium text-gray-500">Giới tính: </span>
+                  <span className="font-medium text-gray-500">Gender: </span>
                   <span>{user.gender}</span>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export const ProfileAbout = ({ username }: ProfileAboutProps) => {
       {/* Social Media */}
       {(user.facebook || user.instagram || user.twitter || user.linkedin) && (
         <>
-          <h2 className="text-lg font-semibold mt-6 mb-4 text-gray-800">Mạng xã hội</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-4 text-gray-800">Social Media</h2>
           <div className="space-y-3 text-sm text-gray-700">
             {user.facebook && (
               <div className="flex items-center gap-3">

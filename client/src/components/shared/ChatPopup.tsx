@@ -1,12 +1,19 @@
-﻿import { useEffect, useRef, useState, useCallback } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Maximize2 } from 'lucide-react'
+import debounce from 'lodash.debounce'
 import { useChat } from '../../contexts/ChatContext'
 import { chatService } from '../../services/chatService'
 import type { User } from '../../types'
-import { Avatar } from './Avatar'
 import { ChatListItem } from './ChatListItem'
-import debounce from 'lodash.debounce'
+
+interface Conversation {
+  id: string
+  participant: User
+  lastMessage?: { content?: string; createdAt: string }
+  unreadCount: number
+  participantId: string
+}
 
 export const ChatPopup = () => {
   const navigate = useNavigate()
@@ -15,10 +22,11 @@ export const ChatPopup = () => {
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
+  const debouncedSearchRef = useRef<ReturnType<typeof debounce>>(null)
 
-  // Debounced search handler
-  const handleSearch = useCallback(
-    debounce(async (query: string) => {
+  // Initialize debounced search function once
+  useEffect(() => {
+    debouncedSearchRef.current = debounce(async (query: string) => {
       if (!query.trim()) {
         setSearchResults([])
         return
@@ -32,13 +40,16 @@ export const ChatPopup = () => {
       } finally {
         setIsSearching(false)
       }
-    }, 300),
-    []
-  )
+    }, 300)
+
+    return () => {
+      debouncedSearchRef.current?.cancel()
+    }
+  }, [])
 
   useEffect(() => {
-    handleSearch(searchQuery)
-  }, [searchQuery, handleSearch])
+    debouncedSearchRef.current?.(searchQuery)
+  }, [searchQuery])
 
   // Close popup when clicking outside
   useEffect(() => {
@@ -79,19 +90,19 @@ export const ChatPopup = () => {
       role="dialog"
       aria-label="Chat popup"
       tabIndex={-1}
-      className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 max-h-[450px] flex flex-col"
+      className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[500px] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
     >
       
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-orange-50 to-white">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xl font-bold text-gray-900">Messages</h3>
+          <h3 className="text-lg font-bold text-gray-900">Messages</h3>
           <button
             onClick={handleGoToFullPage}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-            title="Open full page"
+            className="p-2 hover:bg-orange-100 rounded-full transition-all duration-200 cursor-pointer hover:scale-110"
+            title="Open full chat page"
           >
-            <Maximize2 className="w-5 h-5 text-gray-600" />
+            <Maximize2 className="w-5 h-5 text-orange-500" />
           </button>
         </div>
 
@@ -100,37 +111,63 @@ export const ChatPopup = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search on Messenger..."
+            placeholder="Search conversations..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-orange-50 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 placeholder:text-gray-400"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-700 placeholder:text-gray-400 transition-all"
           />
         </div>
       </div>
 
       {/* Conversation List */}
-      <div className="overflow-y-auto flex-1">
+      <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
         {isSearching ? (
-          <div className="p-4 text-center text-gray-500">Searching...</div>
+          <div className="p-8 text-center flex flex-col items-center justify-center">
+            <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-2"></div>
+            <p className="text-sm text-gray-500">Searching...</p>
+          </div>
         ) : displayList.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">{searchQuery.trim() ? 'No results found' : 'No messages yet'}</div>
+          <div className="p-8 text-center flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+              <div className="text-gray-400 text-xl">💬</div>
+            </div>
+            <p className="text-sm font-medium text-gray-700">{searchQuery.trim() ? 'No conversations found' : 'No messages yet'}</p>
+            <p className="text-xs text-gray-500 mt-1">{searchQuery.trim() ? 'Try a different search term' : 'Start a new conversation'}</p>
+          </div>
         ) : (
-          <div>
-            {(searchQuery ? searchResults : conversations).map(item =>
-              searchQuery ? (
-                <ChatListItem key={item.id} user={item} online={onlineUsers.has(item.id)} onClick={() => handleOpenChat(item)} />
-              ) : (
-                <ChatListItem
-                  key={item.id}
-                  user={item.participant}
-                  online={onlineUsers.has(item.participant.id)}
-                  lastMessage={item.lastMessage}
-                  unreadCount={item.unreadCount}
-                  formatTime={formatTime}
-                  onClick={() => handleOpenChat(item.participant)}
-                />
-              )
-            )}
+          <div className="divide-y divide-gray-100">
+            {(searchQuery ? searchResults : conversations).map(item => {
+              if (searchQuery) {
+                const user = item as User
+                return (
+                  <div
+                    key={user.id}
+                    className="p-3 hover:bg-orange-50 transition-colors duration-150 cursor-pointer"
+                    onClick={() => handleOpenChat(user)}
+                  >
+                    <ChatListItem user={user} online={onlineUsers.has(user.id)} onClick={() => {}} />
+                  </div>
+                )
+              } else {
+                const conversation = item as Conversation
+                return (
+                  <div
+                    key={conversation.id}
+                    className="p-3 hover:bg-orange-50 transition-colors duration-150 cursor-pointer"
+                    onClick={() => handleOpenChat(conversation.participant)}
+                  >
+                    <ChatListItem
+                      user={conversation.participant}
+                      online={onlineUsers.has(conversation.participant.id)}
+                      lastMessage={conversation.lastMessage}
+                      unreadCount={conversation.unreadCount}
+                      formatTime={formatTime}
+                      onClick={() => {}}
+                    />
+                  </div>
+                )
+              }
+            })}
           </div>
         )}
       </div>

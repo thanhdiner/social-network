@@ -203,7 +203,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       }
     } catch (err) {
       console.error('Upload avatar error:', err)
-      alert('Upload avatar thất bại')
+  alert('Failed to upload avatar')
     } finally {
       setUploadingAvatar(false)
     }
@@ -244,14 +244,14 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       }
     } catch (err) {
       console.error('Upload cover error:', err)
-      alert('Upload ảnh bìa thất bại')
+  alert('Failed to upload cover image')
     } finally {
       setUploadingCover(false)
     }
   }
 
   const handleRemoveCover = async () => {
-    if (!confirm('Bạn có chắc muốn xóa ảnh bìa?')) return
+  if (!confirm('Are you sure you want to remove the cover image?')) return
 
     try {
       setUploadingCover(true)
@@ -268,7 +268,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       await refreshUser()
     } catch (err) {
       console.error('Remove cover error:', err)
-      alert('Xóa ảnh bìa thất bại')
+  alert('Failed to remove cover image')
     } finally {
       setUploadingCover(false)
     }
@@ -307,7 +307,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
                 onClick={() => coverInputRef.current?.click()}
                 disabled={uploadingCover}
                 className="p-2 bg-white rounded-full shadow-md hover:bg-orange-50 transition"
-                title="Thay đổi ảnh bìa"
+                title="Change cover image"
               >
                 <Camera className="text-orange-500" size={17} />
               </button>
@@ -318,7 +318,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
                   onClick={handleRemoveCover}
                   disabled={uploadingCover}
                   className="p-2 bg-white rounded-full shadow-md hover:bg-red-50 transition"
-                  title="Xóa ảnh bìa"
+                  title="Remove cover image"
                 >
                   <X className="text-red-500" size={17} />
                 </button>
