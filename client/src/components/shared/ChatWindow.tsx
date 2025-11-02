@@ -33,7 +33,7 @@ import { ImageViewer } from './ImageViewer'
 import uploadService from '../../services/uploadService'
 import type { Message, User } from '../../types'
 import { Avatar } from './Avatar'
-import { saveMessagesCache, getMessagesCache, clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
+import { saveMessagesCache, clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
 import { ChatMessageSkeleton } from './ChatMessageSkeleton'
 import userService from '../../services/userService'
 import { MessageStatus } from './MessageStatus'
@@ -103,7 +103,7 @@ const AudioPlayerBase = ({ audioUrl, isOwn }: AudioPlayerProps) => {
   return (
     <div className="px-2 py-2">
       <div className={`flex items-center gap-2 rounded-full px-2 py-2 w-[146px] ${isOwn ? 'bg-white/20' : 'bg-orange-500'}`}>
-        <button onClick={togglePlay} className="flex-shrink-0 cursor-pointer">
+        <button onClick={togglePlay} className="shrink-0 cursor-pointer">
           {isPlaying ? (
             <Pause className={`w-4 h-4 ${isOwn ? 'text-white' : 'text-white'} fill-current`} />
           ) : (
@@ -122,7 +122,7 @@ const AudioPlayerBase = ({ audioUrl, isOwn }: AudioPlayerProps) => {
         </div>
 
         {/* Duration */}
-        <span className={`text-[10px] font-medium ${isOwn ? 'text-white' : 'text-white'} min-w-[28px]`}>
+        <span className={`text-[10px] font-medium ${isOwn ? 'text-white' : 'text-white'} min-w-7`}>
           {formatTime(currentTime > 0 ? currentTime : duration)}
         </span>
 
@@ -222,32 +222,20 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       // Nếu đã load xong rồi thì skip (tránh fetch lại khi re-render)
       if (initialLoadDone) return
 
-      // Thử lấy từ cache trước
-      const cachedMessages = getMessagesCache(user.id)
-      if (cachedMessages && cachedMessages.length > 0) {
-        // Có cache → Hiển thị ngay
-        const capped = cachedMessages.slice(-MAX_CACHE)
+      try {
+        setLoading(true)
+        // Always fetch from server to get fresh messages (including messages sent while window was closed)
+        const data = await chatService.getMessages(user.id)
+        const capped = data.slice(-MAX_CACHE)
         setMessages(capped)
         setVisibleCount(Math.min(CHUNK, capped.length))
+        saveMessagesCache(user.id, capped)
         setLoading(false)
         setInitialLoadDone(true)
-        // KHÔNG fetch background nữa, tin dùng cache + socket realtime
-      } else {
-        // Không có cache → Fetch từ server
-        try {
-          setLoading(true)
-          const data = await chatService.getMessages(user.id)
-          const capped = data.slice(-MAX_CACHE)
-          setMessages(capped)
-          setVisibleCount(Math.min(CHUNK, capped.length))
-          saveMessagesCache(user.id, capped)
-          setLoading(false)
-          setInitialLoadDone(true)
-        } catch (error) {
-          console.error('Failed to load messages:', error)
-          setLoading(false)
-          setInitialLoadDone(true)
-        }
+      } catch (error) {
+        console.error('Failed to load messages:', error)
+        setLoading(false)
+        setInitialLoadDone(true)
       }
 
       // Mark as read after a delay to allow user to see "Delivered" status first

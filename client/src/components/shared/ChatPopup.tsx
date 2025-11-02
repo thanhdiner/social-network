@@ -1,9 +1,10 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Maximize2 } from 'lucide-react'
+import { Search, Maximize2, MoreVertical, Trash2 } from 'lucide-react'
 import debounce from 'lodash.debounce'
 import { useChat } from '../../contexts/ChatContext'
 import { chatService } from '../../services/chatService'
+import { clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
 import type { User } from '../../types'
 import { ChatListItem } from './ChatListItem'
 
@@ -17,12 +18,14 @@ interface Conversation {
 
 export const ChatPopup = () => {
   const navigate = useNavigate()
-  const { conversations, openChatWindow, closePopup, onlineUsers } = useChat()
+  const { conversations, openChatWindow, closePopup, onlineUsers, closeChatWindow, loadConversations } = useChat()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
   const debouncedSearchRef = useRef<ReturnType<typeof debounce>>(null)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Initialize debounced search function once
   useEffect(() => {
@@ -51,12 +54,21 @@ export const ChatPopup = () => {
     debouncedSearchRef.current?.(searchQuery)
   }, [searchQuery])
 
+  // Auto load conversations when popup opens or when new message arrives
+  useEffect(() => {
+    loadConversations()
+  }, [loadConversations])
+
   // Close popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!popupRef.current?.contains(target) && !target.closest('[data-chat-trigger]')) {
         closePopup()
+      }
+      // Close menu if clicking outside
+      if (menuRef.current && !menuRef.current.contains(target) && !target.closest('.group')) {
+        setMenuOpen(null)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -80,6 +92,28 @@ export const ChatPopup = () => {
     if (hours < 24) return `${hours}h`
     if (days < 7) return `${days}d`
     return date.toLocaleDateString('en-US')
+  }
+
+  const handleDeleteConversation = async (e: React.MouseEvent, userId: string) => {
+    e.stopPropagation()
+    if (confirm('Delete all messages in this conversation? This action cannot be undone.')) {
+      try {
+        // Delete on server
+        await chatService.deleteConversation(userId)
+        // Clear local cache
+        clearMessagesCache(userId)
+        clearConversationsCache()
+        // Close chat window for this user
+        closeChatWindow(userId)
+        // Reload conversations list
+        loadConversations()
+        // Close menu
+        setMenuOpen(null)
+      } catch (error) {
+        console.error('Failed to delete conversation:', error)
+        alert('An error occurred, please try again')
+      }
+    }
   }
 
   const displayList = searchQuery.trim() ? searchResults : conversations
@@ -153,17 +187,49 @@ export const ChatPopup = () => {
                 return (
                   <div
                     key={conversation.id}
-                    className="p-3 hover:bg-orange-50 transition-colors duration-150 cursor-pointer"
+                    className="p-3 hover:bg-orange-50 transition-colors duration-150 cursor-pointer group relative"
                     onClick={() => handleOpenChat(conversation.participant)}
                   >
-                    <ChatListItem
-                      user={conversation.participant}
-                      online={onlineUsers.has(conversation.participant.id)}
-                      lastMessage={conversation.lastMessage}
-                      unreadCount={conversation.unreadCount}
-                      formatTime={formatTime}
-                      onClick={() => {}}
-                    />
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <ChatListItem
+                          user={conversation.participant}
+                          online={onlineUsers.has(conversation.participant.id)}
+                          lastMessage={conversation.lastMessage}
+                          unreadCount={conversation.unreadCount}
+                          formatTime={formatTime}
+                          onClick={() => {}}
+                        />
+                      </div>
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuOpen(menuOpen === conversation.id ? null : conversation.id)
+                          }}
+                          className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-orange-100 rounded-full transition-all cursor-pointer"
+                          title="Options"
+                        >
+                          <MoreVertical className="w-4 h-4 text-gray-600" />
+                        </button>
+                        
+                        {menuOpen === conversation.id && (
+                          <div
+                            ref={menuRef}
+                            className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px]"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => handleDeleteConversation(e, conversation.participantId)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Delete all messages</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )
               }
