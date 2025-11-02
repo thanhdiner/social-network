@@ -72,6 +72,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: UserSocket,
     @MessageBody() data: { messageId: string },
   ) {
+    console.log('[ChatGateway] message_received ack', {
+      userId: client.userId,
+      messageId: data.messageId,
+    });
     // Client acknowledges they received the message
     // This will be handled by ChatService to update deliveredAt
     return { success: true };
@@ -172,7 +176,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     
     if (socketId) {
       this.server.to(socketId).emit('messages_delivered', payload);
-      console.log(`[ChatGateway] Emitted messages_delivered to ${socketId}`, payload);
+      console.log(
+        `[ChatGateway] Emitted messages_delivered to ${socketId}`,
+        payload,
+      );
     } else {
       console.log(`[ChatGateway] No socket found for sender ${senderId}`);
     }
@@ -261,7 +268,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       const receiverSocketId = this.userSockets.get(data.receiverId);
       console.log(`[ChatGateway] Receiver socket ID: ${receiverSocketId}`);
-      
+
       if (receiverSocketId && client.userId) {
         this.server.to(receiverSocketId).emit('voice_call_incoming', {
           callerId: client.userId,
@@ -269,9 +276,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           callerName: data.callerName,
           callerAvatar: data.callerAvatar,
         });
-        console.log(`[ChatGateway] Emitted voice_call_incoming to ${receiverSocketId}`);
+        console.log(
+          `[ChatGateway] Emitted voice_call_incoming to ${receiverSocketId}`,
+        );
       } else {
-        console.log(`[ChatGateway] Cannot emit: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`);
+        console.log(
+          `[ChatGateway] Cannot emit: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`,
+        );
       }
       return { success: true };
     } catch (error) {
@@ -319,11 +330,103 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice_call_signal')
   handleVoiceCallSignal(
     @ConnectedSocket() client: UserSocket,
-    @MessageBody() data: { userId: string; signal: any },
+    @MessageBody() data: { userId: string; signal: unknown },
   ) {
     const userSocketId = this.userSockets.get(data.userId);
     if (userSocketId) {
       this.server.to(userSocketId).emit('voice_call_signal', {
+        signal: data.signal,
+      });
+    }
+    return { success: true };
+  }
+
+  // Video call events
+  @SubscribeMessage('video_call_start')
+  handleVideoCallStart(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody()
+    data: {
+      receiverId: string;
+      callerName: string;
+      callerAvatar: string | null;
+    },
+  ) {
+    try {
+      console.log(
+        `[ChatGateway] video_call_start from ${client.userId} to ${data.receiverId}`,
+      );
+      const receiverSocketId = this.userSockets.get(data.receiverId);
+      console.log(
+        `[ChatGateway] Video receiver socket ID: ${receiverSocketId}`,
+      );
+
+      if (receiverSocketId && client.userId) {
+        this.server.to(receiverSocketId).emit('video_call_incoming', {
+          callerId: client.userId,
+          receiverId: data.receiverId,
+          callerName: data.callerName,
+          callerAvatar: data.callerAvatar,
+        });
+        console.log(
+          `[ChatGateway] Emitted video_call_incoming to ${receiverSocketId}`,
+        );
+      } else {
+        console.log(
+          `[ChatGateway] Cannot emit video call: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`,
+        );
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[ChatGateway] Error in video_call_start:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  @SubscribeMessage('video_call_accept')
+  handleVideoCallAccept(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { callerId: string },
+  ) {
+    const callerSocketId = this.userSockets.get(data.callerId);
+    if (callerSocketId) {
+      this.server.to(callerSocketId).emit('video_call_accepted');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('video_call_reject')
+  handleVideoCallReject(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { callerId: string },
+  ) {
+    const callerSocketId = this.userSockets.get(data.callerId);
+    if (callerSocketId) {
+      this.server.to(callerSocketId).emit('video_call_rejected');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('video_call_end')
+  handleVideoCallEnd(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { userId: string },
+  ) {
+    const userSocketId = this.userSockets.get(data.userId);
+    if (userSocketId) {
+      this.server.to(userSocketId).emit('video_call_ended');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('video_call_signal')
+  handleVideoCallSignal(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { userId: string; signal: unknown },
+  ) {
+    const userSocketId = this.userSockets.get(data.userId);
+    if (userSocketId) {
+      this.server.to(userSocketId).emit('video_call_signal', {
         signal: data.signal,
       });
     }

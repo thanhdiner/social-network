@@ -30,6 +30,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { chatService } from '../../services/chatService'
 import socketService from '../../services/socketService'
 import voiceCallService from '../../services/voiceCallService'
+import videoCallService from '../../services/videoCallService'
 import { EmojiPicker } from './EmojiPicker'
 import { ImageViewer } from './ImageViewer'
 import uploadService from '../../services/uploadService'
@@ -39,6 +40,12 @@ import { saveMessagesCache, clearMessagesCache, clearConversationsCache } from '
 import { ChatMessageSkeleton } from './ChatMessageSkeleton'
 import userService from '../../services/userService'
 import { MessageStatus } from './MessageStatus'
+
+type AudioRecorder = {
+  startRecording: () => void
+  stopRecording: (callback?: () => void) => void
+  getBlob: () => Blob
+}
 
 // Custom Audio Player Component - Memoized for performance
 interface AudioPlayerProps {
@@ -152,7 +159,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioPreview, setAudioPreview] = useState<string>('')
-  const recorderRef = useRef<any>(null)
+  const recorderRef = useRef<AudioRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
@@ -892,7 +899,19 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                 <Phone className="w-4 h-4" />
               </button>
               <button
-                onClick={() => alert('Video call feature coming soon')}
+                onClick={async () => {
+                  console.log('Video call button clicked', { user, currentUser })
+                  if (currentUser) {
+                    try {
+                      console.log('Starting video call to', user.id)
+                      await videoCallService.startCall(user.id, user.name, user.avatar || null)
+                    } catch (error) {
+                      console.error('Error starting video call:', error)
+                    }
+                  } else {
+                    console.error('No current user')
+                  }
+                }}
                 className="p-1.5 hover:bg-white/20 rounded-full transition-colors cursor-pointer"
                 title="Video call"
               >
@@ -1523,9 +1542,10 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       }
                     }}
                     onMouseUp={async () => {
-                      if (recorderRef.current && recording) {
-                        recorderRef.current.stopRecording(async () => {
-                          const blob = recorderRef.current.getBlob()
+                      const recorderInstance = recorderRef.current
+                      if (recorderInstance && recording) {
+                        recorderInstance.stopRecording(async () => {
+                          const blob = recorderInstance.getBlob()
 
                           // Stop all tracks to release microphone
                           if (mediaStreamRef.current) {
@@ -1573,9 +1593,10 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                     }}
                     onMouseLeave={async () => {
                       // Also stop if user moves mouse away while holding
-                      if (recorderRef.current && recording) {
-                        recorderRef.current.stopRecording(async () => {
-                          const blob = recorderRef.current.getBlob()
+                      const recorderInstance = recorderRef.current
+                      if (recorderInstance && recording) {
+                        recorderInstance.stopRecording(async () => {
+                          const blob = recorderInstance.getBlob()
 
                           // Stop all tracks
                           if (mediaStreamRef.current) {

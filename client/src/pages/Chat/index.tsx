@@ -13,6 +13,8 @@ import { saveMessagesCache, getMessagesCache, clearMessagesCache, clearConversat
 import { ChatMessageSkeleton } from '../../components/shared/ChatMessageSkeleton';
 import userService from '../../services/userService';
 import { MessageStatus } from '../../components/shared/MessageStatus';
+import voiceCallService from '../../services/voiceCallService';
+import videoCallService from '../../services/videoCallService';
 
 export default function Chat() {
   const { user: currentUser } = useAuth();
@@ -48,6 +50,50 @@ export default function Chat() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [hasBlocked, setHasBlocked] = useState(false);
+
+  const handleStartVoiceCall = async () => {
+    if (!selectedUser) {
+      return;
+    }
+
+    if (!currentUser) {
+      console.error('Voice call unavailable without authenticated user');
+      return;
+    }
+
+    try {
+      await voiceCallService.startCall(
+        selectedUser.id,
+        selectedUser.name,
+        selectedUser.avatar ?? null
+      );
+    } catch (error) {
+      console.error('Failed to start voice call:', error);
+      alert('Không thể bắt đầu cuộc gọi thoại. Vui lòng thử lại!');
+    }
+  };
+
+  const handleStartVideoCall = async () => {
+    if (!selectedUser) {
+      return;
+    }
+
+    if (!currentUser) {
+      console.error('Video call unavailable without authenticated user');
+      return;
+    }
+
+    try {
+      await videoCallService.startCall(
+        selectedUser.id,
+        selectedUser.name,
+        selectedUser.avatar ?? null
+      );
+    } catch (error) {
+      console.error('Failed to start video call:', error);
+      alert('Không thể bắt đầu cuộc gọi video. Vui lòng thử lại!');
+    }
+  };
 
   // Load conversations khi mount
   useEffect(() => {
@@ -573,14 +619,14 @@ export default function Chat() {
                 {currentUser?.id !== selectedUser.id && (
                   <>
                     <button 
-                      onClick={() => alert('Voice call feature coming soon')}
+                      onClick={handleStartVoiceCall}
                       className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" 
                       title="Voice call"
                     >
                       <Phone className="w-5 h-5 text-orange-500" />
                     </button>
                     <button 
-                      onClick={() => alert('Video call feature coming soon')}
+                      onClick={handleStartVideoCall}
                       className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" 
                       title="Video call"
                     >

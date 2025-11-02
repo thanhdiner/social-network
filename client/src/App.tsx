@@ -17,6 +17,7 @@ import UserNotFound from '@/pages/UserNotFound'
 import { PostDetail } from '@/pages/PostDetail'
 import { SearchResults } from '@/pages/Search'
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
+import { VideoCallModal } from '@/components/shared/VideoCallModal'
 
 function App() {
   return (
@@ -147,8 +148,9 @@ function App() {
           {/* Redirect unknown routes to 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-        {/* Voice Call Modal - Global */}
-        <VoiceCallModal />
+  {/* Global call modals */}
+  <VoiceCallModal />
+  <VideoCallModal />
         </ChatProvider>
       </AuthProvider>
     </Router>

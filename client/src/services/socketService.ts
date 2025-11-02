@@ -1,6 +1,17 @@
 import { io, Socket } from 'socket.io-client'
 import type { Message } from '../types'
 
+type IncomingCallPayload = {
+  callerId: string
+  receiverId: string
+  callerName: string
+  callerAvatar: string | null
+}
+
+type CallSignalPayload = {
+  signal: unknown
+}
+
 class SocketService {
   private socket: Socket | null = null
   private userId: string | null = null
@@ -17,7 +28,9 @@ class SocketService {
       try {
         this.socket.off()
         this.socket.disconnect()
-      } catch {}
+      } catch (error) {
+        console.warn('SocketService: failed to reset existing socket', error)
+      }
       this.socket = null
     }
 
@@ -58,7 +71,9 @@ class SocketService {
       try {
         this.socket.off()
         this.socket.disconnect()
-      } catch {}
+      } catch (error) {
+        console.warn('SocketService: failed to disconnect socket', error)
+      }
       this.socket = null
       this.userId = null
       this.connecting = false
@@ -134,7 +149,7 @@ class SocketService {
   }
 
   // Voice call events
-  onVoiceCallIncoming(callback: (data: any) => void) {
+  onVoiceCallIncoming(callback: (data: IncomingCallPayload) => void) {
     this.socket?.on('voice_call_incoming', callback);
   }
 
@@ -150,7 +165,7 @@ class SocketService {
     this.socket?.on('voice_call_ended', callback);
   }
 
-  onVoiceCallSignal(callback: (data: any) => void) {
+  onVoiceCallSignal(callback: (data: CallSignalPayload) => void) {
     this.socket?.on('voice_call_signal', callback);
   }
 
@@ -160,6 +175,35 @@ class SocketService {
     this.socket?.off('voice_call_rejected');
     this.socket?.off('voice_call_ended');
     this.socket?.off('voice_call_signal');
+  }
+
+  // Video call events
+  onVideoCallIncoming(callback: (data: IncomingCallPayload) => void) {
+    this.socket?.on('video_call_incoming', callback);
+  }
+
+  onVideoCallAccepted(callback: () => void) {
+    this.socket?.on('video_call_accepted', callback);
+  }
+
+  onVideoCallRejected(callback: () => void) {
+    this.socket?.on('video_call_rejected', callback);
+  }
+
+  onVideoCallEnded(callback: () => void) {
+    this.socket?.on('video_call_ended', callback);
+  }
+
+  onVideoCallSignal(callback: (data: CallSignalPayload) => void) {
+    this.socket?.on('video_call_signal', callback);
+  }
+
+  offVideoCallEvents() {
+    this.socket?.off('video_call_incoming');
+    this.socket?.off('video_call_accepted');
+    this.socket?.off('video_call_rejected');
+    this.socket?.off('video_call_ended');
+    this.socket?.off('video_call_signal');
   }
 
   getSocket() {
