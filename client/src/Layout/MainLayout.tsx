@@ -118,19 +118,19 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       {/* Chat UI docked to the right */}
       {/* Expanded chat windows along bottom-right */}
       <div className="fixed bottom-0 right-4 flex items-end gap-3 z-40">
-        {chatWindows
-          .filter((w) => !w.isMinimized)
-          .slice(0, maxVisibleChats) // Limit visible chats based on screen size
-          .map((chatWindow, index) => (
-            <div key={chatWindow.userId} style={{ marginRight: `${index * 8}px` }}>
-              <ChatWindow
-                user={chatWindow.user}
-                isMinimized={false}
-                onClose={() => closeChatWindow(chatWindow.userId)}
-                onMinimize={() => minimizeChatWindow(chatWindow.userId)}
-              />
-            </div>
-          ))}
+          {chatWindows
+            .filter((w) => !w.isMinimized)
+            .slice(0, maxVisibleChats) // Limit visible chats based on screen size
+            .map((chatWindow) => (
+              <div key={chatWindow.userId}>
+                <ChatWindow
+                  user={chatWindow.user}
+                  isMinimized={false}
+                  onClose={() => closeChatWindow(chatWindow.userId)}
+                  onMinimize={() => minimizeChatWindow(chatWindow.userId)}
+                />
+              </div>
+            ))}
       </div>
 
       {/* Minimized chat bubbles pinned on the right (Facebook-like) */}
