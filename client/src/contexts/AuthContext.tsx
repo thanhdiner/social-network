@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react'
 import type { ReactNode } from 'react'
 import authService from '../services/authService'
 import socketService from '../services/socketService'
+import voiceCallService from '../services/voiceCallService'
 import type { User, LoginData, RegisterData } from '../services/authService'
 import { clearAllChatCache } from '../utils/chatCache'
 
@@ -39,6 +40,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Connect to Socket.IO when user is loaded
         if (userData?.id) {
           socketService.connect(userData.id)
+          // Setup voice call listeners after socket connects
+          setTimeout(() => {
+            voiceCallService.ensureSocketListeners()
+          }, 500)
         }
       }
     } catch (error) {
@@ -54,6 +59,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authService.login(data)
       await loadUser()
+      // Setup voice call listeners after login
+      setTimeout(() => {
+        voiceCallService.ensureSocketListeners()
+      }, 500)
     } finally {
       setIsLoading(false)
     }

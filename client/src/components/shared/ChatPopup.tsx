@@ -81,6 +81,7 @@ export const ChatPopup = () => {
       tabIndex={-1}
       className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 max-h-[450px] flex flex-col"
     >
+      
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">

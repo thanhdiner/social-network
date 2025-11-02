@@ -243,4 +243,85 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(socketId).emit('message_unsent', payload);
     }
   }
+
+  // Voice call events
+  @SubscribeMessage('voice_call_start')
+  handleVoiceCallStart(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody()
+    data: {
+      receiverId: string;
+      callerName: string;
+      callerAvatar: string | null;
+    },
+  ) {
+    console.log(
+      `[ChatGateway] voice_call_start from ${client.userId} to ${data.receiverId}`,
+    );
+    const receiverSocketId = this.userSockets.get(data.receiverId);
+    console.log(`[ChatGateway] Receiver socket ID: ${receiverSocketId}`);
+    
+    if (receiverSocketId && client.userId) {
+      this.server.to(receiverSocketId).emit('voice_call_incoming', {
+        callerId: client.userId,
+        receiverId: data.receiverId,
+        callerName: data.callerName,
+        callerAvatar: data.callerAvatar,
+      });
+      console.log(`[ChatGateway] Emitted voice_call_incoming to ${receiverSocketId}`);
+    } else {
+      console.log(`[ChatGateway] Cannot emit: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`);
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('voice_call_accept')
+  handleVoiceCallAccept(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { callerId: string },
+  ) {
+    const callerSocketId = this.userSockets.get(data.callerId);
+    if (callerSocketId) {
+      this.server.to(callerSocketId).emit('voice_call_accepted');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('voice_call_reject')
+  handleVoiceCallReject(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { callerId: string },
+  ) {
+    const callerSocketId = this.userSockets.get(data.callerId);
+    if (callerSocketId) {
+      this.server.to(callerSocketId).emit('voice_call_rejected');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('voice_call_end')
+  handleVoiceCallEnd(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { userId: string },
+  ) {
+    const userSocketId = this.userSockets.get(data.userId);
+    if (userSocketId) {
+      this.server.to(userSocketId).emit('voice_call_ended');
+    }
+    return { success: true };
+  }
+
+  @SubscribeMessage('voice_call_signal')
+  handleVoiceCallSignal(
+    @ConnectedSocket() client: UserSocket,
+    @MessageBody() data: { userId: string; signal: any },
+  ) {
+    const userSocketId = this.userSockets.get(data.userId);
+    if (userSocketId) {
+      this.server.to(userSocketId).emit('voice_call_signal', {
+        signal: data.signal,
+      });
+    }
+    return { success: true };
+  }
 }

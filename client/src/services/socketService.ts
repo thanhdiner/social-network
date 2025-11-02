@@ -133,6 +133,35 @@ class SocketService {
     this.socket?.off('message_unsent');
   }
 
+  // Voice call events
+  onVoiceCallIncoming(callback: (data: any) => void) {
+    this.socket?.on('voice_call_incoming', callback);
+  }
+
+  onVoiceCallAccepted(callback: () => void) {
+    this.socket?.on('voice_call_accepted', callback);
+  }
+
+  onVoiceCallRejected(callback: () => void) {
+    this.socket?.on('voice_call_rejected', callback);
+  }
+
+  onVoiceCallEnded(callback: () => void) {
+    this.socket?.on('voice_call_ended', callback);
+  }
+
+  onVoiceCallSignal(callback: (data: any) => void) {
+    this.socket?.on('voice_call_signal', callback);
+  }
+
+  offVoiceCallEvents() {
+    this.socket?.off('voice_call_incoming');
+    this.socket?.off('voice_call_accepted');
+    this.socket?.off('voice_call_rejected');
+    this.socket?.off('voice_call_ended');
+    this.socket?.off('voice_call_signal');
+  }
+
   getSocket() {
     return this.socket
   }
