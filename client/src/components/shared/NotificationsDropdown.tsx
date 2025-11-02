@@ -67,8 +67,9 @@ export const NotificationsDropdown = () => {
     })
 
     // Listen for new notifications (like, comment)
-    socketService.onNewNotification((notification) => {
-      setNotifications(prev => [notification, ...prev])
+    socketService.onNewNotification((notification: unknown) => {
+      const notif = notification as Notification
+      setNotifications((prev: Notification[]): Notification[] => [notif, ...prev])
       setUnreadCount(prev => prev + 1)
     })
 

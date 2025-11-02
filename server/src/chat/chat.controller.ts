@@ -123,5 +123,61 @@ export class ChatController {
     return this.chatService.unsendMessage(messageId, req.user.userId);
   }
 
+  @Put('conversations/:userId/mute')
+  muteConversation(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+  ) {
+    this.logger.log(
+      `PUT /chat/conversations/${userId}/mute user=${req.user.userId}`,
+    );
+    return this.chatService.muteConversation(req.user.userId, userId);
+  }
+
+  @Delete('conversations/:userId/mute')
+  unmuteConversation(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+  ) {
+    this.logger.log(
+      `DELETE /chat/conversations/${userId}/mute user=${req.user.userId}`,
+    );
+    return this.chatService.unmuteConversation(req.user.userId, userId);
+  }
+
+  @Get('conversations/:userId/muted')
+  checkIfMuted(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+  ) {
+    this.logger.log(
+      `GET /chat/conversations/${userId}/muted user=${req.user.userId}`,
+    );
+    return this.chatService.checkIfMuted(req.user.userId, userId);
+  }
+
+  @Post('call-log')
+  logCall(
+    @Request() req: RequestWithUser,
+    @Body()
+    data: {
+      receiverId: string;
+      callType: 'voice' | 'video';
+      callDuration: number;
+      callStatus: 'completed' | 'missed' | 'rejected' | 'no-answer';
+    },
+  ) {
+    this.logger.log(
+      `POST /chat/call-log from=${req.user.userId} to=${data.receiverId} status=${data.callStatus} duration=${data.callDuration}`,
+    );
+    return this.chatService.logCall(
+      req.user.userId,
+      data.receiverId,
+      data.callType,
+      data.callDuration,
+      data.callStatus,
+    );
+  }
+
   // Blocking APIs removed
 }

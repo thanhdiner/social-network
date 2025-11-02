@@ -13,6 +13,7 @@ interface Conversation {
   participant: User
   lastMessage?: { content?: string; createdAt: string }
   unreadCount: number
+  isMuted: boolean
   participantId: string
 }
 
@@ -197,6 +198,7 @@ export const ChatPopup = () => {
                           online={onlineUsers.has(conversation.participant.id)}
                           lastMessage={conversation.lastMessage}
                           unreadCount={conversation.unreadCount}
+                          isMuted={conversation.isMuted}
                           formatTime={formatTime}
                           onClick={() => {}}
                         />

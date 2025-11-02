@@ -1,15 +1,16 @@
 import { memo } from 'react'
 import type { Message, User } from '../../types'
 import { Avatar } from './Avatar'
+import { Phone, PhoneOff, PhoneMissed, PhoneIncoming } from 'lucide-react'
 
 interface ChatMessageItemProps {
   message: Message
   isOwn: boolean
   showAvatar: boolean
   user: User
-  currentUserId?: string
+  // currentUserId?: string
   onReactionAdd: (messageId: string, emoji: string) => Promise<void>
-  onShowEmojiReactions: (messageId: string) => void
+  // onShowEmojiReactions: (messageId: string) => void
   showEmojiReactions: string | null
   quickReactions: string[]
 }
@@ -19,12 +20,34 @@ const ChatMessageItemBase = ({
   isOwn,
   showAvatar,
   user,
-  currentUserId,
+  // currentUserId,
   onReactionAdd,
-  onShowEmojiReactions,
+  // onShowEmojiReactions,
   showEmojiReactions,
   quickReactions
 }: ChatMessageItemProps) => {
+  // Check if this is a call log message
+  const isCallLog = message.callType !== null && message.callType !== undefined;
+  
+  // Render call log icon based on status
+  const renderCallIcon = () => {
+    if (!isCallLog) return null;
+    
+    const iconClass = "w-4 h-4";
+    switch (message.callStatus) {
+      case 'completed':
+        return <Phone className={iconClass} />;
+      case 'missed':
+        return <PhoneMissed className={iconClass} />;
+      case 'rejected':
+        return <PhoneOff className={iconClass} />;
+      case 'no-answer':
+        return <PhoneIncoming className={iconClass} />;
+      default:
+        return <Phone className={iconClass} />;
+    }
+  };
+
   return (
     <div
       key={message.id}
@@ -38,8 +61,8 @@ const ChatMessageItemBase = ({
       </div>
 
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[65%] relative`}>
-        {/* Emoji reactions picker - shown above message */}
-        {showEmojiReactions === message.id && (
+        {/* Emoji reactions picker - shown above message (not for call logs) */}
+        {!isCallLog && showEmojiReactions === message.id && (
           <div
             onClick={e => e.stopPropagation()}
             className="mb-1 bg-white border border-gray-200 rounded-full shadow-lg px-2 py-2 z-50 flex items-center gap-1"
@@ -60,12 +83,21 @@ const ChatMessageItemBase = ({
         )}
 
         <div
-          className={`rounded-2xl transition-all hover:shadow-md ${message.imageUrl || message.videoUrl ? '' : 'px-3 py-2'} ${
-            isOwn ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+          className={`rounded-2xl transition-all ${isCallLog ? 'cursor-default' : 'hover:shadow-md'} ${message.imageUrl || message.videoUrl ? '' : 'px-3 py-2'} ${
+            isCallLog 
+              ? 'bg-gray-100 text-gray-600 border border-gray-200' 
+              : isOwn 
+                ? 'bg-orange-500 text-white hover:bg-orange-600' 
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
           } ${message.unsent ? 'opacity-60 italic' : ''}`}
         >
           {message.unsent ? (
             <p className={`text-sm italic ${isOwn ? 'text-white/90' : 'text-gray-600'}`}>Message unsent</p>
+          ) : isCallLog ? (
+            <div className="flex items-center gap-2">
+              {renderCallIcon()}
+              <p className="text-sm">{message.content}</p>
+            </div>
           ) : (
             <p>{message.content}</p>
           )}

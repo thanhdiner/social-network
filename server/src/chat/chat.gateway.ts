@@ -255,24 +255,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       callerAvatar: string | null;
     },
   ) {
-    console.log(
-      `[ChatGateway] voice_call_start from ${client.userId} to ${data.receiverId}`,
-    );
-    const receiverSocketId = this.userSockets.get(data.receiverId);
-    console.log(`[ChatGateway] Receiver socket ID: ${receiverSocketId}`);
-    
-    if (receiverSocketId && client.userId) {
-      this.server.to(receiverSocketId).emit('voice_call_incoming', {
-        callerId: client.userId,
-        receiverId: data.receiverId,
-        callerName: data.callerName,
-        callerAvatar: data.callerAvatar,
-      });
-      console.log(`[ChatGateway] Emitted voice_call_incoming to ${receiverSocketId}`);
-    } else {
-      console.log(`[ChatGateway] Cannot emit: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`);
+    try {
+      console.log(
+        `[ChatGateway] voice_call_start from ${client.userId} to ${data.receiverId}`,
+      );
+      const receiverSocketId = this.userSockets.get(data.receiverId);
+      console.log(`[ChatGateway] Receiver socket ID: ${receiverSocketId}`);
+      
+      if (receiverSocketId && client.userId) {
+        this.server.to(receiverSocketId).emit('voice_call_incoming', {
+          callerId: client.userId,
+          receiverId: data.receiverId,
+          callerName: data.callerName,
+          callerAvatar: data.callerAvatar,
+        });
+        console.log(`[ChatGateway] Emitted voice_call_incoming to ${receiverSocketId}`);
+      } else {
+        console.log(`[ChatGateway] Cannot emit: receiverSocketId=${receiverSocketId}, clientUserId=${client.userId}`);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('[ChatGateway] Error in voice_call_start:', error);
+      return { success: false, error: (error as Error).message };
     }
-    return { success: true };
   }
 
   @SubscribeMessage('voice_call_accept')

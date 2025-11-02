@@ -184,7 +184,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           .filter((w) => w.isMinimized)
           .map((w) => {
             const conv = conversations.find(c => c.participantId === w.userId)
-            const unread = conv?.unreadCount || 0
+            const unread = !conv?.isMuted ? (conv?.unreadCount || 0) : 0
             return (
             <div
               key={w.userId}
@@ -208,7 +208,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 {onlineUsers.has(w.userId) && (
                   <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white" />
                 )}
-                {/* Unread badge when messages arrive while minimized */}
+                {/* Unread badge when messages arrive while minimized - hidden if muted */}
                 {unread > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full w-5 h-5 flex items-center justify-center font-bold shadow">
                     {unread > 9 ? '9+' : unread}
@@ -235,7 +235,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           .slice(maxVisibleChats) // Get chats beyond the visible limit
           .map((w) => {
             const conv = conversations.find(c => c.participantId === w.userId)
-            const unread = conv?.unreadCount || 0
+            const unread = !conv?.isMuted ? (conv?.unreadCount || 0) : 0
             return (
             <div
               key={w.userId}
@@ -259,7 +259,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 {onlineUsers.has(w.userId) && (
                   <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-white" />
                 )}
-                {/* Unread badge */}
+                {/* Unread badge - hidden if muted */}
                 {unread > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full w-5 h-5 flex items-center justify-center font-bold shadow">
                     {unread > 9 ? '9+' : unread}

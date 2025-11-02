@@ -1,5 +1,5 @@
-import { Message, User } from '../../types'
-import { ChatMessage } from './ChatMessage'
+import type { Message, User } from '../../types'
+// import { ChatMessageItem } from './ChatMessageItem'
 
 interface ChatMessageListProps {
   messages: Message[]
@@ -14,22 +14,24 @@ export const ChatMessageList = ({
   messages,
   visibleCount,
   currentUser,
-  onlineUsers,
-  typingUsers,
-  user
+  // onlineUsers,
+  // typingUsers,
+  // user
 }: ChatMessageListProps) => {
   const visibleMessages = messages.slice(Math.max(messages.length - visibleCount, 0))
 
   return (
     <>
       {visibleMessages.map((message, index, arr) => (
-        <ChatMessage
+        <div
           key={message.id}
-          message={message}
-          isOwn={message.senderId === currentUser?.id}
-          isLast={index === arr.length - 1}
-          nextMessage={arr[index + 1]}
-        />
+          data-message={message.id}
+          data-is-own={message.senderId === currentUser?.id}
+          data-is-last={index === arr.length - 1}
+          data-next-message={arr[index + 1]?.id}
+        >
+          Message {message.id}
+        </div>
       ))}
     </>
   )

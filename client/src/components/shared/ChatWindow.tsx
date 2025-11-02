@@ -20,7 +20,9 @@ import {
   Reply,
   Paperclip,
   Play,
-  Pause
+  Pause,
+  Bell,
+  BellOff
 } from 'lucide-react'
 import RecordRTC from 'recordrtc'
 import { useChat } from '../../contexts/ChatContext'
@@ -188,6 +190,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const menuRef = useRef<HTMLDivElement>(null)
   const [isBlocked, setIsBlocked] = useState(false)
   const [hasBlocked, setHasBlocked] = useState(false) // User đã block mình
+  const [isMuted, setIsMuted] = useState(false) // Conversation is muted
   const [messageMenuOpen, setMessageMenuOpen] = useState<string | null>(null) // messageId
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -584,6 +587,37 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     checkBlock()
   }, [user.id])
 
+  // Check mute status when opening
+  useEffect(() => {
+    const checkMute = async () => {
+      try {
+        const muted = await chatService.checkIfMuted(user.id)
+        setIsMuted(muted)
+      } catch (error) {
+        console.error('Failed to check mute status:', error)
+      }
+    }
+    checkMute()
+  }, [user.id])
+
+  const handleToggleMute = async () => {
+    try {
+      if (isMuted) {
+        await chatService.unmuteConversation(user.id)
+        setIsMuted(false)
+      } else {
+        await chatService.muteConversation(user.id)
+        setIsMuted(true)
+      }
+      setMenuOpen(false)
+      // Reload conversations to update unread count
+      loadConversations()
+    } catch (error) {
+      console.error('Failed to toggle mute:', error)
+      alert('An error occurred, please try again')
+    }
+  }
+
   // Close menu when clicking outside (use 'click' to avoid mousedown/click race)
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -839,11 +873,15 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
           {currentUser?.id !== user.id && (
             <>
               <button
-                onClick={() => {
+                onClick={async () => {
                   console.log('Voice call button clicked', { user, currentUser })
                   if (currentUser) {
-                    console.log('Starting call to', user.id)
-                    voiceCallService.startCall(user.id, user.name, user.avatar || null)
+                    try {
+                      console.log('Starting call to', user.id)
+                      await voiceCallService.startCall(user.id, user.name, user.avatar || null)
+                    } catch (error) {
+                      console.error('Error starting voice call:', error)
+                    }
                   } else {
                     console.error('No current user')
                   }
@@ -890,6 +928,23 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                 >
                   <UserIcon className="w-4 h-4 text-orange-500" />
                   <span>View Profile</span>
+                </button>
+
+                <button 
+                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer" 
+                  onClick={handleToggleMute}
+                >
+                  {isMuted ? (
+                    <>
+                      <Bell className="w-4 h-4 text-orange-500" />
+                      <span>Unmute Notifications</span>
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="w-4 h-4 text-orange-500" />
+                      <span>Mute Notifications</span>
+                    </>
+                  )}
                 </button>
 
                 <button className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer" onClick={handleBlockUser}>

@@ -1,5 +1,6 @@
 import SimplePeer from 'simple-peer';
 import socketService from './socketService';
+import { chatService } from './chatService';
 
 export interface VoiceCallData {
   callerId: string;
@@ -13,6 +14,11 @@ export interface CallState {
   isCalling: boolean;
   isReceivingCall: boolean;
   caller: VoiceCallData | null;
+  participant: {
+    id: string;
+    name: string;
+    avatar: string | null;
+  } | null;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
 }
@@ -24,6 +30,7 @@ class VoiceCallService {
     isCalling: false,
     isReceivingCall: false,
     caller: null,
+    participant: null,
     localStream: null,
     remoteStream: null,
   };
@@ -32,9 +39,21 @@ class VoiceCallService {
   private ringtoneGain: GainNode | null = null;
   private ringtoneIntervalId: NodeJS.Timeout | null = null;
   private listenersSetup = false;
+  private currentUserId: string | null = null;
+  private currentUserInfo: { id: string; name: string; avatar: string | null } | null = null;
+  private activePeerUserId: string | null = null;
+  private callStartTimestamp: number | null = null;
+  private isInitiator = false;
+  private callLogged = false;
+  private callTimeoutId: NodeJS.Timeout | null = null;
 
   constructor() {
     this.setupRingtone();
+  }
+
+  setCurrentUser(user: { id: string; name: string; avatar: string | null } | null) {
+    this.currentUserInfo = user;
+    this.currentUserId = user?.id ?? null;
   }
 
   private setupRingtone() {
@@ -117,6 +136,24 @@ class VoiceCallService {
     }
   }
 
+  private clearCallTimeout() {
+    if (this.callTimeoutId) {
+      clearTimeout(this.callTimeoutId);
+      this.callTimeoutId = null;
+    }
+  }
+
+  private scheduleCallTimeout() {
+    this.clearCallTimeout();
+    this.callTimeoutId = setTimeout(() => {
+      if (this.isInitiator && this.callState.isCalling && !this.callState.isInCall) {
+        console.log('VoiceCallService: Call timeout reached, ending call');
+        this.stopRingtone();
+        void this.endCall();
+      }
+    }, 15000);
+  }
+
   // Setup socket listeners when needed
   ensureSocketListeners() {
     if (this.listenersSetup) {
@@ -134,8 +171,17 @@ class VoiceCallService {
 
     socket.on('voice_call_incoming', (data: VoiceCallData) => {
       console.log('VoiceCallService: Received voice_call_incoming', data);
+      this.isInitiator = false;
+      this.callLogged = false;
+      this.callStartTimestamp = null;
+      this.activePeerUserId = data.callerId;
       this.callState.isReceivingCall = true;
       this.callState.caller = data;
+      this.callState.participant = {
+        id: data.callerId,
+        name: data.callerName,
+        avatar: data.callerAvatar,
+      };
       this.playRingtone();
       this.notifyListeners();
     });
@@ -145,18 +191,25 @@ class VoiceCallService {
       this.stopRingtone();
       this.callState.isCalling = false;
       this.callState.isInCall = true;
+      this.callStartTimestamp = Date.now();
+      this.clearCallTimeout();
       this.notifyListeners();
     });
 
     socket.on('voice_call_rejected', () => {
       console.log('VoiceCallService: Call rejected');
       this.stopRingtone();
-      this.endCall();
+      this.clearCallTimeout();
+      if (this.isInitiator) {
+        void this.logCall('rejected', 0);
+      }
+      void this.endCall({ skipLog: true });
     });
 
     socket.on('voice_call_ended', () => {
       console.log('VoiceCallService: Call ended');
-      this.endCall();
+      this.clearCallTimeout();
+      void this.endCall();
     });
 
     socket.on('voice_call_signal', (data: { signal: SimplePeer.SignalData }) => {
@@ -187,14 +240,24 @@ class VoiceCallService {
         video: false 
       });
 
+      this.currentUserId = this.currentUserInfo?.id ?? null;
+      this.activePeerUserId = userId;
+      this.isInitiator = true;
+      this.callStartTimestamp = null;
+      this.callLogged = false;
       this.callState.localStream = stream;
       this.callState.isCalling = true;
       // Store receiver info for the caller
       this.callState.caller = {
-        callerId: '', // Will be set by currentUser
-        receiverId: userId,
-        callerName: userName, // This is the person we're calling
+        callerId: userId,
+        receiverId: this.currentUserInfo?.id ?? '',
+        callerName: userName,
         callerAvatar: userAvatar,
+      };
+      this.callState.participant = {
+        id: userId,
+        name: userName,
+        avatar: userAvatar,
       };
       
       this.notifyListeners();
@@ -212,14 +275,15 @@ class VoiceCallService {
       const socket = socketService.getSocket();
       socket?.emit('voice_call_start', {
         receiverId: userId,
-        callerName: userName,
-        callerAvatar: userAvatar,
+        callerName: this.currentUserInfo?.name ?? 'Someone',
+        callerAvatar: this.currentUserInfo?.avatar ?? null,
       });
 
       this.playRingtone();
+      this.scheduleCallTimeout();
     } catch (error) {
       console.error('Error starting call:', error);
-      this.endCall();
+      await this.endCall({ skipLog: true });
       throw error;
     }
   }
@@ -239,6 +303,13 @@ class VoiceCallService {
       this.callState.localStream = stream;
       this.callState.isReceivingCall = false;
       this.callState.isInCall = true;
+      this.callStartTimestamp = Date.now();
+      this.activePeerUserId = this.callState.caller.callerId;
+      this.callState.participant = {
+        id: this.callState.caller.callerId,
+        name: this.callState.caller.callerName,
+        avatar: this.callState.caller.callerAvatar,
+      };
       this.notifyListeners();
 
       // Create peer as receiver
@@ -267,7 +338,7 @@ class VoiceCallService {
     
     if (!this.callState.caller) {
       console.warn('VoiceCallService: No caller info to reject');
-      this.endCall();
+      void this.endCall({ skipLog: true });
       return;
     }
 
@@ -280,11 +351,26 @@ class VoiceCallService {
     this.stopRingtone();
     
     // Clean up everything
-    this.endCall();
+    void this.endCall({ skipLog: true });
   }
 
-  endCall() {
+  async endCall(options?: { skipLog?: boolean }) {
     console.log('VoiceCallService: Ending call');
+
+    const skipLog = options?.skipLog ?? false;
+    const wasInCall = this.callState.isInCall;
+    const wasCalling = this.callState.isCalling;
+    const callStartedAt = this.callStartTimestamp;
+
+    if (!skipLog && this.isInitiator && !this.callLogged) {
+      if (wasInCall && callStartedAt) {
+        const durationSeconds = Math.max(1, Math.floor((Date.now() - callStartedAt) / 1000));
+        void this.logCall('completed', durationSeconds);
+      } else if (wasCalling && !wasInCall) {
+        void this.logCall('no-answer', 0);
+      }
+    }
+    this.clearCallTimeout();
     
     // Notify other peer (only if in active call or calling)
     if (this.callState.isInCall || this.callState.isCalling) {
@@ -325,9 +411,15 @@ class VoiceCallService {
       isCalling: false,
       isReceivingCall: false,
       caller: null,
+      participant: null,
       localStream: null,
       remoteStream: null,
     };
+
+    this.activePeerUserId = null;
+    this.callStartTimestamp = null;
+    this.isInitiator = false;
+    this.callLogged = false;
 
     console.log('VoiceCallService: Call ended, state reset');
     this.notifyListeners();
@@ -353,11 +445,11 @@ class VoiceCallService {
 
     this.peer.on('error', (error: Error) => {
       console.error('Peer error:', error);
-      this.endCall();
+      void this.endCall({ skipLog: !this.isInitiator });
     });
 
     this.peer.on('close', () => {
-      this.endCall();
+      void this.endCall();
     });
   }
 
@@ -374,6 +466,41 @@ class VoiceCallService {
       }
     }
     return false;
+  }
+
+  private async logCall(
+    callStatus: 'completed' | 'missed' | 'rejected' | 'no-answer',
+    callDuration: number,
+  ) {
+    if (!this.isInitiator) {
+      console.log('VoiceCallService: Skipping call log for non-initiator');
+      return;
+    }
+
+    if (this.callLogged) {
+      console.log('VoiceCallService: Call already logged');
+      return;
+    }
+
+    if (!this.activePeerUserId) {
+      console.warn('VoiceCallService: Unable to log call - missing peer user id');
+      return;
+    }
+
+    if (!this.currentUserId) {
+      console.warn('VoiceCallService: Unable to log call - missing current user id');
+      return;
+    }
+
+    this.callLogged = true;
+    const receiverId = this.activePeerUserId;
+
+    try {
+      await chatService.logCall(receiverId, 'voice', callDuration, callStatus);
+      console.log('VoiceCallService: Call log saved', { receiverId, callStatus, callDuration });
+    } catch (error) {
+      console.error('VoiceCallService: Failed to log call', error);
+    }
   }
 }
 

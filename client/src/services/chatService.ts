@@ -56,6 +56,38 @@ export const chatService = {
     await api.put(`/chat/messages/${messageId}/unsend`);
   },
 
+  // Mute conversation
+  async muteConversation(userId: string): Promise<void> {
+    await api.put(`/chat/conversations/${userId}/mute`);
+  },
+
+  // Unmute conversation
+  async unmuteConversation(userId: string): Promise<void> {
+    await api.delete(`/chat/conversations/${userId}/mute`);
+  },
+
+  // Check if conversation is muted
+  async checkIfMuted(userId: string): Promise<boolean> {
+    const response = await api.get(`/chat/conversations/${userId}/muted`);
+    return response.data;
+  },
+
+  // Log call (voice/video call history)
+  async logCall(
+    receiverId: string,
+    callType: 'voice' | 'video',
+    callDuration: number,
+    callStatus: 'completed' | 'missed' | 'rejected' | 'no-answer'
+  ): Promise<Message> {
+    const response = await api.post('/chat/call-log', {
+      receiverId,
+      callType,
+      callDuration,
+      callStatus,
+    });
+    return response.data;
+  },
+
   // Blocking APIs removed
 };
 

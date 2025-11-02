@@ -14,8 +14,8 @@ export const RightSidebar = () => {
   const [groupedStories, setGroupedStories] = useState<GroupedStories[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(true)
   const [createStoryOpen, setCreateStoryOpen] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
-  const [selectedStoryGroup, setSelectedStoryGroup] = useState<GroupedStories | null>(null)
+  // const [viewerOpen, setViewerOpen] = useState(false)
+  // const [selectedStoryGroup, setSelectedStoryGroup] = useState<GroupedStories | null>(null)
 
   useEffect(() => {
     loadActiveUsers()
@@ -57,15 +57,15 @@ export const RightSidebar = () => {
     loadStories()
   }
 
-  const handleStoryDeleted = () => {
-    loadStories()
-    setViewerOpen(false)
-  }
+  // const handleStoryDeleted = () => {
+  //   loadStories()
+  //   setViewerOpen(false)
+  // }
 
-  const handleViewStory = (group: GroupedStories) => {
-    setSelectedStoryGroup(group)
-    setViewerOpen(true)
-  }
+  // const handleViewStory = (group: GroupedStories) => {
+  //   setSelectedStoryGroup(group)
+  //   setViewerOpen(true)
+  // }
 
   return (
     <aside className="h-full p-4 bg-white">
@@ -109,8 +109,8 @@ export const RightSidebar = () => {
             {groupedStories.map(group => (
               <div 
                 key={group.userId} 
-                onClick={() => handleViewStory(group)}
-                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 cursor-pointer transition"
+                // onClick={() => handleViewStory(group)}
+                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 transition"
               >
                 <div className="relative">
                   <Avatar
@@ -185,6 +185,7 @@ export const RightSidebar = () => {
         onStoryCreated={handleStoryCreated}
       />
 
+      {/* TODO: Fix StoryViewer component
       {selectedStoryGroup && (
         <StoryViewer 
           open={viewerOpen} 
@@ -193,6 +194,7 @@ export const RightSidebar = () => {
           onDelete={handleStoryDeleted}
         />
       )}
+      */}
     </aside>
   )
 }

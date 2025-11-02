@@ -536,7 +536,7 @@ export default function Chat() {
                         >
                           {conv.lastMessage?.content || 'Start the conversation'}
                         </p>
-                        {conv.unreadCount > 0 && (
+                        {conv.unreadCount > 0 && !conv.isMuted && (
                           <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full min-w-5 text-center">
                             {conv.unreadCount}
                           </span>

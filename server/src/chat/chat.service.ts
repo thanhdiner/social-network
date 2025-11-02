@@ -14,6 +14,7 @@ export interface ConversationResponse {
   } | null;
   lastMessage: any;
   unreadCount: number;
+  isMuted: boolean;
   updatedAt: Date;
 }
 
@@ -87,6 +88,9 @@ export class ChatService {
           },
         });
 
+        // Check if conversation is muted
+        const isMuted = await this.checkIfMuted(userId, partnerId);
+
         conversationsMap.set(partnerId, {
           id: `${userId}-${partnerId}`,
           participantId: partnerId,
@@ -96,6 +100,7 @@ export class ChatService {
             receiver: partner,
           },
           unreadCount,
+          isMuted,
           updatedAt: message.createdAt,
         });
       }
@@ -491,4 +496,125 @@ export class ChatService {
 
     return { success: true };
   }
+
+  async muteConversation(userId: string, mutedUserId: string) {
+    this.logger.log(`User ${userId} muting conversation with ${mutedUserId}`);
+
+    // Check if already muted
+    const existing = await this.prisma.mutedConversation.findUnique({
+      where: {
+        userId_mutedUserId: {
+          userId,
+          mutedUserId,
+        },
+      },
+    });
+
+    if (existing) {
+      return { success: true, message: 'Already muted' };
+    }
+
+    await this.prisma.mutedConversation.create({
+      data: {
+        userId,
+        mutedUserId,
+      },
+    });
+
+    this.logger.log(`User ${userId} muted conversation with ${mutedUserId}`);
+
+    return { success: true, message: 'Conversation muted' };
+  }
+
+  async unmuteConversation(userId: string, mutedUserId: string) {
+    this.logger.log(
+      `User ${userId} unmuting conversation with ${mutedUserId}`,
+    );
+
+    await this.prisma.mutedConversation.deleteMany({
+      where: {
+        userId,
+        mutedUserId,
+      },
+    });
+
+    this.logger.log(`User ${userId} unmuted conversation with ${mutedUserId}`);
+
+    return { success: true, message: 'Conversation unmuted' };
+  }
+
+  async checkIfMuted(userId: string, mutedUserId: string): Promise<boolean> {
+    const muted = await this.prisma.mutedConversation.findUnique({
+      where: {
+        userId_mutedUserId: {
+          userId,
+          mutedUserId,
+        },
+      },
+    });
+
+    return !!muted;
+  }
+
+  async logCall(
+    senderId: string,
+    receiverId: string,
+    callType: 'voice' | 'video',
+    callDuration: number,
+    callStatus: 'completed' | 'missed' | 'rejected' | 'no-answer',
+  ) {
+    this.logger.log(
+      `Logging ${callType} call from ${senderId} to ${receiverId}: status=${callStatus}, duration=${callDuration}s`,
+    );
+
+    // Generate content based on call status
+    let content = '';
+    const icon = callType === 'voice' ? '📞' : '📹';
+
+    if (callStatus === 'completed') {
+      const minutes = Math.floor(callDuration / 60);
+      const seconds = callDuration % 60;
+      const timeStr =
+        minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+      content = `${icon} ${callType === 'voice' ? 'Voice' : 'Video'} call - ${timeStr}`;
+    } else if (callStatus === 'missed') {
+      content = `${icon} Missed ${callType} call`;
+    } else if (callStatus === 'rejected') {
+      content = `${icon} ${callType === 'voice' ? 'Voice' : 'Video'} call declined`;
+    } else if (callStatus === 'no-answer') {
+      content = `${icon} ${callType === 'voice' ? 'Voice' : 'Video'} call - No answer`;
+    }
+
+    // Create message with call log info
+    const message = await this.prisma.message.create({
+      data: {
+        content,
+        senderId,
+        receiverId,
+        callType,
+        callDuration,
+        callStatus,
+        read: false,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    this.logger.log(`Call log message created: ${message.id}`);
+
+    // Emit to receiver (if online)
+    this.chatGateway.sendMessage(receiverId, message);
+
+    return message;
+  }
 }
+

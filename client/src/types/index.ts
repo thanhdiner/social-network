@@ -148,6 +148,9 @@ export interface Message {
   deliveredAt?: string;
   readAt?: string;
   unsent?: boolean;
+  callType?: 'voice' | 'video';
+  callDuration?: number;
+  callStatus?: 'completed' | 'missed' | 'rejected' | 'no-answer';
   createdAt: string;
   sender?: User;
   receiver?: User;
@@ -183,6 +186,7 @@ export interface Conversation {
   participant: User;
   lastMessage?: Message;
   unreadCount: number;
+  isMuted: boolean;
   updatedAt: string;
 }
 

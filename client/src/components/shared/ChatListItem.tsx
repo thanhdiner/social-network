@@ -1,3 +1,4 @@
+import { BellOff } from 'lucide-react';
 import type { User } from '../../types';
 import { Avatar } from './Avatar';
 
@@ -6,6 +7,7 @@ interface ChatListItemProps {
   online?: boolean;
   lastMessage?: { content?: string; createdAt: string };
   unreadCount?: number;
+  isMuted?: boolean;
   onClick: () => void;
   formatTime?: (date: string) => string;
 }
@@ -15,6 +17,7 @@ export const ChatListItem = ({
   online,
   lastMessage,
   unreadCount = 0,
+  isMuted = false,
   onClick,
   formatTime,
 }: ChatListItemProps) => {
@@ -31,7 +34,10 @@ export const ChatListItem = ({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <div className="font-semibold text-gray-900">{user.name}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="font-semibold text-gray-900">{user.name}</div>
+            {isMuted && <BellOff className="w-3.5 h-3.5 text-gray-400" />}
+          </div>
           {lastMessage && formatTime && (
             <span className="text-xs text-gray-500">{formatTime(lastMessage.createdAt)}</span>
           )}
@@ -44,7 +50,7 @@ export const ChatListItem = ({
           >
             {lastMessage?.content || 'Start the conversation'}
           </p>
-          {unreadCount > 0 && (
+          {unreadCount > 0 && !isMuted && (
             <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full min-w-5 text-center">
               {unreadCount}
             </span>

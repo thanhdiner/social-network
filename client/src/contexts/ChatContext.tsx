@@ -62,8 +62,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (cachedConversations) {
         setConversations(cachedConversations)
         
-        // Đếm tin nhắn chưa đọc từ cache
-        const count = cachedConversations.reduce((sum, conv) => sum + conv.unreadCount, 0)
+        // Đếm tin nhắn chưa đọc từ cache (loại trừ conversations bị mute)
+        const count = cachedConversations.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
         setUnreadCount(count)
       }
 
@@ -74,8 +74,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // Lưu vào cache
       saveConversationsCache(data)
       
-      // Đếm tin nhắn chưa đọc
-      const count = data.reduce((sum, conv) => sum + conv.unreadCount, 0)
+      // Đếm tin nhắn chưa đọc (loại trừ conversations bị mute)
+      const count = data.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
       setUnreadCount(count)
     } catch (error) {
       console.error('Failed to load conversations:', error)
@@ -246,7 +246,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     });
 
     const handleNewMessage = (message: Message) => {
-      // Cáº­p nháº­t conversation
+      // Cập nhật conversation
       setConversations(prev => {
         const senderId = message.senderId === user.id ? message.receiverId : message.senderId;
         const existingIndex = prev.findIndex(c => c.participantId === senderId);
@@ -254,26 +254,28 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
         if (existingIndex >= 0) {
           const conv = updated[existingIndex];
+          const shouldIncreaseUnread = message.senderId !== user.id && !conv.isMuted;
+          
           updated[existingIndex] = {
             ...conv,
             lastMessage: message,
-            unreadCount: message.senderId !== user.id ? conv.unreadCount + 1 : conv.unreadCount,
+            unreadCount: shouldIncreaseUnread ? conv.unreadCount + 1 : conv.unreadCount,
             updatedAt: message.createdAt,
           };
-          // Di chuyá»ƒn lÃªn Ä'áº§u
+          // Di chuyển lên đầu
           const [movedConv] = updated.splice(existingIndex, 1);
           updated.unshift(movedConv);
+          
+          // Tăng unread count trong header nếu cần
+          if (shouldIncreaseUnread) {
+            setUnreadCount(prevCount => prevCount + 1);
+          }
         }
 
         // Lưu vào cache
         saveConversationsCache(updated);
         return updated;
       });
-
-      // TÄƒng unread count náº¿u khÃ´ng pháº£i tin nháº¯n cá»§a mÃ¬nh
-      if (message.senderId !== user.id) {
-        setUnreadCount(prev => prev + 1);
-      }
     };
 
     const handleOnlineUsersUpdated = (data: { userIds: string[] }) => {

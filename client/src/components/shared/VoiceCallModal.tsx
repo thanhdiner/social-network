@@ -67,7 +67,7 @@ export const VoiceCallModal = () => {
   };
 
   const handleEnd = () => {
-    voiceCallService.endCall();
+    void voiceCallService.endCall();
   };
 
   const handleClose = () => {
@@ -94,20 +94,32 @@ export const VoiceCallModal = () => {
   // Display logic:
   // - If receiving call: show caller info (who is calling me)
   // - If making call: show receiver info (who I'm calling)
-  const displayUser = callState.caller ? {
-    name: callState.caller.callerName,
-    avatar: callState.caller.callerAvatar,
-  } : {
-    name: 'Unknown',
-    avatar: null,
-  };
+  const displayUser = (() => {
+    if (callState.participant) {
+      return callState.participant;
+    }
+
+    if (callState.caller) {
+      return {
+        id: callState.caller.callerId,
+        name: callState.caller.callerName,
+        avatar: callState.caller.callerAvatar,
+      };
+    }
+
+    return {
+      id: 'unknown',
+      name: 'Unknown',
+      avatar: null,
+    };
+  })();
 
   // If minimized, show floating indicator
   if (isMinimized) {
     return (
       <div 
         onClick={() => setIsMinimized(false)}
-        className="fixed bottom-4 right-4 bg-orange-500 text-white rounded-full px-6 py-3 shadow-2xl flex items-center gap-3 cursor-pointer hover:bg-orange-600 transition-all z-[9999] animate-pulse"
+        className="fixed bottom-4 right-4 bg-orange-500 text-white rounded-full px-6 py-3 shadow-2xl flex items-center gap-3 cursor-pointer hover:bg-orange-600 transition-all z-50 animate-pulse"
       >
         <Phone className="w-5 h-5" />
         <div>
@@ -123,10 +135,10 @@ export const VoiceCallModal = () => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center">
-      <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl shadow-2xl w-96 overflow-hidden">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-linear-to-br from-orange-50 to-orange-100 rounded-2xl shadow-2xl w-96 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-linear-to-r from-orange-500 to-orange-600 px-6 py-4 flex items-center justify-between">
           <h3 className="text-white font-semibold">
             {callState.isReceivingCall && 'Cuộc gọi đến'}
             {callState.isCalling && 'Đang gọi...'}
@@ -177,7 +189,7 @@ export const VoiceCallModal = () => {
                   onClick={handleReject}
                   className="bg-red-500 hover:bg-red-600 text-white rounded-full p-4 shadow-lg transition-all hover:scale-110 cursor-pointer"
                 >
-                  <Phone className="w-6 h-6 -rotate-[135deg]" />
+                  <Phone className="w-6 h-6 -rotate-135" />
                 </button>
                 <button
                   onClick={handleAnswer}
@@ -204,7 +216,7 @@ export const VoiceCallModal = () => {
                   onClick={handleEnd}
                   className="bg-red-500 hover:bg-red-600 text-white rounded-full p-4 shadow-lg transition-all hover:scale-110 cursor-pointer"
                 >
-                  <Phone className="w-6 h-6 -rotate-[135deg]" />
+                  <Phone className="w-6 h-6 -rotate-135" />
                 </button>
               </>
             )}

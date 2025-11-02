@@ -40,15 +40,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Connect to Socket.IO when user is loaded
         if (userData?.id) {
           socketService.connect(userData.id)
+          voiceCallService.setCurrentUser({
+            id: userData.id,
+            name: userData.name,
+            avatar: userData.avatar ?? null,
+          })
           // Setup voice call listeners after socket connects
           setTimeout(() => {
             voiceCallService.ensureSocketListeners()
           }, 500)
         }
+      } else {
+        voiceCallService.setCurrentUser(null)
       }
     } catch (error) {
       console.error('Failed to load user:', error)
       localStorage.removeItem('accessToken')
+      voiceCallService.setCurrentUser(null)
     } finally {
       setIsLoading(false)
     }
@@ -83,6 +91,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authService.logout()
       setUser(null)
+  voiceCallService.setCurrentUser(null)
+      void voiceCallService.endCall({ skipLog: true })
 
       // Disconnect socket on logout
       socketService.disconnect()
@@ -113,6 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {

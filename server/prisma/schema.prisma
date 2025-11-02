@@ -153,6 +153,9 @@ model Message {
   readAt      DateTime? // When message was read by recipient
   deletedBy   String[]  @default([]) // Array of user IDs who deleted this message
   unsent      Boolean   @default(false) // Message has been unsent by sender
+  callType    String?   // 'voice' | 'video' - Type of call
+  callDuration Int?     // Duration in seconds
+  callStatus  String?   // 'completed' | 'missed' | 'rejected' | 'no-answer'
   createdAt   DateTime  @default(now())
 
   sender    User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
@@ -288,4 +291,15 @@ model StoryView {
   @@unique([storyId, userId])
   @@index([storyId])
   @@index([userId])
+}
+
+model MutedConversation {
+  id           String   @id @default(uuid())
+  userId       String   // Người tắt thông báo
+  mutedUserId  String   // Người bị tắt thông báo
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, mutedUserId])
+  @@index([userId])
+  @@index([mutedUserId])
 }
