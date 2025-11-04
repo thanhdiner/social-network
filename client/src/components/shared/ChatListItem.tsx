@@ -24,7 +24,7 @@ export const ChatListItem = ({
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-3 hover:bg-gray-100 cursor-pointer transition-colors"
+      className="flex items-center gap-3 px-3 py-2 w-full overflow-hidden"
     >
       <div className="relative">
         <Avatar src={user.avatar || undefined} name={user.name} className="w-14 h-14" size="xl" />

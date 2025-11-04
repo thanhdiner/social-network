@@ -45,6 +45,10 @@ model User {
   sharedPosts    Share[]
   savedPosts     SavedPost[]
   stories        Story[]
+  pinnedMessages Message[] @relation("PinnedMessages")
+  customizationAsUserA ConversationCustomization[] @relation("UserAConversationCustomization")
+  customizationAsUserB ConversationCustomization[] @relation("UserBConversationCustomization")
+  customizationUpdated ConversationCustomization[] @relation("CustomizationUpdatedBy")
 }
 
 model Post {
@@ -157,16 +161,20 @@ model Message {
   callDuration Int?     // Duration in seconds
   callStatus  String?   // 'completed' | 'missed' | 'rejected' | 'no-answer'
   createdAt   DateTime  @default(now())
+  pinnedById  String?
+  pinnedAt    DateTime?
 
   sender    User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   reactions MessageReaction[]
   replyTo   Message?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[]         @relation("MessageReplies")
+  pinnedBy  User?             @relation("PinnedMessages", fields: [pinnedById], references: [id], onDelete: SetNull)
 
   @@index([senderId])
   @@index([receiverId])
   @@index([createdAt])
   @@index([replyToId])
+  @@index([pinnedById])
 }
 
 model MessageReaction {
@@ -302,4 +310,26 @@ model MutedConversation {
   @@unique([userId, mutedUserId])
   @@index([userId])
   @@index([mutedUserId])
+}
+
+model ConversationCustomization {
+  id               String   @id @default(uuid())
+  userAId          String
+  userBId          String
+  themeId          String   @default("sunset")
+  emoji            String   @default("👍")
+  nicknameForUserA String?
+  nicknameForUserB String?
+  updatedById      String?
+  createdAt        DateTime @default(now())
+  changeSummary    String?
+  updatedAt        DateTime @updatedAt
+
+  userA     User   @relation("UserAConversationCustomization", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User   @relation("UserBConversationCustomization", fields: [userBId], references: [id], onDelete: Cascade)
+  updatedBy User?  @relation("CustomizationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
 }

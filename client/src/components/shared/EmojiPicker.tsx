@@ -53,7 +53,7 @@ export const EmojiPicker = ({ onSelect, onClose }: EmojiPickerProps) => {
       className="absolute bottom-full mb-2 right-0 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 p-3 z-50"
     >
       <div className="text-sm font-semibold text-gray-700 mb-2">Pick emoji</div>
-      <div className="grid grid-cols-8 gap-2 max-h-60 overflow-y-auto">
+      <div className="grid grid-cols-6 gap-2 max-h-60 overflow-y-auto">
         {EMOJIS.map((emoji, index) => (
           <button
             key={index}

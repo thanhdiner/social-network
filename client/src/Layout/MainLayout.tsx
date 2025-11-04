@@ -68,6 +68,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     }
   }, [location.pathname])
 
+  const hideRightSidebar = location.pathname.startsWith('/chat')
+  const mainOffsetClasses = isLeftSidebarOpen ? 'md:ml-64 md:pl-8' : 'md:ml-20 md:pl-6'
+  const mainOverflowClass = hideRightSidebar ? 'overflow-hidden' : 'overflow-y-auto'
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
@@ -103,38 +107,45 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         {/* Main content area */}
         <main 
           ref={mainRef} 
-          className="flex-1 overflow-y-auto p-4 md:pl-8 md:ml-62"
+          className={`flex-1 ${mainOverflowClass} ${hideRightSidebar ? `p-0 ${mainOffsetClasses}` : `p-4 ${mainOffsetClasses}`}`}
         >
-          {/* Middle content */}
-          <div className="max-w-3xl mx-auto space-y-4">{children}</div>
+          {hideRightSidebar ? (
+            <div className="h-full">{children}</div>
+          ) : (
+            <div className="max-w-3xl mx-auto space-y-4">{children}</div>
+          )}
         </main>
 
         {/* Right Sidebar */}
-        <aside className="w-80 border-l bg-white overflow-y-auto hidden lg:block">
-          <RightSidebar />
-        </aside>
+        {!hideRightSidebar && (
+          <aside className="w-80 border-l bg-white overflow-y-auto hidden lg:block">
+            <RightSidebar />
+          </aside>
+        )}
       </div>
 
-      {/* Chat UI docked to the right */}
-      {/* Expanded chat windows along bottom-right */}
-      <div className="fixed bottom-0 right-4 flex items-end gap-3 z-40">
-          {chatWindows
-            .filter((w) => !w.isMinimized)
-            .slice(0, maxVisibleChats) // Limit visible chats based on screen size
-            .map((chatWindow) => (
-              <div key={chatWindow.userId}>
-                <ChatWindow
-                  user={chatWindow.user}
-                  isMinimized={false}
-                  onClose={() => closeChatWindow(chatWindow.userId)}
-                  onMinimize={() => minimizeChatWindow(chatWindow.userId)}
-                />
-              </div>
-            ))}
-      </div>
+      {/* Chat UI docked to the right - Hide on /chat page */}
+      {!hideRightSidebar && (
+        <>
+          {/* Expanded chat windows along bottom-right */}
+          <div className="fixed bottom-0 right-4 flex items-end gap-3 z-40">
+              {chatWindows
+                .filter((w) => !w.isMinimized)
+                .slice(0, maxVisibleChats) // Limit visible chats based on screen size
+                .map((chatWindow) => (
+                  <div key={chatWindow.userId}>
+                    <ChatWindow
+                      user={chatWindow.user}
+                      isMinimized={false}
+                      onClose={() => closeChatWindow(chatWindow.userId)}
+                      onMinimize={() => minimizeChatWindow(chatWindow.userId)}
+                    />
+                  </div>
+                ))}
+          </div>
 
-      {/* Minimized chat bubbles pinned on the right (Facebook-like) */}
-      <div className="fixed bottom-24 right-4 flex flex-col items-center gap-3 z-40" onMouseEnter={() => setHoverStack(true)} onMouseLeave={() => setHoverStack(false)}>
+          {/* Minimized chat bubbles pinned on the right (Facebook-like) */}
+          <div className="fixed bottom-24 right-4 flex flex-col items-center gap-3 z-40" onMouseEnter={() => setHoverStack(true)} onMouseLeave={() => setHoverStack(false)}>
         {/* Shared actions trigger (3-dots) for minimized chat stack */}
         {(() => {
           const openCount = chatWindows.filter(w => !w.isMinimized).length
@@ -280,7 +291,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             </div>
             )
           })}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

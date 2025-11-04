@@ -1,5 +1,5 @@
 ﻿import api from './api';
-import type { Message, Conversation, SendMessageData, User } from '../types';
+import type { Message, Conversation, SendMessageData, User, ConversationCustomization } from '../types';
 
 export const chatService = {
   // Láº¥y danh sÃ¡ch conversation
@@ -46,6 +46,16 @@ export const chatService = {
     await api.delete(`/chat/messages/${messageId}/react`);
   },
 
+  async pinMessage(messageId: string): Promise<Message> {
+    const response = await api.put(`/chat/messages/${messageId}/pin`);
+    return response.data;
+  },
+
+  async unpinMessage(messageId: string): Promise<Message> {
+    const response = await api.put(`/chat/messages/${messageId}/unpin`);
+    return response.data;
+  },
+
   // Delete message (hide for self only)
   async deleteMessage(messageId: string): Promise<void> {
     await api.delete(`/chat/messages/${messageId}/delete`);
@@ -69,6 +79,24 @@ export const chatService = {
   // Check if conversation is muted
   async checkIfMuted(userId: string): Promise<boolean> {
     const response = await api.get(`/chat/conversations/${userId}/muted`);
+    return response.data;
+  },
+
+  async getCustomization(userId: string): Promise<ConversationCustomization> {
+    const response = await api.get(`/chat/customization/${userId}`);
+    return response.data;
+  },
+
+  async updateCustomization(
+    userId: string,
+    data: Partial<Pick<ConversationCustomization, 'themeId' | 'emoji' | 'nicknameMe' | 'nicknameThem'>>
+  ): Promise<ConversationCustomization> {
+    const response = await api.put(`/chat/customization/${userId}`, data);
+    return response.data;
+  },
+
+  async resetCustomization(userId: string): Promise<ConversationCustomization> {
+    const response = await api.delete(`/chat/customization/${userId}`);
     return response.data;
   },
 

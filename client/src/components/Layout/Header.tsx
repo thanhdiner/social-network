@@ -23,6 +23,12 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatButtonRef = useRef<HTMLDivElement>(null)
 
+  // Dev debug: log header's unreadCount and popup state to verify re-renders
+  useEffect(() => {
+    // Use warn so it's visible even if 'log' is filtered
+    console.warn('[Header] render/update', { unreadCount, isPopupOpen, path: location.pathname })
+  }, [unreadCount, isPopupOpen, location.pathname])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -88,26 +94,28 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         <span className="flex items-center mr-2">
           <NotificationsDropdown />
           
-          {/* Chat Icon with Popup */}
-          <div ref={chatButtonRef} className="relative" data-chat-trigger>
-            <button data-chat-trigger
-              onClick={handleChatIconClick}
-              className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition relative"
-            >
-              <MessageCircle className="text-orange-400 w-[23px] h-[23px]" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+          {/* Chat Icon with Popup (hidden on /chat page) */}
+          {!location.pathname.startsWith('/chat') && (
+            <div ref={chatButtonRef} className="relative" data-chat-trigger>
+              <button data-chat-trigger
+                onClick={handleChatIconClick}
+                className="p-3 cursor-pointer hover:bg-orange-50 rounded-full transition relative"
+              >
+                <MessageCircle className="text-orange-400 w-[23px] h-[23px]" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-semibold">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {/* Only render popup on md+ screens */}
+              {isPopupOpen && (
+                <div className="hidden md:block">
+                  <ChatPopup />
+                </div>
               )}
-            </button>
-            {/* Only render popup on md+ screens */}
-            {isPopupOpen && (
-              <div className="hidden md:block">
-                <ChatPopup />
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </span>
 
         {/* Avatar */}

@@ -72,11 +72,11 @@ export interface CreatePostData {
 export interface Comment {
   id: string;
   content: string;
-  imageUrl?: string; // URL cá»§a áº£nh Ä‘Ã­nh kÃ¨m
+  imageUrl?: string; // URL của ảnh đính kèm
   postId: string;
   userId: string;
-  imageIndex?: number; // Index cá»§a áº£nh trong post (null = comment chung)
-  parentId?: string; // ID cá»§a comment cha (null = comment gá»‘c)
+  imageIndex?: number; // Index của ảnh trong post (null = comment chung)
+  parentId?: string; // ID của comment cha (null = comment gốc)
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -93,7 +93,7 @@ export interface CreateCommentData {
   imageUrl?: string;
   postId?: string;
   imageIndex?: number;
-  parentId?: string; // ID cá»§a comment cha náº¿u lÃ  reply
+  parentId?: string; // ID của comment cha nếu là reply
 }
 
 export interface CommentLike {
@@ -151,6 +151,8 @@ export interface Message {
   callType?: 'voice' | 'video';
   callDuration?: number;
   callStatus?: 'completed' | 'missed' | 'rejected' | 'no-answer';
+  pinnedById?: string | null;
+  pinnedAt?: string | null;
   createdAt: string;
   sender?: User;
   receiver?: User;
@@ -168,6 +170,13 @@ export interface Message {
       username: string;
     };
   };
+  pinnedBy?: {
+    id: string;
+    name: string;
+    username: string;
+    avatar?: string | null;
+  } | null;
+  isSystem?: boolean;
 }
 
 export interface SendMessageData {
@@ -188,6 +197,16 @@ export interface Conversation {
   unreadCount: number;
   isMuted: boolean;
   updatedAt: string;
+}
+
+export interface ConversationCustomization {
+  themeId: string;
+  emoji: string;
+  nicknameMe?: string | null;
+  nicknameThem?: string | null;
+  updatedAt?: string;
+  updatedById?: string | null;
+  changeSummary?: string;
 }
 
 // Notification Types

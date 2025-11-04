@@ -1,4 +1,4 @@
-import { Home, User, Users, CheckSquare, Calendar, UserPlus, Film } from 'lucide-react'
+import { Home, User, Users, CheckSquare, Calendar, UserPlus, Film, MessageCircle } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -17,7 +17,8 @@ export const LeftSidebar = ({ isCollapsed = false }: LeftSidebarProps) => {
     { icon: UserPlus, label: 'Suggestions', path: '/suggestions' },
     { icon: Users, label: 'Groups', path: '/groups' },
     { icon: CheckSquare, label: 'Todo', path: '/todo' },
-    { icon: Calendar, label: 'Calendar', path: '/calendar' }
+    { icon: Calendar, label: 'Calendar', path: '/calendar' },
+    { icon: MessageCircle, label: 'Chat', path: '/chat' }
   ]
 
   return (

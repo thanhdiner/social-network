@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useRef, useCallback, useTransition, memo } from 'react'
+﻿import { useState, useEffect, useLayoutEffect, useRef, useCallback, useTransition, memo, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -21,8 +22,12 @@ import {
   Paperclip,
   Play,
   Pause,
+  Pin,
+  PinOff,
   Bell,
-  BellOff
+  BellOff,
+  Palette,
+  UserCog
 } from 'lucide-react'
 import RecordRTC from 'recordrtc'
 import { useChat } from '../../contexts/ChatContext'
@@ -34,12 +39,22 @@ import videoCallService from '../../services/videoCallService'
 import { EmojiPicker } from './EmojiPicker'
 import { ImageViewer } from './ImageViewer'
 import uploadService from '../../services/uploadService'
-import type { Message, User } from '../../types'
+import type { Message, User, ConversationCustomization } from '../../types'
 import { Avatar } from './Avatar'
-import { saveMessagesCache, clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
+import {
+  saveMessagesCache,
+  clearMessagesCache,
+  clearConversationsCache,
+  getMessagesCache,
+  getCustomizationCache,
+  saveCustomizationCache,
+  clearCustomizationCache
+} from '../../utils/chatCache'
 import { ChatMessageSkeleton } from './ChatMessageSkeleton'
 import userService from '../../services/userService'
 import { MessageStatus } from './MessageStatus'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 type AudioRecorder = {
   startRecording: () => void
@@ -111,7 +126,16 @@ const AudioPlayerBase = ({ audioUrl, isOwn }: AudioPlayerProps) => {
 
   return (
     <div className="px-2 py-2">
-      <div className={`flex items-center gap-2 rounded-full px-2 py-2 w-[146px] ${isOwn ? 'bg-white/20' : 'bg-orange-500'}`}>
+      <div
+        className={`flex items-center gap-2 rounded-full px-2 py-2 w-[146px]`}
+        style={
+          isOwn
+            ? { backgroundColor: 'rgba(255, 255, 255, 0.2)' }
+            : {
+                background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
+              }
+        }
+      >
         <button onClick={togglePlay} className="shrink-0 cursor-pointer">
           {isPlaying ? (
             <Pause className={`w-4 h-4 ${isOwn ? 'text-white' : 'text-white'} fill-current`} />
@@ -147,6 +171,174 @@ const AudioPlayer = memo(AudioPlayerBase, (prev, next) => {
 
 AudioPlayer.displayName = 'AudioPlayer'
 
+interface ChatThemeConfig {
+  id: string
+  name: string
+  accent: string
+  accentHover: string
+  accentSoft: string
+  accentSoftHover: string
+  accentBorder: string
+  badgeBg: string
+  badgeText: string
+  reactionActive: string
+  ownBubble: string
+  ownText: string
+  otherBubble: string
+  otherText: string
+  replyOwnBg: string
+  replyOwnHover: string
+  replyOwnBorder: string
+  previewGradient: string
+}
+
+interface ChatCustomizationState {
+  themeId: string
+  emoji: string
+  nicknameMe: string
+  nicknameThem: string
+  updatedAt?: string
+  updatedById?: string | null
+  changeSummary?: string
+}
+
+const CHAT_THEMES: ChatThemeConfig[] = [
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    accent: '#f97316',
+    accentHover: '#ea580c',
+    accentSoft: '#fff7ed',
+    accentSoftHover: '#ffedd5',
+    accentBorder: '#fed7aa',
+    badgeBg: '#fff7ed',
+    badgeText: '#ea580c',
+    reactionActive: '#ffedd5',
+    ownBubble: '#f97316',
+    ownText: '#ffffff',
+    otherBubble: '#ffffff',
+    otherText: '#111827',
+    replyOwnBg: 'rgba(249, 115, 22, 0.18)',
+    replyOwnHover: 'rgba(249, 115, 22, 0.28)',
+    replyOwnBorder: '#fdba74',
+    previewGradient: 'from-orange-400 to-orange-600'
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    accent: '#0ea5e9',
+    accentHover: '#0284c7',
+    accentSoft: '#e0f2fe',
+    accentSoftHover: '#bae6fd',
+    accentBorder: '#bae6fd',
+    badgeBg: '#e0f2fe',
+    badgeText: '#0284c7',
+    reactionActive: '#bae6fd',
+    ownBubble: '#0ea5e9',
+    ownText: '#ffffff',
+    otherBubble: '#ffffff',
+    otherText: '#0f172a',
+    replyOwnBg: 'rgba(14, 165, 233, 0.16)',
+    replyOwnHover: 'rgba(14, 165, 233, 0.28)',
+    replyOwnBorder: '#7dd3fc',
+    previewGradient: 'from-sky-400 to-indigo-500'
+  },
+  {
+    id: 'blossom',
+    name: 'Blossom',
+    accent: '#f472b6',
+    accentHover: '#ec4899',
+    accentSoft: '#fdf2f8',
+    accentSoftHover: '#fce7f3',
+    accentBorder: '#fbcfe8',
+    badgeBg: '#fdf2f8',
+    badgeText: '#db2777',
+    reactionActive: '#fce7f3',
+    ownBubble: '#f472b6',
+    ownText: '#ffffff',
+    otherBubble: '#ffffff',
+    otherText: '#111827',
+    replyOwnBg: 'rgba(244, 114, 182, 0.16)',
+    replyOwnHover: 'rgba(244, 114, 182, 0.28)',
+    replyOwnBorder: '#f9a8d4',
+    previewGradient: 'from-pink-400 to-rose-500'
+  },
+  {
+    id: 'forest',
+    name: 'Forest',
+    accent: '#10b981',
+    accentHover: '#059669',
+    accentSoft: '#ecfdf5',
+    accentSoftHover: '#d1fae5',
+    accentBorder: '#a7f3d0',
+    badgeBg: '#ecfdf5',
+    badgeText: '#047857',
+    reactionActive: '#d1fae5',
+    ownBubble: '#10b981',
+    ownText: '#ffffff',
+    otherBubble: '#ffffff',
+    otherText: '#0f172a',
+    replyOwnBg: 'rgba(16, 185, 129, 0.16)',
+    replyOwnHover: 'rgba(16, 185, 129, 0.28)',
+    replyOwnBorder: '#6ee7b7',
+    previewGradient: 'from-emerald-400 to-teal-500'
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    accent: '#6366f1',
+    accentHover: '#4f46e5',
+    accentSoft: '#eef2ff',
+    accentSoftHover: '#e0e7ff',
+    accentBorder: '#c7d2fe',
+    badgeBg: '#eef2ff',
+    badgeText: '#4338ca',
+    reactionActive: '#e0e7ff',
+    ownBubble: '#6366f1',
+    ownText: '#ffffff',
+    otherBubble: '#ffffff',
+    otherText: '#0f172a',
+    replyOwnBg: 'rgba(99, 102, 241, 0.16)',
+    replyOwnHover: 'rgba(99, 102, 241, 0.3)',
+    replyOwnBorder: '#a5b4fc',
+    previewGradient: 'from-indigo-400 to-violet-500'
+  }
+]
+
+const DEFAULT_CUSTOMIZATION: ChatCustomizationState = {
+  themeId: 'sunset',
+  emoji: '👍',
+  nicknameMe: '',
+  nicknameThem: ''
+}
+
+const DEFAULT_EMOJI_OPTIONS = ['👍', '❤️', '😂', '😍', '🔥', '👏', '🙏', '😮', '😎', '🎉', '🤩', '🤗', '😢', '😡', '💯', '🤝', '🥳', '🤙', '💡', '✨']
+
+const getThemeById = (id: string): ChatThemeConfig => CHAT_THEMES.find(theme => theme.id === id) ?? CHAT_THEMES[0]
+
+const normalizeCustomization = (
+  raw?: ConversationCustomization | ChatCustomizationState | null
+): ChatCustomizationState => ({
+  themeId: raw?.themeId || DEFAULT_CUSTOMIZATION.themeId,
+  emoji: raw?.emoji || DEFAULT_CUSTOMIZATION.emoji,
+  nicknameMe: raw?.nicknameMe?.trim?.() || '',
+  nicknameThem: raw?.nicknameThem?.trim?.() || '',
+  updatedAt: raw?.updatedAt,
+  updatedById: raw?.updatedById ?? null,
+  changeSummary:
+    raw && typeof raw === 'object' && 'changeSummary' in raw ? (raw as any).changeSummary ?? undefined : undefined
+})
+
+const mapStateToCustomization = (state: ChatCustomizationState): ConversationCustomization => ({
+  themeId: state.themeId,
+  emoji: state.emoji,
+  nicknameMe: state.nicknameMe,
+  nicknameThem: state.nicknameThem,
+  updatedAt: state.updatedAt,
+  updatedById: state.updatedById ?? null,
+  changeSummary: state.changeSummary
+})
+
 interface ChatWindowProps {
   user: User
   isMinimized: boolean
@@ -163,7 +355,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  const { conversations, markAsRead, onlineUsers, typingUsers, setTyping, loadConversations } = useChat()
+  const { conversations, markAsRead, onlineUsers, typingUsers, setTyping, loadConversations, sendMessage } = useChat()
   const [messages, setMessages] = useState<Message[]>([])
   const [, startTransition] = useTransition()
   const [newMessage, setNewMessage] = useState('')
@@ -188,8 +380,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
-  const MAX_CACHE = 50
-  const CHUNK = 15
+  const MAX_CACHE = 100
+  const CHUNK = 20
   const [visibleCount, setVisibleCount] = useState(CHUNK)
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const atBottomRef = useRef(true)
@@ -204,8 +396,148 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const messageMenuRef = useRef<HTMLDivElement>(null)
   const [showEmojiReactions, setShowEmojiReactions] = useState<string | null>(null) // messageId
   const emojiReactionsRef = useRef<HTMLDivElement>(null)
+  const systemEventKeysRef = useRef<Set<string>>(new Set())
+  // pending pin/unpin actions map to ignore immediate echoes and for optimistic UI
+  const pendingPinActionsRef = useRef<Map<string, number>>(new Map())
+  const markPendingPinAction = (messageId: string) => {
+    pendingPinActionsRef.current.set(messageId, Date.now())
+    setTimeout(() => pendingPinActionsRef.current.delete(messageId), 1500)
+  }
+  // pending reaction actions map to ignore immediate echoes and for optimistic UI
+  const pendingReactionActionsRef = useRef<Map<string, number>>(new Map())
+  const markPendingReactionAction = (messageId: string) => {
+    pendingReactionActionsRef.current.set(messageId, Date.now())
+    setTimeout(() => pendingReactionActionsRef.current.delete(messageId), 1500)
+  }
 
-  const quickReactions = ['❤️', '😂', '😮', '😢', '😡', '👍']
+  // Customization state
+  const [customization, setCustomization] = useState<ChatCustomizationState>(() =>
+    normalizeCustomization(getCustomizationCache(user.id))
+  )
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false)
+  const [emojiDialogOpen, setEmojiDialogOpen] = useState(false)
+  const [nicknameDialogOpen, setNicknameDialogOpen] = useState(false)
+  const [nicknameDraft, setNicknameDraft] = useState({ me: '', them: '' })
+  const [customEmojiInput, setCustomEmojiInput] = useState('')
+
+  const appendCustomizationLog = useCallback(
+    (summary?: string | null, timestamp?: string) => {
+      if (!summary) return
+
+      const isoCreatedAt = timestamp || new Date().toISOString()
+      const key = `${user.id}:${isoCreatedAt}:${summary}`
+      if (systemEventKeysRef.current.has(key)) {
+        return
+      }
+      systemEventKeysRef.current.add(key)
+
+      const event: Message = {
+        id: `system-${user.id}-${isoCreatedAt}`,
+        senderId: user.id,
+        receiverId: user.id,
+        content: summary,
+        createdAt: isoCreatedAt,
+        read: true,
+        reactions: [],
+        isSystem: true
+      }
+
+      let added = false
+      setMessages(prev => {
+        if (prev.some(msg => msg.id === event.id)) {
+          return prev
+        }
+        added = true
+        const next = [...prev, event].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+        const capped = next.slice(-MAX_CACHE)
+        try {
+          saveMessagesCache(user.id, capped)
+        } catch (err) {
+          console.warn('saveMessagesCache failed:', err)
+        }
+        return capped
+      })
+
+      if (added) {
+        setVisibleCount(prev => Math.min(prev + 1, MAX_CACHE))
+      }
+    },
+    [user.id, MAX_CACHE]
+  )
+
+  const activeTheme = useMemo(() => getThemeById(customization.themeId), [customization.themeId])
+  const themeStyleVars = useMemo<CSSProperties>(() => ({
+    '--chat-accent': activeTheme.accent,
+    '--chat-accent-hover': activeTheme.accentHover,
+    '--chat-accent-dark': activeTheme.accentHover,
+    '--chat-accent-light': activeTheme.accentSoftHover,
+    '--chat-accent-soft': activeTheme.accentSoft,
+    '--chat-accent-soft-hover': activeTheme.accentSoftHover,
+    '--chat-accent-border': activeTheme.accentBorder,
+    '--chat-badge-bg': activeTheme.badgeBg,
+    '--chat-badge-text': activeTheme.badgeText,
+    '--chat-reaction-active-bg': activeTheme.reactionActive,
+    '--chat-own-bubble-bg': activeTheme.ownBubble,
+    '--chat-own-bubble-text': activeTheme.ownText,
+    '--chat-other-bubble-bg': activeTheme.otherBubble,
+    '--chat-other-bubble-text': activeTheme.otherText,
+    '--chat-reply-own-bg': activeTheme.replyOwnBg,
+    '--chat-reply-own-hover': activeTheme.replyOwnHover,
+    '--chat-reply-own-border': activeTheme.replyOwnBorder
+  }) as CSSProperties, [activeTheme])
+  const activeEmoji = customization.emoji || DEFAULT_CUSTOMIZATION.emoji
+  const emojiOptions = useMemo(() => {
+    const unique = Array.from(new Set([activeEmoji, ...DEFAULT_EMOJI_OPTIONS]))
+    return unique
+  }, [activeEmoji])
+  const nicknameForThem = useMemo(() => customization.nicknameThem.trim(), [customization.nicknameThem])
+  const nicknameForMe = useMemo(() => customization.nicknameMe.trim(), [customization.nicknameMe])
+  const displayName = useMemo(() => {
+    if (!user) return ''
+    return nicknameForThem || user.name
+  }, [user, nicknameForThem])
+  const myDisplayName = useMemo(() => {
+    const fallback = currentUser?.name || 'You'
+    return nicknameForMe || fallback
+  }, [nicknameForMe, currentUser?.name])
+  const resolveNameByUserId = useCallback(
+    (id?: string | null, fallback?: string) => {
+      if (!id) return fallback || 'Unknown'
+      if (id === currentUser?.id) return myDisplayName
+      if (id === user.id) return displayName
+      return fallback || 'Unknown'
+    },
+    [currentUser?.id, myDisplayName, user.id, displayName]
+  )
+
+  // Ensure self-conversation never inherits other customization state
+  useEffect(() => {
+    if (!currentUser?.id || user.id !== currentUser.id) return
+    const cached = normalizeCustomization(getCustomizationCache(user.id))
+    const matches =
+      customization.themeId === cached.themeId &&
+      customization.emoji === cached.emoji &&
+      customization.nicknameMe === cached.nicknameMe &&
+      customization.nicknameThem === cached.nicknameThem
+    if (!matches) {
+      setCustomization(cached)
+    }
+  }, [
+    currentUser?.id,
+    user.id,
+    customization.themeId,
+    customization.emoji,
+    customization.nicknameMe,
+    customization.nicknameThem
+  ])
+
+  const quickReactions = useMemo(() => {
+    const defaults = ['❤️', '😂', '😮', '😢', '😡', '👍']
+    if (!activeEmoji) return defaults
+    return [activeEmoji, ...defaults.filter(emoji => emoji !== activeEmoji)]
+  }, [activeEmoji])
 
   const isUserOnline = onlineUsers.has(user.id)
   const isUserTyping = user.id !== currentUser?.id && (typingUsers.get(user.id) || false)
@@ -218,11 +550,160 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }, [user.id, setTyping])
 
   // Reset initialLoadDone when switching to a different user
-  useEffect(() => {
+  useLayoutEffect(() => {
     setInitialLoadDone(false)
     setMessages([])
     setVisibleCount(CHUNK)
+    setCustomization(normalizeCustomization(getCustomizationCache(user.id)))
+    systemEventKeysRef.current.clear()
   }, [user.id])
+
+  // Fetch customization
+  useEffect(() => {
+    const fetchCustomization = async () => {
+      if (!user.id || !currentUser) return
+      try {
+        const response = await chatService.getCustomization(user.id)
+        const normalized = normalizeCustomization(response)
+        setCustomization(normalized)
+        saveCustomizationCache(user.id, mapStateToCustomization(normalized))
+        appendCustomizationLog(response.changeSummary, response.updatedAt)
+      } catch (error) {
+        console.error('Failed to load chat customization:', error)
+      }
+    }
+    void fetchCustomization()
+  }, [appendCustomizationLog, user.id, currentUser])
+
+  // Socket listener for customization updates
+  useEffect(() => {
+    if (!currentUser) return
+
+    const handleCustomizationUpdated = (payload: {
+      userAId: string
+      userBId: string
+      themeId: string
+      emoji: string
+      nicknameForUserA?: string | null
+      nicknameForUserB?: string | null
+      updatedById?: string | null
+      updatedAt?: string
+      summary?: string
+    }) => {
+      const { userAId, userBId } = payload
+      if (currentUser.id !== userAId && currentUser.id !== userBId) {
+        return
+      }
+      if (userAId !== user.id && userBId !== user.id) {
+        return
+      }
+
+      const isCurrentUserA = currentUser.id === userAId
+      const partnerId = isCurrentUserA ? userBId : userAId
+      if (partnerId !== user.id) {
+        return
+      }
+
+      const normalized = normalizeCustomization({
+        themeId: payload.themeId,
+        emoji: payload.emoji,
+        nicknameMe: isCurrentUserA ? payload.nicknameForUserA ?? '' : payload.nicknameForUserB ?? '',
+        nicknameThem: isCurrentUserA ? payload.nicknameForUserB ?? '' : payload.nicknameForUserA ?? '',
+        updatedAt: payload.updatedAt,
+        updatedById: payload.updatedById ?? null,
+        changeSummary: payload.summary
+      })
+      setCustomization(normalized)
+      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
+      appendCustomizationLog(payload.summary, payload.updatedAt)
+    }
+
+    socketService.onChatCustomizationUpdated(handleCustomizationUpdated)
+    return () => {
+      socketService.offChatCustomizationUpdated(handleCustomizationUpdated)
+    }
+  }, [appendCustomizationLog, currentUser, user.id])
+
+  // Update nickname draft when customization changes
+  useEffect(() => {
+    setNicknameDraft({
+      me: customization.nicknameMe,
+      them: customization.nicknameThem
+    })
+  }, [customization.nicknameMe, customization.nicknameThem])
+
+  // Customization handlers
+  const handleThemeSelect = useCallback(async (themeId: string) => {
+    try {
+      const response = await chatService.updateCustomization(user.id, { themeId })
+      const normalized = normalizeCustomization(response)
+      setCustomization(normalized)
+      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
+      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setThemeDialogOpen(false)
+    } catch (error) {
+      console.error('Failed to update theme:', error)
+    }
+  }, [appendCustomizationLog, user.id])
+
+  const handleEmojiSelect = useCallback(async (emoji: string) => {
+    try {
+      const response = await chatService.updateCustomization(user.id, { emoji })
+      const normalized = normalizeCustomization(response)
+      setCustomization(normalized)
+      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
+      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setEmojiDialogOpen(false)
+      setCustomEmojiInput('')
+    } catch (error) {
+      console.error('Failed to update emoji:', error)
+    }
+  }, [appendCustomizationLog, user.id])
+
+  const handleCustomEmojiInputChange = useCallback((value: string) => {
+    const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu
+    const emojis = value.match(emojiRegex) || []
+    setCustomEmojiInput(emojis.slice(0, 2).join(''))
+  }, [])
+
+  const handleApplyCustomEmoji = useCallback(async () => {
+    if (!customEmojiInput.trim()) return
+    await handleEmojiSelect(customEmojiInput.trim())
+  }, [customEmojiInput, handleEmojiSelect])
+
+  const handleNicknameSave = useCallback(async () => {
+    try {
+      const response = await chatService.updateCustomization(user.id, {
+        nicknameMe: nicknameDraft.me,
+        nicknameThem: nicknameDraft.them
+      })
+      const normalized = normalizeCustomization(response)
+      setCustomization(normalized)
+      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
+      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setNicknameDialogOpen(false)
+    } catch (error) {
+      console.error('Failed to update nicknames:', error)
+    }
+  }, [appendCustomizationLog, user.id, nicknameDraft])
+
+  const handleEmojiDialogToggle = useCallback((open: boolean) => {
+    setEmojiDialogOpen(open)
+    if (!open) {
+      setCustomEmojiInput('')
+    }
+  }, [])
+
+  const handleNicknameDialogToggle = useCallback((open: boolean) => {
+    setNicknameDialogOpen(open)
+    if (!open) {
+      setNicknameDraft({
+        me: customization.nicknameMe,
+        them: customization.nicknameThem
+      })
+    }
+  }, [customization.nicknameMe, customization.nicknameThem])
+
 
   // Fetch messages when opening/un-minimizing with caching
   useEffect(() => {
@@ -232,11 +713,36 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       // Nếu đã load xong rồi thì skip (tránh fetch lại khi re-render)
       if (initialLoadDone) return
 
+      const cachedMessages = getMessagesCache(user.id)
+      if (cachedMessages && cachedMessages.length > 0) {
+        cachedMessages.forEach(msg => {
+          if (msg.isSystem && msg.content && msg.createdAt) {
+            systemEventKeysRef.current.add(`${user.id}:${msg.createdAt}:${msg.content}`)
+          }
+        })
+        setMessages(cachedMessages)
+        setVisibleCount(Math.min(CHUNK, cachedMessages.length))
+      }
+
       try {
         setLoading(true)
         // Always fetch from server to get fresh messages (including messages sent while window was closed)
         const data = await chatService.getMessages(user.id)
-        const capped = data.slice(-MAX_CACHE)
+        const cachedSystem = (cachedMessages || []).filter(msg => msg.isSystem)
+        const combined = [...data, ...cachedSystem]
+        const deduped = combined.reduce<Message[]>((acc, msg) => {
+          if (!acc.some(existing => existing.id === msg.id)) {
+            acc.push(msg)
+          }
+          return acc
+        }, [])
+        const sorted = deduped.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+        const capped = sorted.slice(-MAX_CACHE)
+        capped.forEach(msg => {
+          if (msg.isSystem && msg.content && msg.createdAt) {
+            systemEventKeysRef.current.add(`${user.id}:${msg.createdAt}:${msg.content}`)
+          }
+        })
         setMessages(capped)
         setVisibleCount(Math.min(CHUNK, capped.length))
         saveMessagesCache(user.id, capped)
@@ -268,6 +774,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         (message.senderId === user.id && message.receiverId === currentUser?.id) ||
         (message.senderId === currentUser?.id && message.receiverId === user.id)
       ) {
+        if (message.isSystem && message.content && message.createdAt) {
+          systemEventKeysRef.current.add(`${user.id}:${message.createdAt}:${message.content}`)
+        }
         startTransition(() => {
           setMessages(prev => {
             // Avoid duplicates - check if message already exists
@@ -324,6 +833,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       const customEvent = event as CustomEvent
       const { messageId, reaction } = customEvent.detail
 
+      // ignore server echo if we initiated the reaction locally very recently
+      if (pendingReactionActionsRef.current.has(messageId)) return
+
       startTransition(() => {
         setMessages(prev => {
           const updated = prev.map(msg => {
@@ -346,6 +858,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     const handleReactionRemoved = (event: Event) => {
       const customEvent = event as CustomEvent
       const { messageId, userId } = customEvent.detail
+
+      // ignore server echo if we initiated the removal locally very recently
+      if (pendingReactionActionsRef.current.has(messageId)) return
 
       startTransition(() => {
         setMessages(prev => {
@@ -539,7 +1054,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   // No blocking: removed block status fetching and actions
 
   const handleDeleteLocal = async () => {
-    if (confirm(`Delete all messages with ${user.name}? This action cannot be undone.`)) {
+    if (confirm(`Delete all messages with ${displayName}? This action cannot be undone.`)) {
       try {
         // Delete on server (mark as deleted for current user)
         await chatService.deleteConversation(user.id)
@@ -547,6 +1062,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         setMessages([])
         clearMessagesCache(user.id)
         clearConversationsCache() // Clear conversations cache to refresh list
+        clearCustomizationCache(user.id)
         setMenuOpen(false)
         // Reload conversations to remove from list
         loadConversations()
@@ -566,7 +1082,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         setIsBlocked(false)
         alert('User unblocked')
       } else {
-        if (confirm(`Are you sure you want to block ${user.name}? You will not be able to message this person.`)) {
+        if (confirm(`Are you sure you want to block ${displayName}? You will not be able to message this person.`)) {
           await userService.blockUser(user.id)
           setIsBlocked(true)
           setMenuOpen(false)
@@ -704,7 +1220,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       }
 
       // Send message with replyToId if replying
-      const sentMessage = await chatService.sendMessage({
+      const sentMessage = await sendMessage({
         receiverId: user.id,
         content,
         imageUrl,
@@ -728,6 +1244,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
 
         // Update visibleCount to show the new message
         setVisibleCount(prev => prev + 1)
+
+        // Mark conversation as read when sending a message
+        markAsRead(user.id)
       }
 
       // Scroll to bottom immediately while waiting for echo
@@ -736,6 +1255,35 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       console.error('Failed to send message:', error)
       setNewMessage(content) // Restore message on error
       setUploading(false)
+    }
+  }
+
+  const handleSendLike = async () => {
+    // quick reaction: send the currently selected emoji as a standalone message
+    if (uploading) return
+    try {
+      const sentMessage = await sendMessage({ receiverId: user.id, content: activeEmoji })
+      if (sentMessage) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === sentMessage.id)) return prev
+          const next = [...prev, sentMessage]
+          const capped = next.slice(-MAX_CACHE)
+          try {
+            saveMessagesCache(user.id, capped)
+          } catch (err) {
+            console.warn('saveMessagesCache failed:', err)
+          }
+          return capped
+        })
+        setVisibleCount(prev => prev + 1)
+
+        // Mark conversation as read when sending a message
+        markAsRead(user.id)
+      }
+      // scroll to bottom and clear typing if any
+      scrollToBottom('auto')
+    } catch (error) {
+      console.error('Failed to send like message:', error)
     }
   }
 
@@ -848,9 +1396,15 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }
 
   return (
-    <div className="w-80 h-[420px] bg-white rounded-t-lg shadow-2xl border border-gray-200 flex flex-col overflow-visible">
+    <div 
+      className="w-80 h-[420px] bg-white rounded-t-lg shadow-2xl border border-gray-200 flex flex-col overflow-visible"
+      style={themeStyleVars}
+    >
       {/* Header */}
-      <div className="bg-linear-to-r from-orange-500 to-orange-600 text-white p-3 flex items-center justify-between shrink-0 relative rounded-t-lg">
+      <div 
+        className="text-white p-3 flex items-center justify-between shrink-0 relative rounded-t-lg"
+        style={{ background: `linear-gradient(to right, ${activeTheme.accent}, ${activeTheme.accentHover})` }}
+      >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div
             className="relative cursor-pointer"
@@ -859,7 +1413,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               setMenuOpen(v => !v)
             }}
           >
-            <Avatar src={user.avatar || undefined} name={user.name} size="sm" className="w-8 h-8" />
+            <Avatar src={user.avatar || undefined} name={displayName} size="sm" className="w-8 h-8" />
             {isUserOnline && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>}
           </div>
           <div className="flex-1 min-w-0">
@@ -870,7 +1424,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                 setMenuOpen(v => !v)
               }}
             >
-              <span>{user.name}</span>
+              <span>{displayName}</span>
               <ChevronDown className="w-4 h-4 shrink-0" />
             </div>
             {isUserOnline ? <div className="text-xs opacity-90">Active now</div> : null}
@@ -885,7 +1439,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   if (currentUser) {
                     try {
                       console.log('Starting call to', user.id)
-                      await voiceCallService.startCall(user.id, user.name, user.avatar || null)
+                      await voiceCallService.startCall(user.id, displayName, user.avatar || null)
                     } catch (error) {
                       console.error('Error starting voice call:', error)
                     }
@@ -904,7 +1458,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   if (currentUser) {
                     try {
                       console.log('Starting video call to', user.id)
-                      await videoCallService.startCall(user.id, user.name, user.avatar || null)
+                      await videoCallService.startCall(user.id, displayName, user.avatar || null)
                     } catch (error) {
                       console.error('Error starting video call:', error)
                     }
@@ -949,6 +1503,43 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   <span>View Profile</span>
                 </button>
 
+                <div className="border-t border-gray-200 my-1" />
+
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setThemeDialogOpen(true)
+                  }}
+                >
+                  <Palette className="w-4 h-4 text-orange-500" />
+                  <span>Theme</span>
+                </button>
+
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setEmojiDialogOpen(true)
+                  }}
+                >
+                  <Smile className="w-4 h-4 text-orange-500" />
+                  <span>Quick Emoji</span>
+                </button>
+
+                <button
+                  className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setNicknameDialogOpen(true)
+                  }}
+                >
+                  <UserCog className="w-4 h-4 text-orange-500" />
+                  <span>Nicknames</span>
+                </button>
+
+                <div className="border-t border-gray-200 my-1" />
+
                 <button 
                   className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 cursor-pointer" 
                   onClick={handleToggleMute}
@@ -982,6 +1573,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               </>
             )}
 
+            <div className="border-t border-gray-200 my-1" />
+
             <button
               className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-red-600 cursor-pointer"
               onClick={handleDeleteLocal}
@@ -1006,12 +1599,21 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               <ChatMessageSkeleton />
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <Avatar src={user.avatar || undefined} name={user.name} size="xl" className="w-16 h-16 mb-2" />
-                <p className="font-semibold">{user.name}</p>
+                <Avatar src={user.avatar || undefined} name={displayName} size="xl" className="w-16 h-16 mb-2" />
+                <p className="font-semibold">{displayName}</p>
                 <p className="text-sm">Start the conversation</p>
               </div>
             ) : (
               messages.slice(Math.max(messages.length - visibleCount, 0)).map((message, index, arr) => {
+                if (message.isSystem) {
+                  return (
+                    <div key={message.id} className="flex justify-center">
+                      <div className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-full shadow-sm">
+                        {message.content}
+                      </div>
+                    </div>
+                  )
+                }
                 const isOwn = message.senderId === currentUser?.id
                 const showAvatar = !isOwn && (index === arr.length - 1 || arr[index + 1]?.senderId !== message.senderId)
 
@@ -1024,7 +1626,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   >
                     {/* Only show avatar for the other user */}
                     <div className={isOwn ? 'w-0' : 'w-6 shrink-0'}>
-                      {showAvatar && <Avatar src={user.avatar || undefined} name={user.name} size="xs" className="w-6 h-6" />}
+                      {showAvatar && <Avatar src={user.avatar || undefined} name={displayName} size="xs" className="w-6 h-6" />}
                     </div>
 
                     <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[65%] relative`}>
@@ -1040,6 +1642,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                               key={emoji}
                               onClick={async () => {
                                 try {
+                                  markPendingReactionAction(message.id)
                                   await chatService.addReaction(message.id, emoji)
                                   // Update local state
                                   setMessages(prev =>
@@ -1076,9 +1679,29 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
 
                       <div
                         className={`rounded-2xl transition-all hover:shadow-md ${message.imageUrl || message.videoUrl ? '' : 'px-3 py-2'} ${
-                          isOwn ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                          isOwn ? 'text-white' : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
                         } ${message.unsent ? 'opacity-60 italic' : ''}`}
+                        style={
+                          isOwn
+                            ? {
+                                background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
+                              }
+                            : undefined
+                        }
                       >
+                        {/* Pinned badge */}
+                        {message.pinnedAt && (
+                          <div
+                            className="absolute -top-2 right-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium shadow-sm pointer-events-none"
+                            style={{
+                              backgroundColor: `var(--chat-accent-light)`,
+                              color: `var(--chat-accent)`,
+                            }}
+                          >
+                            <Pin className="w-3 h-3" />
+                            <span>Pinned</span>
+                          </div>
+                        )}
                         {message.unsent ? (
                           <p className={`text-sm italic ${isOwn ? 'text-white/90' : 'text-gray-600'}`}>Message unsent</p>
                         ) : (
@@ -1100,16 +1723,52 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                                     }
                                   }
                                 }}
-                                className={`px-3 py-2 border-l-4 ${
+                                className={`px-3 py-2 border-l-4 mx-2 mt-2 rounded cursor-pointer transition-colors ${
+                                  isOwn ? '' : 'border-gray-400 bg-gray-200/50 hover:bg-gray-300/70'
+                                }`}
+                                style={
                                   isOwn
-                                    ? 'border-orange-300 bg-orange-400/30 hover:bg-orange-400/50'
-                                    : 'border-gray-400 bg-gray-200/50 hover:bg-gray-300/70'
-                                } mx-2 mt-2 rounded cursor-pointer transition-colors`}
+                                    ? {
+                                        borderColor: `var(--chat-accent-border)`,
+                                        backgroundColor: activeTheme.replyOwnBg,
+                                      }
+                                    : undefined
+                                }
+                                onMouseEnter={e => {
+                                  if (isOwn) {
+                                    e.currentTarget.style.backgroundColor = activeTheme.replyOwnHover
+                                  }
+                                }}
+                                onMouseLeave={e => {
+                                  if (isOwn) {
+                                    e.currentTarget.style.backgroundColor = activeTheme.replyOwnBg
+                                  }
+                                }}
                               >
-                                <p className={`text-xs font-semibold ${isOwn ? 'text-orange-100' : 'text-gray-700'}`}>
-                                  {message.replyTo.sender?.name || 'Unknown'}
+                                <p
+                                  className={`text-xs font-semibold`}
+                                  style={
+                                    isOwn
+                                      ? {
+                                          color: `var(--chat-accent)`,
+                                          opacity: 0.9,
+                                        }
+                                      : { color: '#374151' }
+                                  }
+                                >
+                                  {resolveNameByUserId(message.replyTo.senderId, message.replyTo.sender?.name || 'Unknown')}
                                 </p>
-                                <p className={`text-xs truncate ${isOwn ? 'text-orange-50' : 'text-gray-600'}`}>
+                                <p
+                                  className={`text-xs truncate`}
+                                  style={
+                                    isOwn
+                                      ? {
+                                          color: `var(--chat-accent)`,
+                                          opacity: 0.75,
+                                        }
+                                      : { color: '#4b5563' }
+                                  }
+                                >
                                   {message.replyTo.audioUrl
                                     ? '🎤 Voice message'
                                     : message.replyTo.videoUrl
@@ -1190,6 +1849,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                                 key={emoji}
                                 onClick={async () => {
                                   try {
+                                    markPendingReactionAction(message.id)
                                     if (hasMyReaction) {
                                       await chatService.removeReaction(message.id)
                                       setMessages(prev =>
@@ -1225,8 +1885,15 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                                   }
                                 }}
                                 className={`flex items-center gap-0.5 px-1 py-0.5 rounded-full cursor-pointer transition-colors ${
-                                  hasMyReaction ? 'bg-orange-100' : 'hover:bg-gray-100'
+                                  hasMyReaction ? '' : 'hover:bg-gray-100'
                                 }`}
+                                style={
+                                  hasMyReaction
+                                    ? {
+                                        backgroundColor: `var(--chat-accent-light)`,
+                                      }
+                                    : undefined
+                                }
                               >
                                 <span className="text-sm">{emoji}</span>
                                 {count > 1 && <span className="text-xs text-gray-600">{count}</span>}
@@ -1364,7 +2031,10 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
             {showScrollToLatest && (
               <button
                 onClick={() => scrollToBottom('smooth')}
-                className="absolute bottom-4 right-4 bg-orange-500 text-white rounded-full p-2 shadow-lg hover:bg-orange-600 transition-colors cursor-pointer"
+                className="absolute bottom-4 right-4 text-white rounded-full p-2 shadow-lg transition-colors cursor-pointer"
+                style={{
+                  background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
+                }}
                 title="Scroll to latest"
               >
                 <ChevronDown className="w-5 h-5" />
@@ -1436,12 +2106,15 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               <div className="p-4 bg-gray-100 rounded-lg text-center">
                 <Ban className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-600 font-medium">
-                  {isBlocked ? `You blocked ${user.name}. Unblock to message.` : `You can't message this user.`}
+                  {isBlocked ? `You blocked ${displayName}. Unblock to message.` : `You can't message this user.`}
                 </p>
                 {isBlocked && (
                   <button
                     onClick={handleBlockUser}
-                    className="mt-2 px-4 py-1.5 bg-orange-500 text-white text-sm rounded-full hover:bg-orange-600 transition-colors cursor-pointer"
+                    className="mt-2 px-4 py-1.5 text-white text-sm rounded-full transition-colors cursor-pointer"
+                    style={{
+                      background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
+                    }}
                   >
                     Unblock
                   </button>
@@ -1455,7 +2128,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <Reply size={14} className="text-gray-500 shrink-0" />
-                        <p className="text-xs text-gray-600 font-medium">Replying to {replyingTo.sender?.name || 'Unknown'}</p>
+                        <p className="text-xs text-gray-600 font-medium">
+                          Replying to {resolveNameByUserId(replyingTo.senderId, replyingTo.sender?.name || 'Unknown')}
+                        </p>
                       </div>
                       <p className="text-xs text-gray-500 truncate mt-0.5 ml-5">
                         {replyingTo.audioUrl
@@ -1481,7 +2156,17 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   <div className="relative" ref={attachmentMenuRef}>
                     <button
                       onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                      className="p-2 text-orange-500 hover:bg-orange-50 rounded-full transition-colors cursor-pointer shrink-0"
+                      className="p-2 rounded-full transition-colors cursor-pointer shrink-0"
+                      style={{
+                        color: `var(--chat-accent)`,
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = `var(--chat-accent-light)`
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
                       type="button"
                       disabled={uploading}
                     >
@@ -1498,7 +2183,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                           }}
                           className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
                         >
-                          <ImageIcon size={16} className="text-orange-500" />
+                          <ImageIcon size={16} style={{ color: `var(--chat-accent)` }} />
                           <span>Photo</span>
                         </button>
                         <button
@@ -1538,7 +2223,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       } catch (err) {
                         setRecording(false)
                         console.error('Microphone access error:', err)
-                        alert('Không thể truy cập micro! Vui lòng cho phép quyền truy cập micro.')
+                        alert('Unable to access microphone! Please allow microphone permission.')
                       }
                     }}
                     onMouseUp={async () => {
@@ -1560,7 +2245,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                             setUploading(true)
                             const audioUrl = await uploadService.uploadAudio(blob)
 
-                            const sentMessage = await chatService.sendMessage({
+                            const sentMessage = await sendMessage({
                               receiverId: user.id,
                               content: '🎤 Voice message',
                               audioUrl
@@ -1579,19 +2264,27 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                               })
 
                               setVisibleCount(prev => prev + 1)
+
+                              // Mark conversation as read when sending a message
+                              markAsRead(user.id)
                             }
 
                             scrollToBottom('auto')
                             setUploading(false)
                           } catch (error) {
                             console.error('Failed to send voice message:', error)
-                            alert('Không thể gửi tin nhắn voice. Vui lòng thử lại!')
+                            alert('Unable to send voice message. Please try again!')
                             setUploading(false)
                           }
                         })
                       }
                     }}
-                    onMouseLeave={async () => {
+                    onMouseLeave={async e => {
+                      // Styling for hover effect
+                      if (!recording && !uploading) {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }
+
                       // Also stop if user moves mouse away while holding
                       const recorderInstance = recorderRef.current
                       if (recorderInstance && recording) {
@@ -1611,7 +2304,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                             setUploading(true)
                             const audioUrl = await uploadService.uploadAudio(blob)
 
-                            const sentMessage = await chatService.sendMessage({
+                            const sentMessage = await sendMessage({
                               receiverId: user.id,
                               content: '🎤 Voice message',
                               audioUrl
@@ -1629,6 +2322,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                               })
 
                               setVisibleCount(prev => prev + 1)
+
+                              // Mark conversation as read when sending a message
+                              markAsRead(user.id)
                             }
 
                             scrollToBottom('auto')
@@ -1641,15 +2337,24 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       }
                     }}
                     className={`p-2 rounded-full transition-all cursor-pointer shrink-0 ${
-                      recording
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : uploading
-                        ? 'bg-gray-300 text-gray-500'
-                        : 'text-orange-500 hover:bg-orange-50'
+                      recording ? 'bg-red-500 text-white animate-pulse' : uploading ? 'bg-gray-300 text-gray-500' : ''
                     }`}
+                    style={
+                      !recording && !uploading
+                        ? {
+                            color: `var(--chat-accent)`,
+                            backgroundColor: 'transparent',
+                          }
+                        : undefined
+                    }
+                    onMouseEnter={e => {
+                      if (!recording && !uploading) {
+                        e.currentTarget.style.backgroundColor = `var(--chat-accent-light)`
+                      }
+                    }}
                     type="button"
                     disabled={uploading}
-                    title={recording ? 'Đang ghi âm... Thả để gửi' : uploading ? 'Đang gửi...' : 'Giữ để ghi âm'}
+                    title={recording ? 'Recording... Release to send' : uploading ? 'Uploading...' : 'Hold to record'}
                   >
                     {uploading ? (
                       <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -1698,27 +2403,73 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       data-emoji-trigger
                       onMouseDown={e => e.stopPropagation()}
                       onClick={() => setShowEmojiPicker(v => !v)}
-                      className="p-1 text-orange-500 hover:bg-orange-50 rounded-full transition-colors cursor-pointer"
+                      className="p-1 rounded-full transition-colors cursor-pointer"
+                      style={{
+                        color: `var(--chat-accent)`,
+                        backgroundColor: 'transparent',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = `var(--chat-accent-light)`
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
                       type="button"
                     >
                       <Smile className="w-5 h-5" />
                     </button>
                   </div>
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) || uploading}
-                    className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${
-                      (newMessage.trim() || selectedImages.length > 0 || selectedVideo) && !uploading
-                        ? 'bg-orange-500 text-white hover:bg-orange-600'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {uploading ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Send className="w-5 h-5" />
-                    )}
-                  </button>
+                  {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) ? (
+                    // Show like icon when input is empty
+                    <button
+                      onClick={handleSendLike}
+                      disabled={uploading}
+                      className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${uploading ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white'}`}
+                      style={
+                        !uploading
+                          ? {
+                              color: `var(--chat-accent)`,
+                            }
+                          : undefined
+                      }
+                      onMouseEnter={e => {
+                        if (!uploading) {
+                          e.currentTarget.style.backgroundColor = `var(--chat-accent-light)`
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!uploading) {
+                          e.currentTarget.style.backgroundColor = 'white'
+                        }
+                      }}
+                      title={`Send ${activeEmoji}`}
+                    >
+                      <span className="text-2xl leading-none">{activeEmoji}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) || uploading}
+                      className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${
+                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob) && !uploading
+                          ? 'text-white'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      }`}
+                      style={
+                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob) && !uploading
+                          ? {
+                              background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {uploading ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -1774,6 +2525,123 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
             })()}
             {(() => {
               const msg = messages.find(m => m.id === messageMenuOpen)
+              if (!msg || msg.unsent) return null
+
+              // Show Unpin when pinned, otherwise show Pin
+              if (msg.pinnedAt) {
+                return (
+                  <>
+                    <div className="border-t border-gray-200 my-1" />
+                    <button
+                      onClick={async () => {
+                        // optimistic UI: remove pinned marks immediately
+                        setMessages(prev => {
+                          const next = prev.map(m => (m.id === msg.id ? { ...m, pinnedAt: null, pinnedById: null, pinnedBy: null } : m))
+                          try {
+                            saveMessagesCache(user.id, next)
+                          } catch (err) {
+                            console.warn('saveMessagesCache failed:', err)
+                          }
+                          return next
+                        })
+                        markPendingPinAction?.(msg.id)
+                        try {
+                          const updated = await chatService.unpinMessage(msg.id)
+                          // confirm server response
+                          setMessages(prev => {
+                            const next = prev.map(m => (m.id === msg.id ? { ...m, ...updated } : m))
+                            try {
+                              saveMessagesCache(user.id, next)
+                            } catch (err) {
+                              console.warn('saveMessagesCache failed:', err)
+                            }
+                            return next
+                          })
+                        } catch (error) {
+                          console.error('Failed to unpin message:', error)
+                          // revert optimistic change
+                          setMessages(prev => {
+                            const next = prev.map(m => (m.id === msg.id ? { ...m, pinnedAt: msg.pinnedAt, pinnedById: msg.pinnedById, pinnedBy: msg.pinnedBy } : m))
+                            try {
+                              saveMessagesCache(user.id, next)
+                            } catch (err) {
+                              console.warn('saveMessagesCache failed:', err)
+                            }
+                            return next
+                          })
+                        } finally {
+                          setMessageMenuOpen(null)
+                        }
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                    >
+                      <PinOff size={14} />
+                      <span>Unpin</span>
+                    </button>
+                  </>
+                )
+              }
+
+              return (
+                <>
+                  <div className="border-t border-gray-200 my-1" />
+                  <button
+                    onClick={async () => {
+                      // optimistic UI: apply pinned marks immediately
+                      const optimistic = {
+                        ...msg,
+                        pinnedAt: new Date().toISOString(),
+                        pinnedById: currentUser?.id || '',
+                        pinnedBy: currentUser ? { id: currentUser.id, name: currentUser.name, username: currentUser.username || '', avatar: currentUser.avatar } : undefined
+                      }
+                      setMessages(prev => {
+                        const next = prev.map(m => (m.id === msg.id ? optimistic : m))
+                        try {
+                          saveMessagesCache(user.id, next)
+                        } catch (err) {
+                          console.warn('saveMessagesCache failed:', err)
+                        }
+                        return next
+                      })
+                      markPendingPinAction(msg.id)
+                      try {
+                        const updated = await chatService.pinMessage(msg.id)
+                        // confirm server response
+                          setMessages(prev => {
+                            const next = prev.map(m => (m.id === msg.id ? { ...m, ...updated } : m))
+                            try {
+                              saveMessagesCache(user.id, next)
+                            } catch (err) {
+                              console.warn('saveMessagesCache failed:', err)
+                            }
+                            return next
+                          })
+                      } catch (error) {
+                        console.error('Failed to pin message:', error)
+                        // revert optimistic change
+                        setMessages(prev => {
+                          const next = prev.map(m => (m.id === msg.id ? { ...m, pinnedAt: null, pinnedById: null, pinnedBy: null } : m))
+                          try {
+                            saveMessagesCache(user.id, next)
+                          } catch (err) {
+                            console.warn('saveMessagesCache failed:', err)
+                          }
+                          return next
+                        })
+                      } finally {
+                        setMessageMenuOpen(null)
+                      }
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Pin size={14} />
+                    <span>Pin</span>
+                  </button>
+                </>
+              )
+            })()}
+            {(() => {
+              const msg = messages.find(m => m.id === messageMenuOpen)
               return msg && !msg.unsent && msg.senderId === currentUser?.id
             })() && (
               <>
@@ -1824,6 +2692,123 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
           </div>,
           document.body
         )}
+
+      {/* Theme Selection Dialog */}
+      <Dialog open={themeDialogOpen} onOpenChange={setThemeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Choose Theme</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-3 gap-3 p-4">
+            {CHAT_THEMES.map(theme => (
+              <button
+                key={theme.id}
+                onClick={() => handleThemeSelect(theme.id)}
+                className="flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-transparent hover:border-gray-300 transition-all cursor-pointer group relative"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.accent} 0%, ${theme.accentHover} 100%)`
+                }}
+              >
+                <div className="w-12 h-12 rounded-full bg-white/30 group-hover:bg-white/50 transition-colors" />
+                <span className="text-xs font-medium text-white drop-shadow">{theme.name}</span>
+                {customization?.themeId === theme.id && (
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Emoji Dialog */}
+      <Dialog open={emojiDialogOpen} onOpenChange={handleEmojiDialogToggle}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Choose Quick Reaction</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-4 gap-3">
+              {emojiOptions.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => handleEmojiSelect(emoji)}
+                  className="text-4xl p-4 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer border-2 border-transparent hover:border-gray-300 relative"
+                >
+                  {emoji}
+                  {customization?.emoji === emoji && (
+                    <div className="absolute top-1 right-1 w-4 h-4 bg-green-500 rounded-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600 mb-2">Or enter custom emoji:</p>
+              <div className="flex gap-2">
+                <Input
+                  value={customEmojiInput}
+                  onChange={e => handleCustomEmojiInputChange(e.target.value)}
+                  placeholder="Enter emoji..."
+                  className="flex-1"
+                  maxLength={4}
+                />
+                <button
+                  onClick={handleApplyCustomEmoji}
+                  disabled={!customEmojiInput.trim()}
+                  className="px-4 py-2 text-white rounded-md transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                background: customEmojiInput.trim()
+                  ? `linear-gradient(135deg, ${activeTheme.accent} 0%, ${activeTheme.accentHover} 100%)`
+                  : undefined,
+                backgroundColor: !customEmojiInput.trim() ? '#e5e7eb' : undefined
+              }}
+            >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nickname Dialog */}
+      <Dialog open={nicknameDialogOpen} onOpenChange={handleNicknameDialogToggle}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">Edit Nicknames</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">Your nickname</label>
+              <Input
+                value={nicknameDraft.me}
+                onChange={e => setNicknameDraft(prev => ({ ...prev, me: e.target.value }))}
+                placeholder={currentUser?.name || 'Your name'}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">{displayName}'s nickname</label>
+              <Input
+                value={nicknameDraft.them}
+                onChange={e => setNicknameDraft(prev => ({ ...prev, them: e.target.value }))}
+                  placeholder={displayName}
+                className="w-full"
+              />
+            </div>
+            <button
+              onClick={handleNicknameSave}
+              className="w-full px-4 py-2 text-white rounded-md transition-colors cursor-pointer"
+              style={{
+                background: `linear-gradient(135deg, ${activeTheme.accent} 0%, ${activeTheme.accentHover} 100%)`
+              }}
+            >
+              Save Nicknames
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

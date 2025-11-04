@@ -12,6 +12,18 @@ type CallSignalPayload = {
   signal: unknown
 }
 
+type ChatCustomizationSocketPayload = {
+  userAId: string
+  userBId: string
+  themeId: string
+  emoji: string
+  nicknameForUserA?: string | null
+  nicknameForUserB?: string | null
+  updatedById?: string | null
+  updatedAt?: string
+  summary?: string
+}
+
 class SocketService {
   private socket: Socket | null = null
   private userId: string | null = null
@@ -122,6 +134,14 @@ class SocketService {
 
   offNewNotification() {
     this.socket?.off('new_notification')
+  }
+
+  onChatCustomizationUpdated(callback: (payload: ChatCustomizationSocketPayload) => void) {
+    this.socket?.on('chat_customization_updated', callback)
+  }
+
+  offChatCustomizationUpdated(callback: (payload: ChatCustomizationSocketPayload) => void) {
+    this.socket?.off('chat_customization_updated', callback)
   }
 
   // Chat events

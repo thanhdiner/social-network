@@ -25,6 +25,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private userSockets = new Map<string, string>(); // userId -> socketId
 
+  private serializeMessage<T>(payload: T): T {
+    return JSON.parse(JSON.stringify(payload)) as T;
+  }
+
   handleConnection(client: UserSocket) {
     console.log(`Client connected: ${client.id}`);
   }
@@ -241,6 +245,31 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  notifyConversationCustomization(payload: {
+    userAId: string;
+    userBId: string;
+    themeId: string;
+    emoji: string;
+    nicknameForUserA?: string | null;
+    nicknameForUserB?: string | null;
+    updatedById?: string | null;
+    updatedAt: Date;
+    summary?: string;
+  }) {
+    const serialized = {
+      ...payload,
+      updatedAt: payload.updatedAt.toISOString(),
+      ...(payload.summary ? { summary: payload.summary } : {}),
+    };
+
+    [payload.userAId, payload.userBId].forEach((userId) => {
+      const socketId = this.userSockets.get(userId);
+      if (socketId) {
+        this.server.to(socketId).emit('chat_customization_updated', serialized);
+      }
+    });
+  }
+
   // Notify message unsent
   notifyMessageUnsent(messageId: string, receiverId: string) {
     const payload = { messageId };
@@ -249,6 +278,30 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (socketId) {
       this.server.to(socketId).emit('message_unsent', payload);
     }
+  }
+
+  notifyMessagePinned(message: unknown, participantIds: string[]) {
+    const payload = { message: this.serializeMessage(message) };
+    const uniqueReceivers = new Set(participantIds);
+
+    uniqueReceivers.forEach((receiverId) => {
+      const socketId = this.userSockets.get(receiverId);
+      if (socketId) {
+        this.server.to(socketId).emit('message_pinned', payload);
+      }
+    });
+  }
+
+  notifyMessageUnpinned(message: unknown, participantIds: string[]) {
+    const payload = { message: this.serializeMessage(message) };
+    const uniqueReceivers = new Set(participantIds);
+
+    uniqueReceivers.forEach((receiverId) => {
+      const socketId = this.userSockets.get(receiverId);
+      if (socketId) {
+        this.server.to(socketId).emit('message_unpinned', payload);
+      }
+    });
   }
 
   // Voice call events

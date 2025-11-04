@@ -19,6 +19,13 @@ interface RequestWithUser extends Request {
   };
 }
 
+type UpdateCustomizationBody = Partial<{
+  themeId: string;
+  emoji: string;
+  nicknameMe: string;
+  nicknameThem: string;
+}>;
+
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
@@ -42,12 +49,66 @@ export class ChatController {
     return this.chatService.getMessages(req.user.userId, userId);
   }
 
+  @Get('customization/:userId')
+  getCustomization(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+  ) {
+    this.logger.log(
+      `GET /chat/customization/${userId} user=${req.user.userId}`,
+    );
+    return this.chatService.getConversationCustomization(
+      req.user.userId,
+      userId,
+    );
+  }
+
+  @Put('customization/:userId')
+  updateCustomization(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+    @Body() body: UpdateCustomizationBody,
+  ) {
+    this.logger.log(
+      `PUT /chat/customization/${userId} user=${req.user.userId}`,
+    );
+    return this.chatService.updateConversationCustomization(
+      req.user.userId,
+      userId,
+      body,
+    );
+  }
+
+  @Delete('customization/:userId')
+  resetCustomization(
+    @Request() req: RequestWithUser,
+    @Param('userId') userId: string,
+  ) {
+    this.logger.log(
+      `DELETE /chat/customization/${userId} user=${req.user.userId}`,
+    );
+    return this.chatService.resetConversationCustomization(
+      req.user.userId,
+      userId,
+    );
+  }
+
   @Post('messages')
   sendMessage(
     @Request() req: RequestWithUser,
-    @Body() data: { receiverId: string; content: string; imageUrl?: string; videoUrl?: string; audioUrl?: string; replyToId?: string },
+    @Body()
+    data: {
+      receiverId: string;
+      content: string;
+      imageUrl?: string;
+      videoUrl?: string;
+      audioUrl?: string;
+      replyToId?: string;
+    },
   ) {
-    this.logger.log(`POST /chat/messages from=${req.user.userId} to=${data.receiverId}`);
+    this.logger.log(
+      `POST /chat/messages from=${req.user.userId} to=${data.receiverId}`,
+    );
     return this.chatService.sendMessage(
       req.user.userId,
       data.receiverId,
@@ -61,7 +122,9 @@ export class ChatController {
 
   @Put('messages/:userId/read')
   markAsRead(@Request() req: RequestWithUser, @Param('userId') userId: string) {
-    this.logger.log(`PUT /chat/messages/${userId}/read user=${req.user.userId}`);
+    this.logger.log(
+      `PUT /chat/messages/${userId}/read user=${req.user.userId}`,
+    );
     return this.chatService.markAsRead(req.user.userId, userId);
   }
 
@@ -83,11 +146,7 @@ export class ChatController {
     this.logger.log(
       `POST /chat/messages/${messageId}/react user=${req.user.userId} emoji=${data.emoji}`,
     );
-    return this.chatService.addReaction(
-      req.user.userId,
-      messageId,
-      data.emoji,
-    );
+    return this.chatService.addReaction(req.user.userId, messageId, data.emoji);
   }
 
   @Delete('messages/:messageId/react')
@@ -121,6 +180,28 @@ export class ChatController {
       `PUT /chat/messages/${messageId}/unsend user=${req.user.userId}`,
     );
     return this.chatService.unsendMessage(messageId, req.user.userId);
+  }
+
+  @Put('messages/:messageId/pin')
+  pinMessage(
+    @Request() req: RequestWithUser,
+    @Param('messageId') messageId: string,
+  ) {
+    this.logger.log(
+      `PUT /chat/messages/${messageId}/pin user=${req.user.userId}`,
+    );
+    return this.chatService.pinMessage(req.user.userId, messageId);
+  }
+
+  @Put('messages/:messageId/unpin')
+  unpinMessage(
+    @Request() req: RequestWithUser,
+    @Param('messageId') messageId: string,
+  ) {
+    this.logger.log(
+      `PUT /chat/messages/${messageId}/unpin user=${req.user.userId}`,
+    );
+    return this.chatService.unpinMessage(req.user.userId, messageId);
   }
 
   @Put('conversations/:userId/mute')

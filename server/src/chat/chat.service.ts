@@ -1,6 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ChatGateway } from './chat.gateway';
+import type { ConversationCustomization as ConversationCustomizationModel } from '@prisma/client';
 
 export interface ConversationResponse {
   id: string;
@@ -18,6 +25,18 @@ export interface ConversationResponse {
   updatedAt: Date;
 }
 
+const DEFAULT_CHAT_THEME_ID = 'sunset';
+const DEFAULT_CHAT_EMOJI = '👍';
+const CHAT_THEME_LABELS: Record<string, string> = {
+  sunset: 'Sunset',
+  ocean: 'Ocean',
+  blossom: 'Blossom',
+  forest: 'Forest',
+  midnight: 'Midnight',
+};
+
+type ParticipantKey = 'userA' | 'userB';
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -25,6 +44,170 @@ export class ChatService {
     private chatGateway: ChatGateway,
   ) {}
   private readonly logger = new Logger(ChatService.name);
+
+  private getOrderedParticipants(currentUserId: string, partnerId: string) {
+    if (currentUserId === partnerId) {
+      throw new BadRequestException(
+        'Cannot customize conversation with yourself',
+      );
+    }
+
+    const [userAId, userBId] = [currentUserId, partnerId].sort((a, b) =>
+      a < b ? -1 : 1,
+    );
+    const isCurrentUserA = currentUserId === userAId;
+    return { userAId, userBId, isCurrentUserA };
+  }
+
+  private normalizeNickname(value?: string | null) {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private getThemeLabel(themeId: string) {
+    return CHAT_THEME_LABELS[themeId] ?? themeId;
+  }
+
+  private composeCustomizationChangeSummary(params: {
+    actorId: string;
+    actorName: string;
+    partnerName: string;
+    after: ConversationCustomizationModel;
+    themeChanged: boolean;
+    emojiChanged: boolean;
+    nicknameSelfTargets: ParticipantKey[];
+    nicknamePartnerTargets: ParticipantKey[];
+  }) {
+    const {
+      actorId,
+      actorName,
+      partnerName,
+      after,
+      themeChanged,
+      emojiChanged,
+      nicknameSelfTargets,
+      nicknamePartnerTargets,
+    } = params;
+
+    const parts: string[] = [];
+
+    if (themeChanged) {
+      parts.push(`theme → ${this.getThemeLabel(after.themeId)}`);
+    }
+
+    if (emojiChanged) {
+      parts.push(`quick emoji → ${after.emoji}`);
+    }
+
+    const userAName = after.userAId === actorId ? actorName : partnerName;
+    const userBName = after.userBId === actorId ? actorName : partnerName;
+
+    nicknameSelfTargets.forEach((target) => {
+      const nickname =
+        target === 'userA'
+          ? after.nicknameForUserA?.trim() || ''
+          : after.nicknameForUserB?.trim() || '';
+
+      if (nickname) {
+        parts.push(`renamed themselves to "${nickname}"`);
+      } else {
+        parts.push('cleared their nickname');
+      }
+    });
+
+    nicknamePartnerTargets.forEach((target) => {
+      const nickname =
+        target === 'userA'
+          ? after.nicknameForUserA?.trim() || ''
+          : after.nicknameForUserB?.trim() || '';
+      const subjectName = target === 'userA' ? userAName : userBName;
+
+      if (nickname) {
+        parts.push(`now calls ${subjectName} "${nickname}"`);
+      } else {
+        parts.push(`cleared ${subjectName}'s nickname`);
+      }
+    });
+
+    if (parts.length === 0) {
+      return null;
+    }
+
+    const safeActorName = actorName || 'Someone';
+    return `⚙️ ${safeActorName} updated the conversation: ${parts.join(' • ')}`;
+  }
+
+  private async ensureCustomizationRecord(
+    userAId: string,
+    userBId: string,
+  ): Promise<ConversationCustomizationModel> {
+    const existing = await this.prisma.conversationCustomization.findUnique({
+      where: {
+        userAId_userBId: {
+          userAId,
+          userBId,
+        },
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    return this.prisma.conversationCustomization.create({
+      data: {
+        userAId,
+        userBId,
+        themeId: DEFAULT_CHAT_THEME_ID,
+        emoji: DEFAULT_CHAT_EMOJI,
+      },
+    });
+  }
+
+  private formatCustomizationForUser(
+    record: ConversationCustomizationModel,
+    isCurrentUserA: boolean,
+    summary?: string | null,
+  ) {
+    const nicknameMe = isCurrentUserA
+      ? record.nicknameForUserA
+      : record.nicknameForUserB;
+    const nicknameThem = isCurrentUserA
+      ? record.nicknameForUserB
+      : record.nicknameForUserA;
+
+    return {
+      themeId: record.themeId,
+      emoji: record.emoji,
+      nicknameMe: nicknameMe ?? '',
+      nicknameThem: nicknameThem ?? '',
+      updatedById: record.updatedById,
+      updatedAt: record.updatedAt.toISOString(),
+      // Prefer explicit summary passed by caller (recent update). If not provided, fall back to stored summary in DB.
+      ...(summary
+        ? { changeSummary: summary }
+        : (record as any).changeSummary
+        ? { changeSummary: (record as any).changeSummary }
+        : {}),
+    };
+  }
+
+  private broadcastCustomizationUpdate(
+    record: ConversationCustomizationModel,
+    summary?: string | null,
+  ) {
+    this.chatGateway.notifyConversationCustomization({
+      userAId: record.userAId,
+      userBId: record.userBId,
+      themeId: record.themeId,
+      emoji: record.emoji,
+      nicknameForUserA: record.nicknameForUserA,
+      nicknameForUserB: record.nicknameForUserB,
+      updatedById: record.updatedById,
+      updatedAt: record.updatedAt,
+      summary: summary ?? undefined,
+    });
+  }
 
   async getConversations(userId: string): Promise<ConversationResponse[]> {
     // Lấy tất cả tin nhắn của user
@@ -46,6 +229,14 @@ export class ChatService {
             username: true,
             avatar: true,
             email: true,
+          },
+        },
+        pinnedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
           },
         },
       },
@@ -110,9 +301,7 @@ export class ChatService {
   }
 
   async getMessages(userId: string, partnerId: string) {
-    this.logger.log(
-      `getMessages: userId=${userId}, partnerId=${partnerId}`,
-    );
+    this.logger.log(`getMessages: userId=${userId}, partnerId=${partnerId}`);
 
     // Mark messages as delivered when receiver fetches them
     const deliveredAt = new Date();
@@ -196,6 +385,8 @@ export class ChatService {
             id: true,
             content: true,
             imageUrl: true,
+            videoUrl: true,
+            audioUrl: true,
             senderId: true,
             sender: {
               select: {
@@ -206,6 +397,14 @@ export class ChatService {
             },
           },
         },
+        pinnedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'asc',
@@ -213,6 +412,253 @@ export class ChatService {
     });
 
     return messages;
+  }
+
+  async getConversationCustomization(currentUserId: string, partnerId: string) {
+    const partner = await this.prisma.user.findUnique({
+      where: { id: partnerId },
+      select: { id: true },
+    });
+
+    if (!partner) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { userAId, userBId, isCurrentUserA } = this.getOrderedParticipants(
+      currentUserId,
+      partnerId,
+    );
+
+    const record = await this.ensureCustomizationRecord(userAId, userBId);
+    return this.formatCustomizationForUser(record, isCurrentUserA);
+  }
+
+  async updateConversationCustomization(
+    currentUserId: string,
+    partnerId: string,
+    payload: Partial<{
+      themeId: string;
+      emoji: string;
+      nicknameMe: string;
+      nicknameThem: string;
+    }>,
+  ) {
+    const partner = await this.prisma.user.findUnique({
+      where: { id: partnerId },
+      select: { id: true, name: true },
+    });
+
+    if (!partner) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { userAId, userBId, isCurrentUserA } = this.getOrderedParticipants(
+      currentUserId,
+      partnerId,
+    );
+
+    const before = await this.ensureCustomizationRecord(userAId, userBId);
+
+    const updateData: Record<string, unknown> = {};
+    let hasChanges = false;
+    let themeChanged = false;
+    let emojiChanged = false;
+    const nicknameSelfTargets = new Set<ParticipantKey>();
+    const nicknamePartnerTargets = new Set<ParticipantKey>();
+
+    if (payload.themeId && payload.themeId !== before.themeId) {
+      updateData.themeId = payload.themeId;
+      themeChanged = true;
+      hasChanges = true;
+    }
+
+    if (payload.emoji && payload.emoji !== before.emoji) {
+      updateData.emoji = payload.emoji;
+      emojiChanged = true;
+      hasChanges = true;
+    }
+
+    if ('nicknameMe' in payload) {
+      const normalized = this.normalizeNickname(payload.nicknameMe);
+      const currentValue = isCurrentUserA
+        ? before.nicknameForUserA
+        : before.nicknameForUserB;
+      if (normalized !== currentValue) {
+        if (isCurrentUserA) {
+          updateData.nicknameForUserA = normalized;
+          nicknameSelfTargets.add('userA');
+        } else {
+          updateData.nicknameForUserB = normalized;
+          nicknameSelfTargets.add('userB');
+        }
+        hasChanges = true;
+      }
+    }
+
+    if ('nicknameThem' in payload) {
+      const normalized = this.normalizeNickname(payload.nicknameThem);
+      const currentValue = isCurrentUserA
+        ? before.nicknameForUserB
+        : before.nicknameForUserA;
+      if (normalized !== currentValue) {
+        if (isCurrentUserA) {
+          updateData.nicknameForUserB = normalized;
+          nicknamePartnerTargets.add('userB');
+        } else {
+          updateData.nicknameForUserA = normalized;
+          nicknamePartnerTargets.add('userA');
+        }
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) {
+      return this.formatCustomizationForUser(before, isCurrentUserA);
+    }
+
+    updateData.updatedById = currentUserId;
+
+    const updated = await this.prisma.conversationCustomization.update({
+      where: {
+        userAId_userBId: {
+          userAId,
+          userBId,
+        },
+      },
+      data: updateData,
+    });
+
+  let summary: string | null = null;
+    try {
+      const actor = await this.prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { id: true, name: true },
+      });
+
+      if (actor) {
+        summary = this.composeCustomizationChangeSummary({
+          actorId: actor.id,
+          actorName: actor.name?.trim() || 'Someone',
+          partnerName: partner.name?.trim() || 'Someone',
+          after: updated,
+          themeChanged,
+          emojiChanged,
+          nicknameSelfTargets: Array.from(nicknameSelfTargets),
+          nicknamePartnerTargets: Array.from(nicknamePartnerTargets),
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to build customization change summary', error);
+    }
+
+    // Persist changeSummary so participants who reload later can still see the summary
+    let finalRecord = updated;
+    if (summary) {
+      try {
+        // Use any-cast because Prisma client types may not be regenerated yet in the running environment.
+        finalRecord = await (this.prisma as any).conversationCustomization.update({
+          where: {
+            userAId_userBId: {
+              userAId,
+              userBId,
+            },
+          },
+          data: {
+            changeSummary: summary,
+          },
+        });
+      } catch (err) {
+        this.logger.error('Failed to persist changeSummary', err);
+      }
+    }
+
+    this.broadcastCustomizationUpdate(finalRecord, summary);
+
+    return this.formatCustomizationForUser(finalRecord, isCurrentUserA, summary);
+  }
+
+  async resetConversationCustomization(
+    currentUserId: string,
+    partnerId: string,
+  ) {
+    const partner = await this.prisma.user.findUnique({
+      where: { id: partnerId },
+      select: { id: true, name: true },
+    });
+
+    if (!partner) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { userAId, userBId, isCurrentUserA } = this.getOrderedParticipants(
+      currentUserId,
+      partnerId,
+    );
+
+    const before = await this.ensureCustomizationRecord(userAId, userBId);
+
+    const isAlreadyDefault =
+      before.themeId === DEFAULT_CHAT_THEME_ID &&
+      before.emoji === DEFAULT_CHAT_EMOJI &&
+      !before.nicknameForUserA &&
+      !before.nicknameForUserB;
+
+    if (isAlreadyDefault) {
+      return this.formatCustomizationForUser(before, isCurrentUserA);
+    }
+
+    const updated = await this.prisma.conversationCustomization.update({
+      where: {
+        userAId_userBId: {
+          userAId,
+          userBId,
+        },
+      },
+      data: {
+        themeId: DEFAULT_CHAT_THEME_ID,
+        emoji: DEFAULT_CHAT_EMOJI,
+        nicknameForUserA: null,
+        nicknameForUserB: null,
+        updatedById: currentUserId,
+      },
+    });
+
+    let summary: string | null = null;
+    try {
+      const actor = await this.prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { name: true },
+      });
+
+      const actorName = actor?.name?.trim() || 'Someone';
+      summary = `⚙️ ${actorName} reset the chat customization to default.`;
+    } catch (error) {
+      this.logger.error('Failed to build customization reset summary', error);
+    }
+
+    // Persist changeSummary so partner who reloads can see it
+    let finalRecordReset = updated;
+    if (summary) {
+      try {
+        finalRecordReset = await (this.prisma as any).conversationCustomization.update({
+          where: {
+            userAId_userBId: {
+              userAId,
+              userBId,
+            },
+          },
+          data: {
+            changeSummary: summary,
+          },
+        });
+      } catch (err) {
+        this.logger.error('Failed to persist reset changeSummary', err);
+      }
+    }
+
+    this.broadcastCustomizationUpdate(finalRecordReset, summary);
+
+    return this.formatCustomizationForUser(finalRecordReset, isCurrentUserA, summary);
   }
 
   async sendMessage(
@@ -266,6 +712,14 @@ export class ChatService {
             },
           },
         },
+        pinnedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
       },
     });
 
@@ -281,7 +735,9 @@ export class ChatService {
         data: { deliveredAt },
       });
 
-      this.logger.log(`Message ${message.id} delivered to online user ${receiverId}`);
+      this.logger.log(
+        `Message ${message.id} delivered to online user ${receiverId}`,
+      );
 
       // Notify sender that message was delivered
       this.chatGateway.notifyMessagesDelivered(
@@ -397,9 +853,7 @@ export class ChatService {
       },
     });
 
-    this.logger.log(
-      `User ${userId} reacted ${emoji} to message ${messageId}`,
-    );
+    this.logger.log(`User ${userId} reacted ${emoji} to message ${messageId}`);
 
     // Emit socket event to both sender and receiver
     const receiverIds = [message.senderId, message.receiverId].filter(
@@ -428,7 +882,9 @@ export class ChatService {
       },
     });
 
-    this.logger.log(`User ${userId} removed reaction from message ${messageId}`);
+    this.logger.log(
+      `User ${userId} removed reaction from message ${messageId}`,
+    );
 
     // Emit socket event to both sender and receiver
     const receiverIds = [message.senderId, message.receiverId].filter(
@@ -486,6 +942,8 @@ export class ChatService {
       where: { id: messageId },
       data: {
         unsent: true,
+        pinnedById: null,
+        pinnedAt: null,
       },
     });
 
@@ -495,6 +953,172 @@ export class ChatService {
     this.chatGateway.notifyMessageUnsent(messageId, message.receiverId);
 
     return { success: true };
+  }
+
+  async pinMessage(userId: string, messageId: string) {
+    this.logger.log(`User ${userId} pinning message ${messageId}`);
+
+    const existing = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        senderId: true,
+        receiverId: true,
+        unsent: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Message not found');
+    }
+
+    if (existing.senderId !== userId && existing.receiverId !== userId) {
+      throw new ForbiddenException('You are not part of this conversation');
+    }
+
+    if (existing.unsent) {
+      throw new BadRequestException('Cannot pin an unsent message');
+    }
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: {
+        pinnedById: userId,
+        pinnedAt: new Date(),
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            email: true,
+          },
+        },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            imageUrl: true,
+            videoUrl: true,
+            audioUrl: true,
+            senderId: true,
+            sender: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+            createdAt: true,
+          },
+        },
+        pinnedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    const participantIds = [existing.senderId, existing.receiverId];
+    this.chatGateway.notifyMessagePinned(updated, participantIds);
+
+    return updated;
+  }
+
+  async unpinMessage(userId: string, messageId: string) {
+    this.logger.log(`User ${userId} unpinning message ${messageId}`);
+
+    const existing = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: {
+        id: true,
+        senderId: true,
+        receiverId: true,
+        pinnedById: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Message not found');
+    }
+
+    if (existing.senderId !== userId && existing.receiverId !== userId) {
+      throw new ForbiddenException('You are not part of this conversation');
+    }
+
+    if (!existing.pinnedById) {
+      return { success: true };
+    }
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: {
+        pinnedById: null,
+        pinnedAt: null,
+      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+            email: true,
+          },
+        },
+        replyTo: {
+          select: {
+            id: true,
+            content: true,
+            imageUrl: true,
+            videoUrl: true,
+            audioUrl: true,
+            senderId: true,
+            sender: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
+          },
+        },
+        reactions: {
+          select: {
+            id: true,
+            userId: true,
+            emoji: true,
+            createdAt: true,
+          },
+        },
+        pinnedBy: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    const participantIds = [existing.senderId, existing.receiverId];
+    this.chatGateway.notifyMessageUnpinned(updated, participantIds);
+
+    return updated;
   }
 
   async muteConversation(userId: string, mutedUserId: string) {
@@ -527,9 +1151,7 @@ export class ChatService {
   }
 
   async unmuteConversation(userId: string, mutedUserId: string) {
-    this.logger.log(
-      `User ${userId} unmuting conversation with ${mutedUserId}`,
-    );
+    this.logger.log(`User ${userId} unmuting conversation with ${mutedUserId}`);
 
     await this.prisma.mutedConversation.deleteMany({
       where: {
@@ -574,8 +1196,7 @@ export class ChatService {
     if (callStatus === 'completed') {
       const minutes = Math.floor(callDuration / 60);
       const seconds = callDuration % 60;
-      const timeStr =
-        minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+      const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
       content = `${icon} ${callType === 'voice' ? 'Voice' : 'Video'} call - ${timeStr}`;
     } else if (callStatus === 'missed') {
       content = `${icon} Missed ${callType} call`;
@@ -617,4 +1238,3 @@ export class ChatService {
     return message;
   }
 }
-

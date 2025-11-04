@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Search, Maximize2, MoreVertical, Trash2, User as UserIcon, Bell, BellOff, Ban, ShieldOff } from 'lucide-react'
 import debounce from 'lodash.debounce'
@@ -28,10 +29,18 @@ export const ChatPopup = () => {
   const debouncedSearchRef = useRef<ReturnType<typeof debounce>>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [menuConversation, setMenuConversation] = useState<Conversation | null>(null)
   const [muteStatusMap, setMuteStatusMap] = useState<Record<string, boolean>>({})
   const [blockStatuses, setBlockStatuses] = useState<Record<string, { isBlocked: boolean; hasBlocked: boolean }>>({})
   const [blockStatusLoadingId, setBlockStatusLoadingId] = useState<string | null>(null)
   const [pendingActionUserId, setPendingActionUserId] = useState<string | null>(null)
+
+  const closeMenu = useCallback(() => {
+    setMenuOpen(null)
+    setMenuConversation(null)
+    setMenuPosition(null)
+  }, [])
 
   // Initialize debounced search function once
   useEffect(() => {
@@ -81,13 +90,13 @@ export const ChatPopup = () => {
         closePopup()
       }
       // Close menu if clicking outside
-      if (menuRef.current && !menuRef.current.contains(target) && !target.closest('.group')) {
-        setMenuOpen(null)
+      if (menuRef.current && !menuRef.current.contains(target) && !target.closest('[data-chat-menu-trigger]')) {
+        closeMenu()
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [closePopup])
+  }, [closePopup, closeMenu])
 
   const handleOpenChat = (user: User) => openChatWindow(user)
 
@@ -111,10 +120,9 @@ export const ChatPopup = () => {
     },
     [blockStatuses]
   )
-
   const handleViewProfile = (e: React.MouseEvent, conversation: Conversation) => {
     e.stopPropagation()
-    setMenuOpen(null)
+    closeMenu()
     closePopup()
     navigate(`/profile/${conversation.participant.username || conversation.participant.id}`)
   }
@@ -134,7 +142,7 @@ export const ChatPopup = () => {
       }
       clearConversationsCache()
       await loadConversations()
-      setMenuOpen(null)
+      closeMenu()
     } catch (error) {
       console.error('Failed to toggle mute:', error)
       alert('An error occurred, please try again')
@@ -171,7 +179,7 @@ export const ChatPopup = () => {
         await loadConversations()
         alert('User blocked')
       }
-      setMenuOpen(null)
+      closeMenu()
     } catch (error) {
       console.error('Failed to block/unblock user:', error)
       alert('An error occurred, please try again')
@@ -206,7 +214,7 @@ export const ChatPopup = () => {
       clearConversationsCache()
       closeChatWindow(userId)
       await loadConversations()
-      setMenuOpen(null)
+      closeMenu()
     } catch (error) {
       console.error('Failed to delete conversation:', error)
       alert('An error occurred, please try again')
@@ -218,6 +226,7 @@ export const ChatPopup = () => {
   const displayList = searchQuery.trim() ? searchResults : conversations
 
   return (
+    <>
     <div
       ref={popupRef}
       role="dialog"
@@ -252,7 +261,7 @@ export const ChatPopup = () => {
       </div>
 
       {/* Conversation List */}
-      <div className="overflow-y-auto flex-1 divide-y divide-gray-100">
+      <div className="overflow-y-auto overflow-x-hidden flex-1 divide-y divide-gray-100">
         {isSearching ? (
           <div className="p-8 text-center flex flex-col items-center justify-center">
             <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-2"></div>
@@ -261,7 +270,7 @@ export const ChatPopup = () => {
         ) : displayList.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center justify-center">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-              <div className="text-gray-400 text-xl">💬</div>
+              <div className="text-gray-400 text-xl">??</div>
             </div>
             <p className="text-sm font-medium text-gray-700">{searchQuery.trim() ? 'No conversations found' : 'No messages yet'}</p>
             <p className="text-xs text-gray-500 mt-1">{searchQuery.trim() ? 'Try a different search term' : 'Start a new conversation'}</p>
@@ -285,11 +294,11 @@ export const ChatPopup = () => {
                 return (
                   <div
                     key={conversation.id}
-                    className="p-3 hover:bg-orange-50 transition-colors duration-150 cursor-pointer group relative"
+                    className="p-2 cursor-pointer group"
                     onClick={() => handleOpenChat(conversation.participant)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
+                    <div className="flex items-center justify-between rounded-2xl px-2 py-1 transition-colors duration-150 group-hover:bg-orange-50">
+                      <div className="flex-1 min-w-0">
                         <ChatListItem
                           user={conversation.participant}
                           online={onlineUsers.has(conversation.participant.id)}
@@ -300,14 +309,33 @@ export const ChatPopup = () => {
                           onClick={() => {}}
                         />
                       </div>
-                      <div className="relative shrink-0">
+                      <div className="shrink-0 ml-2">
                         <button
+                          data-chat-menu-trigger
                           onClick={(e) => {
                             e.stopPropagation()
                             const isOpening = menuOpen !== conversation.id
-                            setMenuOpen(isOpening ? conversation.id : null)
                             if (isOpening) {
+                              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+                              const MENU_WIDTH = 220
+                              const MENU_HEIGHT = 240
+                              const padding = 12
+                              let top = rect.bottom + 8
+                              if (top + MENU_HEIGHT > window.innerHeight - padding) {
+                                top = Math.max(padding, rect.top - MENU_HEIGHT - 8)
+                              }
+                              let left = rect.right - MENU_WIDTH
+                              if (left + MENU_WIDTH > window.innerWidth - padding) {
+                                left = window.innerWidth - MENU_WIDTH - padding
+                              }
+                              if (left < padding) left = padding
+
+                              setMenuPosition({ top, left })
+                              setMenuOpen(conversation.id)
+                              setMenuConversation(conversation)
                               void ensureBlockStatus(conversation.participantId)
+                            } else {
+                              closeMenu()
                             }
                           }}
                           className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-orange-100 rounded-full transition-all cursor-pointer"
@@ -315,74 +343,6 @@ export const ChatPopup = () => {
                         >
                           <MoreVertical className="w-4 h-4 text-gray-600" />
                         </button>
-                        
-                        {menuOpen === conversation.id && (
-                          <div
-                            ref={menuRef}
-                            className="absolute right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[200px] p-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={(e) => handleViewProfile(e, conversation)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 transition-colors rounded-md cursor-pointer"
-                            >
-                              <UserIcon className="w-4 h-4 text-orange-500" />
-                              <span>View Profile</span>
-                            </button>
-
-                            <button
-                              onClick={(e) => handleToggleMute(e, conversation)}
-                              disabled={pendingActionUserId === conversation.participantId}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors rounded-md ${pendingActionUserId === conversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-50 cursor-pointer'}`}
-                            >
-                              {(muteStatusMap[conversation.participantId] ?? conversation.isMuted) ? (
-                                <>
-                                  <Bell className="w-4 h-4 text-orange-500" />
-                                  <span>Unmute Notifications</span>
-                                </>
-                              ) : (
-                                <>
-                                  <BellOff className="w-4 h-4 text-orange-500" />
-                                  <span>Mute Notifications</span>
-                                </>
-                              )}
-                            </button>
-
-                            <button
-                              onClick={(e) => handleBlockUser(e, conversation)}
-                              disabled={pendingActionUserId === conversation.participantId || blockStatusLoadingId === conversation.participantId}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${pendingActionUserId === conversation.participantId || blockStatusLoadingId === conversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-50 cursor-pointer'} ${(blockStatuses[conversation.participantId]?.isBlocked ?? false) ? 'text-green-600' : 'text-orange-600'}`}
-                            >
-                              {blockStatusLoadingId === conversation.participantId ? (
-                                <>
-                                  <ShieldOff className="w-4 h-4 text-gray-400" />
-                                  <span>Checking status...</span>
-                                </>
-                              ) : (blockStatuses[conversation.participantId]?.isBlocked ?? false) ? (
-                                <>
-                                  <ShieldOff className="w-4 h-4 text-green-600" />
-                                  <span>Unblock User</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Ban className="w-4 h-4 text-orange-600" />
-                                  <span>Block User</span>
-                                </>
-                              )}
-                            </button>
-
-                            <div className="my-1 mx-2 border-t border-gray-100" />
-
-                            <button
-                              onClick={(e) => handleDeleteConversation(e, conversation)}
-                              disabled={pendingActionUserId === conversation.participantId}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors rounded-md ${pendingActionUserId === conversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-50 cursor-pointer'}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              <span>Delete all messages</span>
-                            </button>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -393,5 +353,111 @@ export const ChatPopup = () => {
         )}
       </div>
     </div>
+    {menuOpen && menuConversation && menuPosition
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-[9999] min-w-[200px] p-1"
+              style={{ top: menuPosition.top, left: menuPosition.left }}
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                onClick={e => handleViewProfile(e, menuConversation)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 transition-colors rounded-md cursor-pointer"
+              >
+                <UserIcon className="w-4 h-4 text-orange-500" />
+                <span>View Profile</span>
+              </button>
+
+              <button
+                onClick={e => handleToggleMute(e, menuConversation)}
+                disabled={pendingActionUserId === menuConversation.participantId}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors rounded-md ${
+                  pendingActionUserId === menuConversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-50 cursor-pointer'
+                }`}
+              >
+                {(muteStatusMap[menuConversation.participantId] ?? menuConversation.isMuted) ? (
+                  <>
+                    <Bell className="w-4 h-4 text-orange-500" />
+                    <span>Unmute Notifications</span>
+                  </>
+                ) : (
+                  <>
+                    <BellOff className="w-4 h-4 text-orange-500" />
+                    <span>Mute Notifications</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={e => handleBlockUser(e, menuConversation)}
+                disabled={
+                  pendingActionUserId === menuConversation.participantId ||
+                  blockStatusLoadingId === menuConversation.participantId
+                }
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-md ${
+                  pendingActionUserId === menuConversation.participantId ||
+                  blockStatusLoadingId === menuConversation.participantId
+                    ? 'opacity-60 cursor-not-allowed'
+                    : 'hover:bg-orange-50 cursor-pointer'
+                } ${
+                  (blockStatuses[menuConversation.participantId]?.isBlocked ?? false)
+                    ? 'text-green-600'
+                    : 'text-orange-600'
+                }`}
+              >
+                {blockStatusLoadingId === menuConversation.participantId ? (
+                  <>
+                    <ShieldOff className="w-4 h-4 text-gray-400" />
+                    <span>Checking status...</span>
+                  </>
+                ) : (blockStatuses[menuConversation.participantId]?.isBlocked ?? false) ? (
+                  <>
+                    <ShieldOff className="w-4 h-4 text-green-600" />
+                    <span>Unblock User</span>
+                  </>
+                ) : (
+                  <>
+                    <Ban className="w-4 h-4 text-orange-600" />
+                    <span>Block User</span>
+                  </>
+                )}
+              </button>
+
+              <div className="my-1 mx-2 border-t border-gray-100" />
+
+              <button
+                onClick={e => handleDeleteConversation(e, menuConversation)}
+                disabled={pendingActionUserId === menuConversation.participantId}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors rounded-md ${
+                  pendingActionUserId === menuConversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-50 cursor-pointer'
+                }`}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete all messages</span>
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

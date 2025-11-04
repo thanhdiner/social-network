@@ -1,6 +1,6 @@
 ﻿import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import type { Conversation, Message, User } from '../types';
+import type { Conversation, Message, User, SendMessageData } from '../types';
 import { chatService } from '../services/chatService';
 import socketService from '../services/socketService';
 import { useAuth } from './AuthContext';
@@ -36,7 +36,7 @@ interface ChatContextType {
   togglePopup: () => void;
   closePopup: () => void;
   loadConversations: () => void;
-  sendMessage: (receiverId: string, content: string, imageUrl?: string) => Promise<void>;
+  sendMessage: (data: SendMessageData) => Promise<Message>;
   markAsRead: (userId: string) => void;
   setTyping: (receiverId: string, isTyping: boolean) => void;
 }
@@ -54,38 +54,61 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Throttle map to avoid repeated markAsRead bursts
   const lastMarkRef = useRef<Map<string, number>>(new Map());
 
+  // Always keep global unread count in sync with conversations
+  useEffect(() => {
+    const totalUnread = conversations.reduce((sum, conv) => {
+      if (conv.isMuted) return sum;
+      return sum + (conv.unreadCount || 0);
+    }, 0);
+    setUnreadCount(prev => (prev === totalUnread ? prev : totalUnread));
+  }, [conversations]);
+
   // Load conversations
   const loadConversations = useCallback(async () => {
     try {
       // Thử lấy từ cache trước
       const cachedConversations = getConversationsCache()
+      const normalizeUnread = (list: Conversation[]) =>
+        list.map(conv =>
+          conv.participantId === user?.id
+            ? { ...conv, unreadCount: 0 }
+            : conv
+        )
+
       if (cachedConversations) {
-        setConversations(cachedConversations)
+        const normalizedCache = normalizeUnread(cachedConversations)
+        setConversations(normalizedCache)
         
         // Đếm tin nhắn chưa đọc từ cache (loại trừ conversations bị mute)
-        const count = cachedConversations.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
+        const count = normalizedCache.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
         setUnreadCount(count)
       }
 
       // Vẫn fetch từ API để cập nhật dữ liệu mới nhất
       const data = await chatService.getConversations()
-      setConversations(data)
+      const normalizedData = normalizeUnread(data)
+      setConversations(normalizedData)
       
       // Lưu vào cache
-      saveConversationsCache(data)
+      saveConversationsCache(normalizedData)
       
       // Đếm tin nhắn chưa đọc (loại trừ conversations bị mute)
-      const count = data.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
+      const count = normalizedData.reduce((sum, conv) => !conv.isMuted ? sum + conv.unreadCount : sum, 0)
       setUnreadCount(count)
     } catch (error) {
       console.error('Failed to load conversations:', error)
     }
-  }, [])
+  }, [user?.id])
+
+  // Log unreadCount changes for debugging
+  useEffect(() => {
+    console.log('[ChatContext] unreadCount state =>', unreadCount);
+  }, [unreadCount]);
 
   // Má»Ÿ chat window
   const openChatWindow = useCallback((user: User) => {
     setChatWindows(prev => {
-      // Náº¿u Ä‘Ã£ cÃ³ window nÃ y rá»“i thÃ¬ chá»‰ má»Ÿ ra (un-minimize)
+  // If this window already exists just un-minimize it
       const existing = prev.find(w => w.userId === user.id);
       if (existing) {
         return prev.map(w => 
@@ -93,7 +116,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         );
       }
       
-      // Giá»›i háº¡n tá»‘i Ä‘a 3 chat windows
+  // Limit to maximum of 3 chat windows
       if (prev.length >= 3) {
         return [...prev.slice(1), { userId: user.id, user, isMinimized: false }];
       }
@@ -136,38 +159,80 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setIsPopupOpen(false);
   }, []);
 
-  // Gá»­i tin nháº¯n
-  const sendMessage = useCallback(async (receiverId: string, content: string, imageUrl?: string) => {
+  // Send message
+  const sendMessage = useCallback(async ({ receiverId, content, imageUrl, videoUrl, audioUrl, replyToId }: SendMessageData) => {
     try {
-      const message = await chatService.sendMessage({ receiverId, content, imageUrl });
+      console.log('[ChatContext] sendMessage called', { receiverId, content, imageUrl, videoUrl, audioUrl, replyToId });
+      const message = await chatService.sendMessage({ receiverId, content, imageUrl, videoUrl, audioUrl, replyToId });
 
-      // Cáº­p nháº­t conversation
+      let shouldReload = false;
+      let unreadReduction = 0;
+
       setConversations(prev => {
         const existingIndex = prev.findIndex(c => c.participantId === receiverId);
         const updated = [...prev];
 
         if (existingIndex >= 0) {
+          const conv = updated[existingIndex];
+
+          if (!conv.isMuted && conv.unreadCount > 0) {
+            unreadReduction = conv.unreadCount;
+          }
+
           updated[existingIndex] = {
-            ...updated[existingIndex],
+            ...conv,
             lastMessage: message,
+            unreadCount: 0,
             updatedAt: message.createdAt,
           };
-          // Di chuyá»ƒn lÃªn Ä'áº§u
-          const [conv] = updated.splice(existingIndex, 1);
-          updated.unshift(conv);
+
+          const [moved] = updated.splice(existingIndex, 1);
+          updated.unshift(moved);
+        } else {
+          const participant = (message.receiver as User | undefined);
+
+          if (!participant) {
+            shouldReload = true;
+            return prev;
+          }
+
+          const newConversation: Conversation = {
+            id: `${message.senderId}-${receiverId}`,
+            participantId: receiverId,
+            participant,
+            lastMessage: message,
+            unreadCount: 0,
+            isMuted: false,
+            updatedAt: message.createdAt,
+          };
+
+          updated.unshift(newConversation);
         }
 
-        // Lưu vào cache
         saveConversationsCache(updated);
         return updated;
       });
+
+      if (unreadReduction > 0) {
+        setUnreadCount(prev => {
+          const next = Math.max(0, prev - unreadReduction);
+          console.log('[ChatContext] sendMessage reducing unreadCount', prev, '->', next, { receiverId, unreadReduction });
+          return next;
+        });
+      }
+
+      if (shouldReload) {
+        void loadConversations();
+      }
+
+      return message;
     } catch (error) {
       console.error('Failed to send message:', error);
       throw error;
     }
-  }, []);
+  }, [loadConversations]);
 
-  // ÄÃ¡nh dáº¥u Ä‘Ã£ Ä‘á»c
+  // Mark as read
   const markAsRead = useCallback(async (userId: string) => {
     try {
       // Throttle: skip if called within 1500ms for same userId
@@ -178,6 +243,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
       lastMarkRef.current.set(userId, now);
 
+  // Get current unread count BEFORE updating conversations
+  const conv = conversations.find(c => c.participantId === userId);
+  const previousUnreadCount = conv?.unreadCount || 0;
+  const isMuted = conv?.isMuted || false;
+  console.log('[ChatContext] markAsRead called for', userId, { previousUnreadCount, isMuted });
+
       await chatService.markAsRead(userId);
 
       setConversations(prev =>
@@ -186,11 +257,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         )
       );
 
-      // Cáº­p nháº­t tá»•ng sá»‘ unread
-      setUnreadCount(prev => {
-        const conv = conversations.find(c => c.participantId === userId);
-        return prev - (conv?.unreadCount || 0);
-      });
+      // Update total unread count - only decrease if conversation is not muted
+      if (!isMuted && previousUnreadCount > 0) {
+        setUnreadCount(prev => Math.max(0, prev - previousUnreadCount));
+      }
     } catch (error) {
       console.error('Failed to mark as read:', error);
     }
@@ -245,37 +315,113 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       console.log('📨 [Socket]', eventName, args);
     });
 
+    console.log('[ChatContext] socket effect mounted for user:', user?.id);
+
     const handleNewMessage = (message: Message) => {
+      console.log('[ChatContext] handleNewMessage received:', message);
+      let unreadCountDelta = 0; // Track the change in total unread count
+      let shouldReloadConversations = false;
+
       // Cập nhật conversation
       setConversations(prev => {
         const senderId = message.senderId === user.id ? message.receiverId : message.senderId;
         const existingIndex = prev.findIndex(c => c.participantId === senderId);
         const updated = [...prev];
-
+        console.log('[ChatContext] updating conversations (senderId, existingIndex):', senderId, existingIndex);
         if (existingIndex >= 0) {
           const conv = updated[existingIndex];
-          const shouldIncreaseUnread = message.senderId !== user.id && !conv.isMuted;
+          const isIncomingMessage = message.senderId !== user.id;
+          
+          // Only increase unreadCount if it's an incoming message
+          let newUnreadCount = conv.unreadCount;
+          if (isIncomingMessage) {
+            newUnreadCount = conv.unreadCount + 1;
+            // Only count towards global unreadCount if not muted
+            if (!conv.isMuted) {
+              unreadCountDelta = 1;
+            }
+          }
           
           updated[existingIndex] = {
             ...conv,
             lastMessage: message,
-            unreadCount: shouldIncreaseUnread ? conv.unreadCount + 1 : conv.unreadCount,
+            unreadCount: newUnreadCount,
             updatedAt: message.createdAt,
           };
+          console.log('[ChatContext] conversation updated:', {
+            participantId: conv.participantId,
+            prevUnread: conv.unreadCount,
+            newUnread: newUnreadCount,
+            isMuted: conv.isMuted,
+          });
           // Di chuyển lên đầu
           const [movedConv] = updated.splice(existingIndex, 1);
           updated.unshift(movedConv);
-          
-          // Tăng unread count trong header nếu cần
-          if (shouldIncreaseUnread) {
-            setUnreadCount(prevCount => prevCount + 1);
+        }
+
+        if (existingIndex === -1) {
+          if (!senderId) {
+            shouldReloadConversations = true;
+            return prev;
           }
+
+          const isIncoming = message.senderId !== user.id;
+
+          // If user is sending message (outgoing), don't create conversation with unread
+          // Just reload to get fresh data from backend
+          if (!isIncoming) {
+            shouldReloadConversations = true;
+            return prev;
+          }
+
+          const participant = message.sender as User | undefined;
+
+          if (!participant) {
+            shouldReloadConversations = true;
+            return prev;
+          }
+
+          const newConversation: Conversation = {
+            id: `${user.id}-${senderId}`,
+            participantId: senderId,
+            participant,
+            lastMessage: message,
+            unreadCount: 1,
+            isMuted: false,
+            updatedAt: message.createdAt,
+          };
+
+          updated.unshift(newConversation);
+          unreadCountDelta = 1;
         }
 
         // Lưu vào cache
         saveConversationsCache(updated);
         return updated;
       });
+
+      // Apply unread count change to global state
+      if (unreadCountDelta !== 0) {
+        setUnreadCount(prevCount => Math.max(0, prevCount + unreadCountDelta));
+      }
+
+      if (shouldReloadConversations) {
+        void loadConversations();
+      }
+
+      // Show browser notification for incoming messages
+      if (message.senderId !== user.id && 'Notification' in window && Notification.permission === 'granted') {
+        const sender = message.sender as User | undefined;
+        const senderName = sender?.name || 'Someone';
+        const messagePreview = message.content?.substring(0, 50) || '📷 Photo';
+        
+        new Notification(`New message from ${senderName}`, {
+          body: messagePreview,
+          icon: sender?.avatar || undefined,
+          tag: `message-${message.senderId}`,
+          requireInteraction: false,
+        });
+      }
     };
 
     const handleOnlineUsersUpdated = (data: { userIds: string[] }) => {
@@ -322,6 +468,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       window.dispatchEvent(new CustomEvent('message_unsent', { detail: data }));
     };
 
+    const handleMessagePinned = (data: { message: Message }) => {
+      console.log('📌 [message_pinned]', data);
+      window.dispatchEvent(new CustomEvent('message_pinned', { detail: data }));
+    };
+
+    const handleMessageUnpinned = (data: { message: Message }) => {
+      console.log('📌 [message_unpinned]', data);
+      window.dispatchEvent(new CustomEvent('message_unpinned', { detail: data }));
+    };
+
     socket.on('new_message', handleNewMessage);
     socket.on('online_users_updated', handleOnlineUsersUpdated);
     socket.on('typing', handleTyping);
@@ -330,6 +486,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     socket.on('reaction_added', handleReactionAdded);
     socket.on('reaction_removed', handleReactionRemoved);
     socket.on('message_unsent', handleMessageUnsent);
+    socket.on('message_pinned', handleMessagePinned);
+    socket.on('message_unpinned', handleMessageUnpinned);
 
     return () => {
       socket.off('new_message', handleNewMessage);
@@ -340,8 +498,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       socket.off('reaction_added', handleReactionAdded);
       socket.off('reaction_removed', handleReactionRemoved);
       socket.off('message_unsent', handleMessageUnsent);
+      socket.off('message_pinned', handleMessagePinned);
+      socket.off('message_unpinned', handleMessageUnpinned);
     };
-  }, [user]);
+  }, [user, loadConversations]);
 
   // Load conversations khi mount
   useEffect(() => {
@@ -377,6 +537,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useChat = () => {
   const context = useContext(ChatContext);
   if (!context) {

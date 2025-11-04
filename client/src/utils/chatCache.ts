@@ -23,11 +23,12 @@
  * - Tiết kiệm băng thông và giảm tải cho server
  */
 
-import type { Conversation, Message } from '../types'
+import type { Conversation, Message, ConversationCustomization } from '../types'
 
 const CACHE_VERSION = '1.0'
 const CONVERSATIONS_CACHE_KEY = 'chat:conversations:v' + CACHE_VERSION
 const MESSAGES_CACHE_PREFIX = 'chat:messages:'
+const CUSTOMIZATION_CACHE_PREFIX = 'chat:customization:'
 const CACHE_TTL = 5 * 60 * 1000 // 5 phút
 
 interface CachedData<T> {
@@ -134,6 +135,64 @@ export const getMessagesCache = (conversationId: string): Message[] | null => {
   }
 }
 
+export const saveCustomizationCache = (
+  userId: string,
+  customization: ConversationCustomization
+): void => {
+  try {
+    const key = CUSTOMIZATION_CACHE_PREFIX + userId + ':v' + CACHE_VERSION
+    const cached: CachedData<ConversationCustomization> = {
+      data: customization,
+      timestamp: Date.now(),
+      version: CACHE_VERSION,
+    }
+    localStorage.setItem(key, JSON.stringify(cached))
+  } catch (error) {
+    console.error('Failed to save customization cache:', error)
+  }
+}
+
+export const getCustomizationCache = (userId: string): ConversationCustomization | null => {
+  try {
+    const key = CUSTOMIZATION_CACHE_PREFIX + userId + ':v' + CACHE_VERSION
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+
+    const cached = JSON.parse(raw) as CachedData<ConversationCustomization>
+    if (cached.version !== CACHE_VERSION || !isCacheValid(cached.timestamp)) {
+      localStorage.removeItem(key)
+      return null
+    }
+
+    return cached.data
+  } catch (error) {
+    console.error('Failed to get customization cache:', error)
+    return null
+  }
+}
+
+export const clearCustomizationCache = (userId: string): void => {
+  try {
+    const key = CUSTOMIZATION_CACHE_PREFIX + userId + ':v' + CACHE_VERSION
+    localStorage.removeItem(key)
+  } catch (error) {
+    console.error('Failed to clear customization cache:', error)
+  }
+}
+
+export const clearAllCustomizationCache = (): void => {
+  try {
+    const keys = Object.keys(localStorage)
+    keys.forEach(key => {
+      if (key.startsWith(CUSTOMIZATION_CACHE_PREFIX)) {
+        localStorage.removeItem(key)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to clear all customization cache:', error)
+  }
+}
+
 /**
  * Xóa messages cache của một conversation
  */
@@ -168,4 +227,5 @@ export const clearAllMessagesCache = (): void => {
 export const clearAllChatCache = (): void => {
   clearConversationsCache()
   clearAllMessagesCache()
+  clearAllCustomizationCache()
 }
