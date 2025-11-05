@@ -387,6 +387,10 @@ export class ChatService {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
+            fileUrl: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
             senderId: true,
             sender: {
               select: {
@@ -665,11 +669,27 @@ export class ChatService {
     senderId: string,
     receiverId: string,
     content: string,
-    imageUrl?: string,
-    videoUrl?: string,
-    audioUrl?: string,
-    replyToId?: string,
+    options: {
+      imageUrl?: string;
+      videoUrl?: string;
+      audioUrl?: string;
+      fileUrl?: string;
+      fileName?: string;
+      fileSize?: number;
+      fileType?: string;
+      replyToId?: string;
+    } = {},
   ) {
+    const {
+      imageUrl,
+      videoUrl,
+      audioUrl,
+      fileUrl,
+      fileName,
+      fileSize,
+      fileType,
+      replyToId,
+    } = options;
     this.logger.log(
       `sendMessage: from=${senderId} to=${receiverId} contentLen=${content?.length ?? 0}`,
     );
@@ -682,6 +702,10 @@ export class ChatService {
         imageUrl,
         videoUrl,
         audioUrl,
+        fileUrl,
+        fileName,
+        fileSize,
+        fileType,
         replyToId,
         // Don't set deliveredAt here initially
       },
@@ -702,6 +726,10 @@ export class ChatService {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
+            fileUrl: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
             senderId: true,
             sender: {
               select: {
@@ -1003,6 +1031,10 @@ export class ChatService {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
+            fileUrl: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
             senderId: true,
             sender: {
               select: {
@@ -1086,6 +1118,10 @@ export class ChatService {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
+            fileUrl: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
             senderId: true,
             sender: {
               select: {

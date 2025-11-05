@@ -160,10 +160,33 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // Send message
-  const sendMessage = useCallback(async ({ receiverId, content, imageUrl, videoUrl, audioUrl, replyToId }: SendMessageData) => {
+  const sendMessage = useCallback(async (data: SendMessageData) => {
+    const { receiverId, content, imageUrl, videoUrl, audioUrl, fileUrl, fileName, fileSize, fileType, replyToId } = data;
     try {
-      console.log('[ChatContext] sendMessage called', { receiverId, content, imageUrl, videoUrl, audioUrl, replyToId });
-      const message = await chatService.sendMessage({ receiverId, content, imageUrl, videoUrl, audioUrl, replyToId });
+      console.log('[ChatContext] sendMessage called', {
+        receiverId,
+        content,
+        imageUrl,
+        videoUrl,
+        audioUrl,
+        fileUrl,
+        fileName,
+        fileSize,
+        fileType,
+        replyToId
+      });
+      const message = await chatService.sendMessage({
+        receiverId,
+        content,
+        imageUrl,
+        videoUrl,
+        audioUrl,
+        fileUrl,
+        fileName,
+        fileSize,
+        fileType,
+        replyToId
+      });
 
       let shouldReload = false;
       let unreadReduction = 0;

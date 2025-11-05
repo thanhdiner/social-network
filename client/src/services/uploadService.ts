@@ -68,6 +68,29 @@ class UploadService {
   }
 
   /**
+   * Upload generic file to Cloudinary via backend
+   */
+  async uploadFile(
+    file: File
+  ): Promise<{ url: string; originalName: string; size: number; mimeType: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post<{
+      url: string;
+      originalName: string;
+      size: number;
+      mimeType: string;
+    }>('/upload/file', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    return response.data;
+  }
+
+  /**
    * Validate image file
    */
   validateImage(file: File): { valid: boolean; error?: string } {
@@ -111,6 +134,22 @@ class UploadService {
       return {
         valid: false,
         error: 'Video size must not exceed 50MB'
+      };
+    }
+
+    return { valid: true };
+  }
+
+  /**
+   * Validate generic file upload
+   */
+  validateFile(file: File): { valid: boolean; error?: string } {
+    // Limit size to 10MB (Cloudinary free tier)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: 'Kích thước file vượt quá 10MB. Vui lòng chọn file nhỏ hơn.',
       };
     }
 

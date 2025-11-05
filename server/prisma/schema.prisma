@@ -149,6 +149,10 @@ model Message {
   imageUrl    String?
   videoUrl    String?
   audioUrl    String?
+  fileUrl     String?
+  fileName    String?
+  fileSize    Int?
+  fileType    String?
   senderId    String
   receiverId  String
   replyToId   String?   // ID of message being replied to

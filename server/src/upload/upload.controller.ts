@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   Controller,
   Post,
@@ -50,6 +47,47 @@ export class UploadController {
 
     const url = await this.uploadService.uploadToCloudinary(file);
     return { url };
+  }
+
+  @Post('file')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+    // Fix encoding for filename (convert from latin1 to utf8)
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
+    console.log('Upload request received:', {
+      originalname: originalName,
+      mimetype: file.mimetype,
+      size: file.size,
+      user: 'current-user-id'
+    });
+
+    try {
+      // Validate file size (max 10MB - Cloudinary free tier limit)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new Error(`File vượt quá giới hạn ${maxSize / (1024 * 1024)}MB. Vui lòng chọn file nhỏ hơn.`);
+      }
+
+      console.log('Starting Cloudinary upload for:', originalName);
+
+      const result = await this.uploadService.uploadToCloudinary(file);
+      
+      console.log('Upload successful:', {
+        url: result,
+        originalName: originalName
+      });
+
+      return {
+        url: result,
+        originalName: originalName,
+        size: file.size,
+        mimeType: file.mimetype
+      };
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw new Error(`Failed to upload file: ${error.message}`);
+    }
   }
 
   @Delete('image')

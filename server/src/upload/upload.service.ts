@@ -23,11 +23,23 @@ export class UploadService {
         {
           folder: 'social-network',
           resource_type: 'auto',
+          // Add timeout and chunk size for files up to 10MB
+          timeout: 120000, // 2 minutes
+          chunk_size: 6000000, // 6MB chunks
         },
         (error, result) => {
-          if (error) return reject(new Error(String(error)));
-          if (!result) return reject(new Error('Upload failed'));
-          resolve(result.secure_url as string);
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            return reject(
+              new Error(
+                `Upload failed: ${error.message || JSON.stringify(error)}`,
+              ),
+            );
+          }
+          if (!result) {
+            return reject(new Error('Upload failed: No result returned'));
+          }
+          resolve(result.secure_url);
         },
       );
 

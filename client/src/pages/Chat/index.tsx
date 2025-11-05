@@ -346,8 +346,10 @@ export default function Chat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
@@ -1875,10 +1877,10 @@ export default function Chat() {
 
   const handleSendMessage = async () => {
     if (!selectedUser) return;
-    if (!newMessage.trim() && selectedImages.length === 0 && !selectedVideo) return;
+    if (!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && selectedFiles.length === 0) return;
 
     const hadConversation = conversations.some(conv => conv.participantId === selectedUser.id);
-    const content = newMessage.trim() || (selectedVideo ? '🎥 Video' : '📷 Photo');
+    const content = newMessage.trim() || (selectedFiles.length > 0 ? '📎 File' : selectedVideo ? '🎥 Video' : '📷 Photo');
     const replyToId = replyingTo?.id;
     setNewMessage('');
     setReplyingTo(null);
@@ -1892,9 +1894,34 @@ export default function Chat() {
     try {
       let imageUrl: string | undefined;
       let videoUrl: string | undefined;
+      let fileUrl: string | undefined;
+      let fileName: string | undefined;
+      let fileSize: number | undefined;
+      let fileType: string | undefined;
 
-      if (selectedVideo) {
-        setUploading(true);
+      setUploading(true);
+
+      if (selectedFiles.length > 0) {
+        const uploadedFiles: string[] = [];
+        const fileNames: string[] = [];
+        let totalSize = 0;
+        
+        for (const file of selectedFiles) {
+          const uploadResult = await uploadService.uploadFile(file);
+          uploadedFiles.push(uploadResult.url);
+          fileNames.push(uploadResult.originalName);
+          totalSize += uploadResult.size;
+        }
+        
+        fileUrl = uploadedFiles.join(',');
+        fileName = fileNames.join(',');
+        fileSize = totalSize;
+        fileType = selectedFiles[0].type;
+        setSelectedFiles([]);
+        if (docFileInputRef.current) {
+          docFileInputRef.current.value = '';
+        }
+      } else if (selectedVideo) {
         videoUrl = await uploadService.uploadVideo(selectedVideo);
         if (videoPreview) {
           URL.revokeObjectURL(videoPreview);
@@ -1904,9 +1931,7 @@ export default function Chat() {
         if (videoInputRef.current) {
           videoInputRef.current.value = '';
         }
-        setUploading(false);
       } else if (selectedImages.length > 0) {
-        setUploading(true);
         const urls: string[] = [];
         for (const file of selectedImages) {
           const url = await uploadService.uploadImage(file);
@@ -1918,7 +1943,6 @@ export default function Chat() {
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-        setUploading(false);
       }
 
       const sentMessage = await sendMessage({
@@ -1926,8 +1950,14 @@ export default function Chat() {
         content,
         imageUrl,
         videoUrl,
+        fileUrl,
+        fileName,
+        fileSize,
+        fileType,
         replyToId
       });
+
+      setUploading(false);
 
       if (sentMessage) {
         setMessages(prev => {
@@ -1954,6 +1984,16 @@ export default function Chat() {
       console.error('Failed to send message:', error);
       setNewMessage(content);
       setUploading(false);
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+      if (errorMessage.includes('File size exceeds') || errorMessage.includes('exceed')) {
+        alert('❌ File too large! Maximum file size is 10MB per file.');
+      } else if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+        alert('❌ Upload limit reached. Please try again later or use smaller files.');
+      } else {
+        alert(`❌ Failed to send message: ${errorMessage}`);
+      }
     }
   };
 
@@ -2136,6 +2176,38 @@ export default function Chat() {
     if (videoInputRef.current) {
       videoInputRef.current.value = '';
     }
+  };
+
+  const handleDocumentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validFiles: File[] = [];
+    for (const file of files) {
+      const validation = uploadService.validateFile(file);
+      if (!validation.valid) {
+        alert(`${file.name}: ${validation.error || 'Invalid file'}`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      if (docFileInputRef.current) docFileInputRef.current.value = '';
+      return;
+    }
+
+    // Clear other attachments if files are selected
+    setSelectedImages([]);
+    setImagePreviews([]);
+    setSelectedVideo(null);
+    setVideoPreview('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (videoInputRef.current) videoInputRef.current.value = '';
+
+    // Limit to max 10 files per message
+    const combined = [...selectedFiles, ...validFiles].slice(0, 10);
+    setSelectedFiles(combined);
   };
 
   const formatTime = (dateString: string) => {
@@ -2884,6 +2956,8 @@ export default function Chat() {
                                         ? '🎥 Video'
                                         : message.replyTo.imageUrl
                                         ? '📷 Photo'
+                                        : message.replyTo.fileUrl
+                                        ? `📎 ${message.replyTo.fileName || 'File'}`
                                         : message.replyTo.content}
                                     </p>
                                   </div>
@@ -2927,11 +3001,63 @@ export default function Chat() {
 
                                 {message.audioUrl && <AudioPlayer audioUrl={message.audioUrl} isOwn={isOwn} />}
 
+                                {/* File Attachments */}
+                                {message.fileUrl && (() => {
+                                  const fileUrls = message.fileUrl.split(',').map(s => s.trim()).filter(Boolean);
+                                  const fileNames = (message.fileName || '').split(',').map(s => s.trim()).filter(Boolean);
+                                  
+                                  return (
+                                    <div className={`${fileUrls.length > 1 ? 'space-y-1' : ''}`}>
+                                      {fileUrls.map((url, idx) => (
+                                        <a
+                                          key={idx}
+                                          href={url}
+                                          download={fileNames[idx] || 'file'}
+                                          className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                                            isOwn ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
+                                          }`}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            // Download file with proper name
+                                            fetch(url)
+                                              .then(response => response.blob())
+                                              .then(blob => {
+                                                const downloadUrl = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = downloadUrl;
+                                                a.download = fileNames[idx] || 'file';
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                window.URL.revokeObjectURL(downloadUrl);
+                                                document.body.removeChild(a);
+                                              })
+                                              .catch(err => console.error('Download failed:', err));
+                                          }}
+                                        >
+                                          <Paperclip size={16} className={isOwn ? 'text-white' : 'text-gray-600'} />
+                                          <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-medium truncate ${isOwn ? 'text-white' : 'text-gray-900'}`}>
+                                              {fileNames[idx] || 'file'}
+                                            </p>
+                                            {message.fileSize && fileUrls.length === 1 && (
+                                              <p className={`text-xs ${isOwn ? 'text-white/70' : 'text-gray-500'}`}>
+                                                {message.fileSize >= 1024 * 1024
+                                                  ? `${(message.fileSize / (1024 * 1024)).toFixed(2)} MB`
+                                                  : `${(message.fileSize / 1024).toFixed(2)} KB`}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+
                                 {message.content &&
-                                  !['📷 Photo', '🎥 Video', '🎤 Voice message'].includes(message.content) && (
+                                  !['📷 Photo', '🎥 Video', '🎤 Voice message', '📎 File'].includes(message.content) && (
                                     <p
                                       className={`text-sm wrap-break-word ${
-                                        message.imageUrl || message.videoUrl || message.audioUrl ? 'px-3 py-2' : ''
+                                        message.imageUrl || message.videoUrl || message.audioUrl || message.fileUrl ? 'px-3 py-2' : ''
                                       }`}
                                     >
                                       {message.content}
@@ -3166,6 +3292,43 @@ export default function Chat() {
                 </div>
               )}
 
+              {/* File Previews */}
+              {selectedFiles.length > 0 && (
+                <div className="mb-2">
+                  <div className={`grid gap-2 ${selectedFiles.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {selectedFiles.map((file, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border-2 border-orange-500">
+                          <Paperclip size={20} className="text-orange-500 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {file.size >= 1024 * 1024
+                                ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                                : `${(file.size / 1024).toFixed(2)} KB`}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newFiles = [...selectedFiles];
+                            newFiles.splice(idx, 1);
+                            setSelectedFiles(newFiles);
+                            if (newFiles.length === 0 && docFileInputRef.current) {
+                              docFileInputRef.current.value = '';
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors cursor-pointer"
+                          type="button"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {isBlocked || hasBlocked ? (
                 <div className="p-4 bg-gray-100 rounded-lg text-center">
                   {isBlocked ? (
@@ -3200,6 +3363,8 @@ export default function Chat() {
                             ? '🎥 Video'
                             : replyingTo.imageUrl
                             ? '📷 Photo'
+                            : replyingTo.fileUrl
+                            ? `📎 ${replyingTo.fileName || 'File'}`
                             : replyingTo.content}
                         </p>
                       </div>
@@ -3223,6 +3388,14 @@ export default function Chat() {
                       type="file"
                       accept="video/*"
                       onChange={handleVideoSelect}
+                      className="hidden"
+                    />
+                    <input
+                      ref={docFileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                      multiple
+                      onChange={handleDocumentSelect}
                       className="hidden"
                     />
 
@@ -3257,6 +3430,16 @@ export default function Chat() {
                           >
                             <Video size={16} data-chat-accent-text="true" />
                             <span>Video</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              docFileInputRef.current?.click();
+                              setShowAttachmentMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                          >
+                            <Paperclip size={16} className="text-blue-500" />
+                            <span>File</span>
                           </button>
                         </div>
                       )}
@@ -3442,7 +3625,7 @@ export default function Chat() {
                       </button>
                     </div>
 
-                    {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo) ? (
+                    {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && selectedFiles.length === 0) ? (
                       <div className="relative">
                         <button
                           onMouseDown={e => {
@@ -3521,14 +3704,14 @@ export default function Chat() {
                     ) : (
                       <button
                         onClick={handleSendMessage}
-                        disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo) || uploading}
+                        disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && selectedFiles.length === 0) || uploading}
                         className={clsx(
                           'p-3 rounded-full transition-colors cursor-pointer',
-                          (newMessage.trim() || selectedImages.length > 0 || selectedVideo) && !uploading
+                          (newMessage.trim() || selectedImages.length > 0 || selectedVideo || selectedFiles.length > 0) && !uploading
                             ? 'text-white'
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         )}
-                        data-chat-accent-bg={(newMessage.trim() || selectedImages.length > 0 || selectedVideo) && !uploading ? 'true' : undefined}
+                        data-chat-accent-bg={(newMessage.trim() || selectedImages.length > 0 || selectedVideo || selectedFiles.length > 0) && !uploading ? 'true' : undefined}
                         title="Send"
                       >
                         {uploading && !recording ? (

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useLayoutEffect, useRef, useCallback, useTransition, memo, useMemo } from 'react'
+﻿import { useState, useEffect, useRef, useCallback, useTransition, memo, useMemo } from 'react'
 import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -39,17 +39,9 @@ import videoCallService from '../../services/videoCallService'
 import { EmojiPicker } from './EmojiPicker'
 import { ImageViewer } from './ImageViewer'
 import uploadService from '../../services/uploadService'
-import type { Message, User, ConversationCustomization } from '../../types'
+import type { Message, User } from '../../types'
 import { Avatar } from './Avatar'
-import {
-  saveMessagesCache,
-  clearMessagesCache,
-  clearConversationsCache,
-  getMessagesCache,
-  getCustomizationCache,
-  saveCustomizationCache,
-  clearCustomizationCache
-} from '../../utils/chatCache'
+import { saveMessagesCache, clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
 import { ChatMessageSkeleton } from './ChatMessageSkeleton'
 import userService from '../../services/userService'
 import { MessageStatus } from './MessageStatus'
@@ -316,29 +308,6 @@ const DEFAULT_EMOJI_OPTIONS = ['👍', '❤️', '😂', '😍', '🔥', '👏',
 
 const getThemeById = (id: string): ChatThemeConfig => CHAT_THEMES.find(theme => theme.id === id) ?? CHAT_THEMES[0]
 
-const normalizeCustomization = (
-  raw?: ConversationCustomization | ChatCustomizationState | null
-): ChatCustomizationState => ({
-  themeId: raw?.themeId || DEFAULT_CUSTOMIZATION.themeId,
-  emoji: raw?.emoji || DEFAULT_CUSTOMIZATION.emoji,
-  nicknameMe: raw?.nicknameMe?.trim?.() || '',
-  nicknameThem: raw?.nicknameThem?.trim?.() || '',
-  updatedAt: raw?.updatedAt,
-  updatedById: raw?.updatedById ?? null,
-  changeSummary:
-    raw && typeof raw === 'object' && 'changeSummary' in raw ? (raw as any).changeSummary ?? undefined : undefined
-})
-
-const mapStateToCustomization = (state: ChatCustomizationState): ConversationCustomization => ({
-  themeId: state.themeId,
-  emoji: state.emoji,
-  nicknameMe: state.nicknameMe,
-  nicknameThem: state.nicknameThem,
-  updatedAt: state.updatedAt,
-  updatedById: state.updatedById ?? null,
-  changeSummary: state.changeSummary
-})
-
 interface ChatWindowProps {
   user: User
   isMinimized: boolean
@@ -367,6 +336,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null)
   const [videoPreview, setVideoPreview] = useState<string>('')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -374,14 +344,15 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
+  const docFileInputRef = useRef<HTMLInputElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<number | null>(null)
   const isTypingRef = useRef(false)
   const [viewerOpen, setViewerOpen] = useState(false)
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
-  const MAX_CACHE = 100
-  const CHUNK = 20
+  const MAX_CACHE = 50
+  const CHUNK = 15
   const [visibleCount, setVisibleCount] = useState(CHUNK)
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const atBottomRef = useRef(true)
@@ -396,7 +367,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const messageMenuRef = useRef<HTMLDivElement>(null)
   const [showEmojiReactions, setShowEmojiReactions] = useState<string | null>(null) // messageId
   const emojiReactionsRef = useRef<HTMLDivElement>(null)
-  const systemEventKeysRef = useRef<Set<string>>(new Set())
   // pending pin/unpin actions map to ignore immediate echoes and for optimistic UI
   const pendingPinActionsRef = useRef<Map<string, number>>(new Map())
   const markPendingPinAction = (messageId: string) => {
@@ -411,61 +381,12 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }
 
   // Customization state
-  const [customization, setCustomization] = useState<ChatCustomizationState>(() =>
-    normalizeCustomization(getCustomizationCache(user.id))
-  )
+  const [customization, setCustomization] = useState<ChatCustomizationState>(DEFAULT_CUSTOMIZATION)
   const [themeDialogOpen, setThemeDialogOpen] = useState(false)
   const [emojiDialogOpen, setEmojiDialogOpen] = useState(false)
   const [nicknameDialogOpen, setNicknameDialogOpen] = useState(false)
   const [nicknameDraft, setNicknameDraft] = useState({ me: '', them: '' })
   const [customEmojiInput, setCustomEmojiInput] = useState('')
-
-  const appendCustomizationLog = useCallback(
-    (summary?: string | null, timestamp?: string) => {
-      if (!summary) return
-
-      const isoCreatedAt = timestamp || new Date().toISOString()
-      const key = `${user.id}:${isoCreatedAt}:${summary}`
-      if (systemEventKeysRef.current.has(key)) {
-        return
-      }
-      systemEventKeysRef.current.add(key)
-
-      const event: Message = {
-        id: `system-${user.id}-${isoCreatedAt}`,
-        senderId: user.id,
-        receiverId: user.id,
-        content: summary,
-        createdAt: isoCreatedAt,
-        read: true,
-        reactions: [],
-        isSystem: true
-      }
-
-      let added = false
-      setMessages(prev => {
-        if (prev.some(msg => msg.id === event.id)) {
-          return prev
-        }
-        added = true
-        const next = [...prev, event].sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        )
-        const capped = next.slice(-MAX_CACHE)
-        try {
-          saveMessagesCache(user.id, capped)
-        } catch (err) {
-          console.warn('saveMessagesCache failed:', err)
-        }
-        return capped
-      })
-
-      if (added) {
-        setVisibleCount(prev => Math.min(prev + 1, MAX_CACHE))
-      }
-    },
-    [user.id, MAX_CACHE]
-  )
 
   const activeTheme = useMemo(() => getThemeById(customization.themeId), [customization.themeId])
   const themeStyleVars = useMemo<CSSProperties>(() => ({
@@ -512,27 +433,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     [currentUser?.id, myDisplayName, user.id, displayName]
   )
 
-  // Ensure self-conversation never inherits other customization state
-  useEffect(() => {
-    if (!currentUser?.id || user.id !== currentUser.id) return
-    const cached = normalizeCustomization(getCustomizationCache(user.id))
-    const matches =
-      customization.themeId === cached.themeId &&
-      customization.emoji === cached.emoji &&
-      customization.nicknameMe === cached.nicknameMe &&
-      customization.nicknameThem === cached.nicknameThem
-    if (!matches) {
-      setCustomization(cached)
-    }
-  }, [
-    currentUser?.id,
-    user.id,
-    customization.themeId,
-    customization.emoji,
-    customization.nicknameMe,
-    customization.nicknameThem
-  ])
-
   const quickReactions = useMemo(() => {
     const defaults = ['❤️', '😂', '😮', '😢', '😡', '👍']
     if (!activeEmoji) return defaults
@@ -550,12 +450,11 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }, [user.id, setTyping])
 
   // Reset initialLoadDone when switching to a different user
-  useLayoutEffect(() => {
+  useEffect(() => {
     setInitialLoadDone(false)
     setMessages([])
     setVisibleCount(CHUNK)
-    setCustomization(normalizeCustomization(getCustomizationCache(user.id)))
-    systemEventKeysRef.current.clear()
+    setCustomization(DEFAULT_CUSTOMIZATION)
   }, [user.id])
 
   // Fetch customization
@@ -564,16 +463,20 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       if (!user.id || !currentUser) return
       try {
         const response = await chatService.getCustomization(user.id)
-        const normalized = normalizeCustomization(response)
-        setCustomization(normalized)
-        saveCustomizationCache(user.id, mapStateToCustomization(normalized))
-        appendCustomizationLog(response.changeSummary, response.updatedAt)
+        setCustomization({
+          themeId: response.themeId || DEFAULT_CUSTOMIZATION.themeId,
+          emoji: response.emoji || DEFAULT_CUSTOMIZATION.emoji,
+          nicknameMe: response.nicknameMe?.trim?.() || '',
+          nicknameThem: response.nicknameThem?.trim?.() || '',
+          updatedAt: response.updatedAt,
+          updatedById: response.updatedById ?? null,
+        })
       } catch (error) {
         console.error('Failed to load chat customization:', error)
       }
     }
     void fetchCustomization()
-  }, [appendCustomizationLog, user.id, currentUser])
+  }, [user.id, currentUser])
 
   // Socket listener for customization updates
   useEffect(() => {
@@ -599,30 +502,22 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       }
 
       const isCurrentUserA = currentUser.id === userAId
-      const partnerId = isCurrentUserA ? userBId : userAId
-      if (partnerId !== user.id) {
-        return
-      }
 
-      const normalized = normalizeCustomization({
+      setCustomization({
         themeId: payload.themeId,
         emoji: payload.emoji,
         nicknameMe: isCurrentUserA ? payload.nicknameForUserA ?? '' : payload.nicknameForUserB ?? '',
         nicknameThem: isCurrentUserA ? payload.nicknameForUserB ?? '' : payload.nicknameForUserA ?? '',
         updatedAt: payload.updatedAt,
         updatedById: payload.updatedById ?? null,
-        changeSummary: payload.summary
       })
-      setCustomization(normalized)
-      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
-      appendCustomizationLog(payload.summary, payload.updatedAt)
     }
 
     socketService.onChatCustomizationUpdated(handleCustomizationUpdated)
     return () => {
       socketService.offChatCustomizationUpdated(handleCustomizationUpdated)
     }
-  }, [appendCustomizationLog, currentUser, user.id])
+  }, [currentUser, user.id])
 
   // Update nickname draft when customization changes
   useEffect(() => {
@@ -636,29 +531,37 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const handleThemeSelect = useCallback(async (themeId: string) => {
     try {
       const response = await chatService.updateCustomization(user.id, { themeId })
-      const normalized = normalizeCustomization(response)
-      setCustomization(normalized)
-      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
-      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setCustomization({
+        themeId: response.themeId || DEFAULT_CUSTOMIZATION.themeId,
+        emoji: response.emoji || DEFAULT_CUSTOMIZATION.emoji,
+        nicknameMe: response.nicknameMe?.trim?.() || '',
+        nicknameThem: response.nicknameThem?.trim?.() || '',
+        updatedAt: response.updatedAt,
+        updatedById: response.updatedById ?? null,
+      })
       setThemeDialogOpen(false)
     } catch (error) {
       console.error('Failed to update theme:', error)
     }
-  }, [appendCustomizationLog, user.id])
+  }, [user.id])
 
   const handleEmojiSelect = useCallback(async (emoji: string) => {
     try {
       const response = await chatService.updateCustomization(user.id, { emoji })
-      const normalized = normalizeCustomization(response)
-      setCustomization(normalized)
-      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
-      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setCustomization({
+        themeId: response.themeId || DEFAULT_CUSTOMIZATION.themeId,
+        emoji: response.emoji || DEFAULT_CUSTOMIZATION.emoji,
+        nicknameMe: response.nicknameMe?.trim?.() || '',
+        nicknameThem: response.nicknameThem?.trim?.() || '',
+        updatedAt: response.updatedAt,
+        updatedById: response.updatedById ?? null,
+      })
       setEmojiDialogOpen(false)
       setCustomEmojiInput('')
     } catch (error) {
       console.error('Failed to update emoji:', error)
     }
-  }, [appendCustomizationLog, user.id])
+  }, [user.id])
 
   const handleCustomEmojiInputChange = useCallback((value: string) => {
     const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu
@@ -677,15 +580,19 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         nicknameMe: nicknameDraft.me,
         nicknameThem: nicknameDraft.them
       })
-      const normalized = normalizeCustomization(response)
-      setCustomization(normalized)
-      saveCustomizationCache(user.id, mapStateToCustomization(normalized))
-      appendCustomizationLog(response.changeSummary, response.updatedAt)
+      setCustomization({
+        themeId: response.themeId || DEFAULT_CUSTOMIZATION.themeId,
+        emoji: response.emoji || DEFAULT_CUSTOMIZATION.emoji,
+        nicknameMe: response.nicknameMe?.trim?.() || '',
+        nicknameThem: response.nicknameThem?.trim?.() || '',
+        updatedAt: response.updatedAt,
+        updatedById: response.updatedById ?? null,
+      })
       setNicknameDialogOpen(false)
     } catch (error) {
       console.error('Failed to update nicknames:', error)
     }
-  }, [appendCustomizationLog, user.id, nicknameDraft])
+  }, [user.id, nicknameDraft])
 
   const handleEmojiDialogToggle = useCallback((open: boolean) => {
     setEmojiDialogOpen(open)
@@ -704,7 +611,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     }
   }, [customization.nicknameMe, customization.nicknameThem])
 
-
   // Fetch messages when opening/un-minimizing with caching
   useEffect(() => {
     const run = async () => {
@@ -713,36 +619,11 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       // Nếu đã load xong rồi thì skip (tránh fetch lại khi re-render)
       if (initialLoadDone) return
 
-      const cachedMessages = getMessagesCache(user.id)
-      if (cachedMessages && cachedMessages.length > 0) {
-        cachedMessages.forEach(msg => {
-          if (msg.isSystem && msg.content && msg.createdAt) {
-            systemEventKeysRef.current.add(`${user.id}:${msg.createdAt}:${msg.content}`)
-          }
-        })
-        setMessages(cachedMessages)
-        setVisibleCount(Math.min(CHUNK, cachedMessages.length))
-      }
-
       try {
         setLoading(true)
         // Always fetch from server to get fresh messages (including messages sent while window was closed)
         const data = await chatService.getMessages(user.id)
-        const cachedSystem = (cachedMessages || []).filter(msg => msg.isSystem)
-        const combined = [...data, ...cachedSystem]
-        const deduped = combined.reduce<Message[]>((acc, msg) => {
-          if (!acc.some(existing => existing.id === msg.id)) {
-            acc.push(msg)
-          }
-          return acc
-        }, [])
-        const sorted = deduped.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        const capped = sorted.slice(-MAX_CACHE)
-        capped.forEach(msg => {
-          if (msg.isSystem && msg.content && msg.createdAt) {
-            systemEventKeysRef.current.add(`${user.id}:${msg.createdAt}:${msg.content}`)
-          }
-        })
+        const capped = data.slice(-MAX_CACHE)
         setMessages(capped)
         setVisibleCount(Math.min(CHUNK, capped.length))
         saveMessagesCache(user.id, capped)
@@ -774,9 +655,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         (message.senderId === user.id && message.receiverId === currentUser?.id) ||
         (message.senderId === currentUser?.id && message.receiverId === user.id)
       ) {
-        if (message.isSystem && message.content && message.createdAt) {
-          systemEventKeysRef.current.add(`${user.id}:${message.createdAt}:${message.content}`)
-        }
         startTransition(() => {
           setMessages(prev => {
             // Avoid duplicates - check if message already exists
@@ -1062,7 +940,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         setMessages([])
         clearMessagesCache(user.id)
         clearConversationsCache() // Clear conversations cache to refresh list
-        clearCustomizationCache(user.id)
         setMenuOpen(false)
         // Reload conversations to remove from list
         loadConversations()
@@ -1159,9 +1036,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }, [menuOpen, messageMenuOpen, showEmojiReactions])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) return
+    if (!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob && selectedFiles.length === 0) return
 
-    const content = newMessage.trim() || (audioBlob ? '🎤 Voice message' : selectedVideo ? '🎥 Video' : '📷 Photo')
+    const content = newMessage.trim() || (selectedFiles.length > 0 ? '📎 File' : audioBlob ? '🎤 Voice message' : selectedVideo ? '🎥 Video' : '📷 Photo')
     const replyToId = replyingTo?.id
     setNewMessage('')
     setReplyingTo(null) // Clear reply state
@@ -1176,10 +1053,37 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       let imageUrl: string | undefined
       let videoUrl: string | undefined
       let audioUrl: string | undefined
+      let fileUrl: string | undefined
+      let fileName: string | undefined
+      let fileSize: number | undefined
+      let fileType: string | undefined
 
+      setUploading(true)
+
+      // Upload files if selected
+      if (selectedFiles.length > 0) {
+        const uploadedFiles: string[] = []
+        const fileNames: string[] = []
+        let totalSize = 0
+        
+        for (const file of selectedFiles) {
+          const uploadResult = await uploadService.uploadFile(file)
+          uploadedFiles.push(uploadResult.url)
+          fileNames.push(uploadResult.originalName)
+          totalSize += uploadResult.size
+        }
+        
+        fileUrl = uploadedFiles.join(',')
+        fileName = fileNames.join(',')
+        fileSize = totalSize
+        fileType = selectedFiles[0].type
+        setSelectedFiles([])
+        if (docFileInputRef.current) {
+          docFileInputRef.current.value = ''
+        }
+      }
       // Upload audio if recorded
-      if (audioBlob) {
-        setUploading(true)
+      else if (audioBlob) {
         audioUrl = await uploadService.uploadAudio(audioBlob)
 
         // Clear audio preview
@@ -1188,11 +1092,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         }
         setAudioBlob(null)
         setAudioPreview('')
-        setUploading(false)
       }
       // Upload video if selected
       else if (selectedVideo) {
-        setUploading(true)
         videoUrl = await uploadService.uploadVideo(selectedVideo)
 
         // Clear video preview
@@ -1201,11 +1103,9 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         }
         setSelectedVideo(null)
         setVideoPreview('')
-        setUploading(false)
       }
       // Upload images if selected
       else if (selectedImages.length > 0) {
-        setUploading(true)
         const uploadedUrls: string[] = []
         for (const file of selectedImages) {
           const url = await uploadService.uploadImage(file)
@@ -1216,7 +1116,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         // Clear image previews
         setSelectedImages([])
         setImagePreviews([])
-        setUploading(false)
       }
 
       // Send message with replyToId if replying
@@ -1226,8 +1125,14 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
         imageUrl,
         videoUrl,
         audioUrl,
+        fileUrl,
+        fileName,
+        fileSize,
+        fileType,
         replyToId
       })
+
+      setUploading(false)
 
       // Optimistically add message to UI
       if (sentMessage) {
@@ -1255,6 +1160,16 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
       console.error('Failed to send message:', error)
       setNewMessage(content) // Restore message on error
       setUploading(false)
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send message'
+      if (errorMessage.includes('File size exceeds') || errorMessage.includes('exceed')) {
+        alert('❌ File too large! Maximum file size is 10MB per file.')
+      } else if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
+        alert('❌ Upload limit reached. Please try again later or use smaller files.')
+      } else {
+        alert(`❌ Failed to send message: ${errorMessage}`)
+      }
     }
   }
 
@@ -1371,6 +1286,38 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     if (videoInputRef.current) {
       videoInputRef.current.value = ''
     }
+  }
+
+  const handleDocumentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const validFiles: File[] = []
+    for (const file of files) {
+      const validation = uploadService.validateFile(file)
+      if (!validation.valid) {
+        alert(`${file.name}: ${validation.error || 'Invalid file'}`)
+        continue
+      }
+      validFiles.push(file)
+    }
+
+    if (validFiles.length === 0) {
+      if (docFileInputRef.current) docFileInputRef.current.value = ''
+      return
+    }
+
+    // Clear other attachments if files are selected
+    setSelectedImages([])
+    setImagePreviews([])
+    setSelectedVideo(null)
+    setVideoPreview('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (videoInputRef.current) videoInputRef.current.value = ''
+
+    // Limit to max 10 files per message
+    const combined = [...selectedFiles, ...validFiles].slice(0, 10)
+    setSelectedFiles(combined)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -1605,15 +1552,6 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               </div>
             ) : (
               messages.slice(Math.max(messages.length - visibleCount, 0)).map((message, index, arr) => {
-                if (message.isSystem) {
-                  return (
-                    <div key={message.id} className="flex justify-center">
-                      <div className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-full shadow-sm">
-                        {message.content}
-                      </div>
-                    </div>
-                  )
-                }
                 const isOwn = message.senderId === currentUser?.id
                 const showAvatar = !isOwn && (index === arr.length - 1 || arr[index + 1]?.senderId !== message.senderId)
 
@@ -1775,6 +1713,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                                     ? '🎥 Video'
                                     : message.replyTo.imageUrl
                                     ? '📷 Photo'
+                                    : message.replyTo.fileUrl
+                                    ? `📎 ${message.replyTo.fileName || 'File'}`
                                     : message.replyTo.content}
                                 </p>
                               </div>
@@ -1820,13 +1760,66 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                             {/* Audio */}
                             {message.audioUrl && <AudioPlayer audioUrl={message.audioUrl} isOwn={isOwn} />}
 
+                            {/* File Attachments */}
+                            {message.fileUrl && (() => {
+                              const fileUrls = message.fileUrl.split(',').map(s => s.trim()).filter(Boolean);
+                              const fileNames = (message.fileName || '').split(',').map(s => s.trim()).filter(Boolean);
+                              
+                              return (
+                                <div className={`${fileUrls.length > 1 ? 'space-y-1' : ''}`}>
+                                  {fileUrls.map((url, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={url}
+                                      download={fileNames[idx] || 'file'}
+                                      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                                        isOwn ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
+                                      }`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        // Download file with proper name
+                                        fetch(url)
+                                          .then(response => response.blob())
+                                          .then(blob => {
+                                            const downloadUrl = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = downloadUrl;
+                                            a.download = fileNames[idx] || 'file';
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            window.URL.revokeObjectURL(downloadUrl);
+                                            document.body.removeChild(a);
+                                          })
+                                          .catch(err => console.error('Download failed:', err));
+                                      }}
+                                    >
+                                      <Paperclip size={16} className={`shrink-0 ${isOwn ? 'text-white' : 'text-gray-600'}`} />
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-sm font-medium wrap-break-word ${isOwn ? 'text-white' : 'text-gray-900'}`}>
+                                          {fileNames[idx] || 'file'}
+                                        </p>
+                                        {message.fileSize && fileUrls.length === 1 && (
+                                          <p className={`text-xs ${isOwn ? 'text-white/70' : 'text-gray-500'}`}>
+                                            {message.fileSize >= 1024 * 1024
+                                              ? `${(message.fileSize / (1024 * 1024)).toFixed(2)} MB`
+                                              : `${(message.fileSize / 1024).toFixed(2)} KB`}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </a>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+
                             {message.content &&
                               message.content !== '📷 Photo' &&
                               message.content !== '🎥 Video' &&
-                              message.content !== '🎤 Voice message' && (
+                              message.content !== '🎤 Voice message' &&
+                              message.content !== '📎 File' && (
                                 <p
                                   className={`text-sm wrap-break-word ${
-                                    message.imageUrl || message.videoUrl || message.audioUrl ? 'px-3 py-2' : ''
+                                    message.imageUrl || message.videoUrl || message.audioUrl || message.fileUrl ? 'px-3 py-2' : ''
                                   }`}
                                 >
                                   {message.content}
@@ -2101,6 +2094,43 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
               </div>
             )}
 
+            {/* File Preview */}
+            {selectedFiles.length > 0 && (
+              <div className="mb-2">
+                <div className={`grid gap-2 ${selectedFiles.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="relative">
+                      <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border-2 border-orange-500">
+                        <Paperclip size={20} className="text-orange-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {file.size >= 1024 * 1024
+                              ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                              : `${(file.size / 1024).toFixed(2)} KB`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newFiles = [...selectedFiles]
+                          newFiles.splice(idx, 1)
+                          setSelectedFiles(newFiles)
+                          if (newFiles.length === 0 && docFileInputRef.current) {
+                            docFileInputRef.current.value = ''
+                          }
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors cursor-pointer"
+                        type="button"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Show blocked message if blocked */}
             {isBlocked || hasBlocked ? (
               <div className="p-4 bg-gray-100 rounded-lg text-center">
@@ -2151,6 +2181,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                 <div className="flex items-center gap-2">
                   <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
                   <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoSelect} className="hidden" />
+                  <input ref={docFileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" multiple onChange={handleDocumentSelect} className="hidden" />
 
                   {/* Single Attachment Button with Menu */}
                   <div className="relative" ref={attachmentMenuRef}>
@@ -2195,6 +2226,16 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                         >
                           <Video size={16} className="text-orange-500" />
                           <span>Video</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            docFileInputRef.current?.click()
+                            setShowAttachmentMenu(false)
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Paperclip size={16} className="text-blue-500" />
+                          <span>File</span>
                         </button>
                       </div>
                     )}
@@ -2419,7 +2460,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       <Smile className="w-5 h-5" />
                     </button>
                   </div>
-                  {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) ? (
+                  {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob && selectedFiles.length === 0) ? (
                     // Show like icon when input is empty
                     <button
                       onClick={handleSendLike}
@@ -2449,14 +2490,14 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                   ) : (
                     <button
                       onClick={handleSendMessage}
-                      disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob) || uploading}
+                      disabled={(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob && selectedFiles.length === 0) || uploading}
                       className={`p-2 rounded-full transition-colors cursor-pointer shrink-0 ${
-                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob) && !uploading
+                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob || selectedFiles.length > 0) && !uploading
                           ? 'text-white'
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                       style={
-                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob) && !uploading
+                        (newMessage.trim() || selectedImages.length > 0 || selectedVideo || audioBlob || selectedFiles.length > 0) && !uploading
                           ? {
                               background: `linear-gradient(135deg, var(--chat-accent) 0%, var(--chat-accent-dark) 100%)`,
                             }

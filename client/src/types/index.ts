@@ -141,6 +141,10 @@ export interface Message {
   imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
   senderId: string;
   receiverId: string;
   replyToId?: string;
@@ -163,6 +167,10 @@ export interface Message {
     imageUrl?: string;
     videoUrl?: string;
     audioUrl?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    fileType?: string;
     senderId: string;
     sender?: {
       id: string;
@@ -184,6 +192,10 @@ export interface SendMessageData {
   imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  fileType?: string;
   receiverId: string;
   replyToId?: string;
 }
