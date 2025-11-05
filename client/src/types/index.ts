@@ -233,3 +233,51 @@ export interface Notification {
   createdAt: string;
 }
 
+// Reel Types
+export interface Reel {
+  id: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  description?: string;
+  userId: string;
+  views: number;
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+  isLiked?: boolean;
+  _count?: {
+    likes: number;
+    comments: number;
+    shares: number;
+  };
+}
+
+export interface CreateReelData {
+  videoUrl: string;
+  thumbnailUrl?: string;
+  description?: string;
+}
+
+export interface UpdateReelData {
+  description?: string;
+}
+
+export interface ReelComment {
+  id: string;
+  content: string;
+  reelId: string;
+  userId: string;
+  parentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
+  replies?: ReelComment[];
+  _count?: {
+    replies: number;
+  };
+}
+
+export interface CreateReelCommentData {
+  content: string;
+  parentId?: string;
+}

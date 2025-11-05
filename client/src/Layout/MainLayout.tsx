@@ -67,8 +67,23 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       mainRef.current.scrollTop = 0
     }
   }, [location.pathname])
+  // Hide right sidebar on chat and reels pages for a cleaner UI
+  const isReels = location.pathname.startsWith('/reels')
+  const hideRightSidebar = isReels || location.pathname.startsWith('/chat')
 
-  const hideRightSidebar = location.pathname.startsWith('/chat')
+  // Auto-collapse left sidebar when entering reels, restore when leaving
+  useEffect(() => {
+    if (isReels) {
+      setIsLeftSidebarOpen(false)
+    } else {
+      const saved = localStorage.getItem('leftSidebarOpen')
+      if (saved !== null) {
+        setIsLeftSidebarOpen(JSON.parse(saved))
+      } else {
+        setIsLeftSidebarOpen(window.innerWidth >= 768)
+      }
+    }
+  }, [isReels])
   const mainOffsetClasses = isLeftSidebarOpen ? 'md:ml-64 md:pl-8' : 'md:ml-20 md:pl-6'
   const mainOverflowClass = hideRightSidebar ? 'overflow-hidden' : 'overflow-y-auto'
 

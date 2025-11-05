@@ -13,9 +13,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Increase payload size limit for file uploads (10MB for Cloudinary free tier)
-  app.use(bodyParser.json({ limit: '10mb' }));
-  app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+  // Increase payload size limit for file uploads (allow large video uploads)
+  // Set to 200MB to support longer reels; multer will still enforce limits if configured
+  app.use(bodyParser.json({ limit: '200mb' }));
+  app.use(bodyParser.urlencoded({ limit: '200mb', extended: true }));
 
   // Global validation pipe
   app.useGlobalPipes(

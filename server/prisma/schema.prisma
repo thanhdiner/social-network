@@ -49,6 +49,10 @@ model User {
   customizationAsUserA ConversationCustomization[] @relation("UserAConversationCustomization")
   customizationAsUserB ConversationCustomization[] @relation("UserBConversationCustomization")
   customizationUpdated ConversationCustomization[] @relation("CustomizationUpdatedBy")
+  reels          Reel[]
+  reelLikes      ReelLike[]
+  reelComments   ReelComment[]
+  reelShares     ReelShare[]
 }
 
 model Post {
@@ -336,4 +340,69 @@ model ConversationCustomization {
   @@unique([userAId, userBId])
   @@index([userAId])
   @@index([userBId])
+}
+
+model Reel {
+  id          String   @id @default(uuid())
+  videoUrl    String
+  thumbnailUrl String?
+  description String?
+  userId      String
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes    ReelLike[]
+  comments ReelComment[]
+  shares   ReelShare[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ReelLike {
+  id        String   @id @default(uuid())
+  reelId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  reel Reel @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reelId, userId])
+  @@index([reelId])
+  @@index([userId])
+}
+
+model ReelComment {
+  id        String   @id @default(uuid())
+  content   String
+  reelId    String
+  userId    String
+  parentId  String?  // For replies
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reel    Reel           @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  ReelComment?   @relation("ReelCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies ReelComment[]  @relation("ReelCommentReplies")
+
+  @@index([reelId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model ReelShare {
+  id        String   @id @default(uuid())
+  reelId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  reel Reel @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([reelId])
+  @@index([userId])
 }

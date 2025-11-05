@@ -13,6 +13,7 @@ import { LifeEventsModule } from './life-events/life-events.module';
 import { CommentsModule } from './comments/comments.module';
 import { StoriesModule } from './stories/stories.module';
 import { SearchModule } from './search/search.module';
+import { ReelsModule } from './reels/reels.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { SearchModule } from './search/search.module';
     CommentsModule,
     StoriesModule,
     SearchModule,
+    ReelsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

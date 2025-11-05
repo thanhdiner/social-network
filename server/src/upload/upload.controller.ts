@@ -17,7 +17,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('image')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 200 * 1024 * 1024 } }))
   async uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new Error('No file uploaded');
@@ -28,7 +28,8 @@ export class UploadController {
   }
 
   @Post('video')
-  @UseInterceptors(FileInterceptor('file'))
+  // Allow larger video uploads (200MB). Client still validates file size before upload.
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 200 * 1024 * 1024 } }))
   async uploadVideo(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new Error('No file uploaded');
@@ -39,7 +40,7 @@ export class UploadController {
   }
 
   @Post('audio')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async uploadAudio(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new Error('No file uploaded');
@@ -50,7 +51,7 @@ export class UploadController {
   }
 
   @Post('file')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   async uploadFile(@UploadedFile() file: Express.Multer.File) {
     // Fix encoding for filename (convert from latin1 to utf8)
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');

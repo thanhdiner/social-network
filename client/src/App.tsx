@@ -20,6 +20,10 @@ import UserNotFound from '@/pages/UserNotFound'
 import { PostDetail } from '@/pages/PostDetail'
 import { SearchResults } from '@/pages/Search'
 import AccountSettings from '@/pages/AccountSettings'
+import ReelsPage from '@/pages/Reels'
+import CreateReelPage from '@/pages/Reels/CreateReel'
+// Keep ReelDetailPage available for direct single-reel modal if needed
+// ReelDetailPage unused now; deep links handled by ReelsPage
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
 import { VideoCallModal } from '@/components/shared/VideoCallModal'
 
@@ -169,6 +173,40 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <SearchResults />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/reels"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ReelsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Allow deep linking to a specific reel while keeping the Reels feed mounted */}
+          <Route
+            path="/reels/:reelId"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <ReelsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/reels/create"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <CreateReelPage />
                 </MainLayout>
               </ProtectedRoute>
             }

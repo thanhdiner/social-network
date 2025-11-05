@@ -1,0 +1,99 @@
+import api from './api';
+import type {
+  Reel,
+  CreateReelData,
+  UpdateReelData,
+  ReelComment,
+  CreateReelCommentData,
+} from '../types';
+
+// Lấy danh sách reels
+export const getReels = async (page = 1, limit = 10): Promise<Reel[]> => {
+  const response = await api.get(`/reels?page=${page}&limit=${limit}`);
+  return response.data;
+};
+
+// Lấy reels của một user
+export const getReelsByUser = async (
+  userId: string,
+  page = 1,
+  limit = 10,
+): Promise<Reel[]> => {
+  const response = await api.get(`/reels/user/${userId}?page=${page}&limit=${limit}`);
+  return response.data;
+};
+
+// Lấy một reel theo ID
+export const getReel = async (id: string): Promise<Reel> => {
+  const response = await api.get(`/reels/${id}`);
+  return response.data;
+};
+
+// Tạo reel mới
+export const createReel = async (data: CreateReelData): Promise<Reel> => {
+  const response = await api.post('/reels', data);
+  return response.data;
+};
+
+// Cập nhật reel
+export const updateReel = async (
+  id: string,
+  data: UpdateReelData,
+): Promise<Reel> => {
+  const response = await api.patch(`/reels/${id}`, data);
+  return response.data;
+};
+
+// Xóa reel
+export const deleteReel = async (id: string): Promise<void> => {
+  await api.delete(`/reels/${id}`);
+};
+
+// Like/Unlike reel
+export const toggleLikeReel = async (
+  id: string,
+): Promise<{ liked: boolean }> => {
+  const response = await api.post(`/reels/${id}/like`);
+  return response.data;
+};
+
+// Lấy comments của reel
+export const getReelComments = async (
+  reelId: string,
+  page = 1,
+  limit = 20,
+): Promise<ReelComment[]> => {
+  const response = await api.get(`/reels/${reelId}/comments?page=${page}&limit=${limit}`);
+  return response.data;
+};
+
+// Lấy replies của một comment
+export const getReelCommentReplies = async (
+  commentId: string,
+  page = 1,
+  limit = 20,
+): Promise<ReelComment[]> => {
+  const response = await api.get(
+    `/reels/comments/${commentId}/replies?page=${page}&limit=${limit}`,
+  );
+  return response.data;
+};
+
+// Tạo comment
+export const createReelComment = async (
+  reelId: string,
+  data: CreateReelCommentData,
+): Promise<ReelComment> => {
+  const response = await api.post(`/reels/${reelId}/comments`, data);
+  return response.data;
+};
+
+// Xóa comment
+export const deleteReelComment = async (commentId: string): Promise<void> => {
+  await api.delete(`/reels/comments/${commentId}`);
+};
+
+// Share reel
+export const shareReel = async (id: string): Promise<void> => {
+  await api.post(`/reels/${id}/share`);
+};
