@@ -8,6 +8,7 @@ import {
   saveConversationsCache, 
   getConversationsCache
 } from '../utils/chatCache';
+import { notificationSound } from '../utils/notificationSound';
 
 interface ChatWindow {
   userId: string;
@@ -39,6 +40,7 @@ interface ChatContextType {
   sendMessage: (data: SendMessageData) => Promise<Message>;
   markAsRead: (userId: string) => void;
   setTyping: (receiverId: string, isTyping: boolean) => void;
+  setActiveConversation: (userId: string | null) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -53,6 +55,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [typingUsers, setTypingUsers] = useState<Map<string, boolean>>(new Map());
   // Throttle map to avoid repeated markAsRead bursts
   const lastMarkRef = useRef<Map<string, number>>(new Map());
+  // Track active conversation để biết user đang ở tab nào
+  const activeConversationRef = useRef<string | null>(null);
 
   // Always keep global unread count in sync with conversations
   useEffect(() => {
@@ -297,6 +301,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Set active conversation (được gọi từ Chat component)
+  const setActiveConversation = useCallback((userId: string | null) => {
+    activeConversationRef.current = userId;
+  }, []);
+
   // Restore chat windows from localStorage
   useEffect(() => {
     if (!user) return;
@@ -345,15 +354,32 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       let unreadCountDelta = 0; // Track the change in total unread count
       let shouldReloadConversations = false;
 
+      // Kiểm tra nếu tin nhắn đến từ người khác và không đang ở trong tab đó
+      const isIncomingMessage = message.senderId !== user.id;
+      const senderId = isIncomingMessage ? message.senderId : message.receiverId;
+      const isNotInActiveTab = activeConversationRef.current !== senderId;
+
+      console.log('🔔 [ChatContext] Message notification check:', {
+        isIncomingMessage,
+        senderId,
+        activeConversation: activeConversationRef.current,
+        isNotInActiveTab,
+        shouldPlaySound: isIncomingMessage && isNotInActiveTab
+      });
+
+      // Phát âm thanh nếu là tin nhắn đến và không đang ở tab đó
+      if (isIncomingMessage && isNotInActiveTab) {
+        console.log('🔊 [ChatContext] Playing notification sound for new message');
+        notificationSound.play();
+      }
+
       // Cập nhật conversation
       setConversations(prev => {
-        const senderId = message.senderId === user.id ? message.receiverId : message.senderId;
         const existingIndex = prev.findIndex(c => c.participantId === senderId);
         const updated = [...prev];
         console.log('[ChatContext] updating conversations (senderId, existingIndex):', senderId, existingIndex);
         if (existingIndex >= 0) {
           const conv = updated[existingIndex];
-          const isIncomingMessage = message.senderId !== user.id;
           
           // Only increase unreadCount if it's an incoming message
           let newUnreadCount = conv.unreadCount;
@@ -553,6 +579,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         sendMessage,
         markAsRead,
         setTyping,
+        setActiveConversation,
       }}
     >
       {children}

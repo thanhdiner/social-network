@@ -316,7 +316,7 @@ AudioPlayer.displayName = 'AudioPlayer';
 export default function Chat() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const { conversations, loadConversations, typingUsers, setTyping, onlineUsers, markAsRead, sendMessage } = useChat();
+  const { conversations, loadConversations, typingUsers, setTyping, onlineUsers, markAsRead, sendMessage, setActiveConversation } = useChat();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1834,6 +1834,15 @@ export default function Chat() {
       setInfoSectionsOpen({ customization: false, media: false, pinned: false });
     }
   }, [selectedUser]);
+
+  // Set active conversation for notification sound control
+  useEffect(() => {
+    if (selectedUser) {
+      setActiveConversation(selectedUser.id);
+    } else {
+      setActiveConversation(null);
+    }
+  }, [selectedUser, setActiveConversation]);
 
   useEffect(() => {
     if (!showInfoPanel) return;
