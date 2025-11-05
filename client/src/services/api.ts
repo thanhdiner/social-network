@@ -32,6 +32,12 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // If error is 401 and we haven't tried to refresh yet
+    // Don't attempt refresh for auth endpoints (login/register/refresh) to avoid loops
+    const requestUrl: string | undefined = originalRequest?.url || originalRequest?.baseURL || undefined;
+    if (requestUrl && (requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register') || requestUrl.includes('/auth/refresh'))) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -52,9 +58,17 @@ api.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
+        // Refresh failed — remove token. Only redirect to /login when we're not
+        // already on the login page to avoid reload loops while the user is
+        // submitting credentials.
         localStorage.removeItem('accessToken');
-        window.location.href = '/login';
+        try {
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        } catch {
+          // ignore
+        }
         return Promise.reject(refreshError);
       }
     }

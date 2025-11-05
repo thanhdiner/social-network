@@ -2,6 +2,7 @@
 import type { MouseEvent as ReactMouseEvent, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Search,
   Send,
@@ -553,6 +554,11 @@ export default function Chat() {
         return;
       }
 
+      // Don't fetch customization for current user's own ID
+      if (userId === currentUser.id) {
+        return;
+      }
+
       customizationFetchRef.current.add(userId);
       try {
         const response = await chatService.getCustomization(userId);
@@ -592,12 +598,16 @@ export default function Chat() {
   useEffect(() => {
     const missing = conversations
       .map(conv => conv.participantId)
-      .filter(participantId => participantId && !customizationMap[participantId]);
+      .filter(participantId => 
+        participantId && 
+        participantId !== currentUser?.id && 
+        !customizationMap[participantId]
+      );
 
     missing.forEach(participantId => {
       void fetchCustomization(participantId);
     });
-  }, [conversations, customizationMap, fetchCustomization]);
+  }, [conversations, customizationMap, fetchCustomization, currentUser]);
 
   useEffect(() => {
     setNicknameDraft({
@@ -950,10 +960,10 @@ export default function Chat() {
     try {
       if (currentlyMuted) {
         await chatService.unmuteConversation(participantId);
-        alert('Notifications unmuted');
+        toast.success('Đã bật thông báo');
       } else {
         await chatService.muteConversation(participantId);
-        alert('Notifications muted');
+        toast.success('Đã tắt thông báo');
       }
       if (selectedUser?.id === participantId) {
         setIsMuted(!currentlyMuted);
@@ -963,7 +973,7 @@ export default function Chat() {
       loadConversations();
     } catch (error) {
       console.error('Failed to toggle mute:', error);
-      alert('An error occurred, please try again');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -990,11 +1000,11 @@ export default function Chat() {
       closeConversationMenu();
       setShowInfoPanel(false);
       loadConversations();
-      alert('All messages deleted');
+      toast.success('Đã xóa tất cả tin nhắn');
       navigate('/chat');
     } catch (error) {
       console.error('Failed to delete conversation:', error);
-      alert('An error occurred, please try again');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -1021,10 +1031,10 @@ export default function Chat() {
       closeConversationMenu();
       setShowInfoPanel(false);
       loadConversations();
-      alert('User blocked');
+      toast.success('Đã chặn người dùng');
     } catch (error) {
       console.error('Failed to block user:', error);
-      alert('An error occurred, please try again');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -1056,7 +1066,7 @@ export default function Chat() {
       );
     } catch (error) {
       console.error('Failed to start voice call:', error);
-      alert('Unable to start voice call. Please try again!');
+      toast.error('Không thể bắt đầu cuộc gọi. Vui lòng thử lại!');
     }
   };
 
@@ -1078,7 +1088,7 @@ export default function Chat() {
       );
     } catch (error) {
       console.error('Failed to start video call:', error);
-      alert('Unable to start video call. Please try again!');
+      toast.error('Không thể bắt đầu cuộc gọi video. Vui lòng thử lại!');
     }
   };
 
@@ -1176,7 +1186,7 @@ export default function Chat() {
         console.error('Failed to pin message:', error);
         // revert optimistic change
         upsertMessageInState(prev);
-        alert('Unable to pin message. Please try again!');
+        toast.error('Không thể ghim tin nhắn. Vui lòng thử lại!');
       } finally {
         setMessageMenuOpen(null);
       }
@@ -1212,7 +1222,7 @@ export default function Chat() {
         console.error('Failed to unpin message:', error);
         // revert optimistic change
         upsertMessageInState(prev);
-        alert('Unable to unpin message. Please try again!');
+        toast.error('Không thể bỏ ghim tin nhắn. Vui lòng thử lại!');
       } finally {
         setMessageMenuOpen(null);
       }
@@ -1680,10 +1690,10 @@ export default function Chat() {
     setSearchParams(params);
         // Reload conversations to remove from list
         loadConversations();
-        alert('All messages deleted');
+        toast.success('Đã xóa tất cả tin nhắn');
       } catch (error) {
         console.error('Failed to delete conversation:', error);
-        alert('An error occurred, please try again');
+        toast.error('Có lỗi xảy ra, vui lòng thử lại');
       }
     }
   };
@@ -1696,9 +1706,9 @@ export default function Chat() {
         setIsBlocked(false);
         loadConversations();
         setShowInfoPanel(false);
-        alert('User unblocked');
+        toast.success('Đã bỏ chặn người dùng');
       } else {
-  if (confirm(`Are you sure you want to block ${displayName}? You will not be able to message this person.`)) {
+  if (confirm(`Bạn có chắc chắn muốn chặn ${displayName}? Bạn sẽ không thể nhắn tin với người này.`)) {
           await userService.blockUser(selectedUser.id);
           setIsBlocked(true);
           setMenuOpen(false);
@@ -1709,12 +1719,12 @@ export default function Chat() {
           setSearchParams(params);
           loadConversations();
           setShowInfoPanel(false);
-          alert('User blocked');
+          toast.success('Đã chặn người dùng');
         }
       }
     } catch (error) {
       console.error('Failed to block/unblock user:', error);
-      alert('An error occurred, please try again');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -1748,7 +1758,7 @@ export default function Chat() {
       loadConversations();
     } catch (error) {
       console.error('Failed to toggle mute:', error);
-      alert('An error occurred, please try again');
+      toast.error('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
@@ -2072,11 +2082,11 @@ export default function Chat() {
       // Show user-friendly error message
       const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
       if (errorMessage.includes('File size exceeds') || errorMessage.includes('exceed')) {
-        alert('❌ File too large! Maximum file size is 10MB per file.');
+        toast.error('File quá lớn! Kích thước tối đa là 10MB mỗi file.');
       } else if (errorMessage.includes('quota') || errorMessage.includes('limit')) {
-        alert('❌ Upload limit reached. Please try again later or use smaller files.');
+        toast.error('Đã đạt giới hạn upload. Vui lòng thử lại sau hoặc sử dụng file nhỏ hơn.');
       } else {
-        alert(`❌ Failed to send message: ${errorMessage}`);
+        toast.error(`Gửi tin nhắn thất bại: ${errorMessage}`);
       }
     }
   };
@@ -2148,7 +2158,7 @@ export default function Chat() {
         saveMessagesCache(selectedUser.id, updated);
         return updated;
       });
-      alert('Unable to send. Please try again.');
+      toast.error('Không thể gửi. Vui lòng thử lại.');
     } finally {
       quickEmojiSendingRef.current = false;
     }

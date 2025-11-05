@@ -60,9 +60,8 @@ export default function Register() {
       });
       navigate('/');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error 
-        ? (err as any).response?.data?.message || err.message
-        : 'Registration failed';
+      const maybeResponse = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      const errorMessage = maybeResponse || (err instanceof Error ? err.message : 'Registration failed');
       setError(errorMessage);
     }
   };
@@ -143,7 +142,7 @@ export default function Register() {
               id="password"
               name="password"
               type="password"
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               value={formData.password}
               onChange={handleChange}
               required
@@ -159,7 +158,7 @@ export default function Register() {
               id="confirmPassword"
               name="confirmPassword"
               type="password"
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="••••••••"
               value={formData.confirmPassword}
               onChange={handleChange}
               required

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Search, Maximize2, MoreVertical, Trash2, User as UserIcon, Bell, BellOff, Ban, ShieldOff } from 'lucide-react'
 import debounce from 'lodash.debounce'
+import { toast } from 'sonner'
 import { useChat } from '../../contexts/ChatContext'
 import { chatService } from '../../services/chatService'
 import { clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
@@ -86,6 +87,12 @@ export const ChatPopup = () => {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
+      
+      // Don't close if clicking on menu buttons
+      if (target.closest('[data-menu-item]')) {
+        return
+      }
+      
       if (!popupRef.current?.contains(target) && !target.closest('[data-chat-trigger]')) {
         closePopup()
       }
@@ -145,7 +152,7 @@ export const ChatPopup = () => {
       closeMenu()
     } catch (error) {
       console.error('Failed to toggle mute:', error)
-      alert('An error occurred, please try again')
+      toast.error('Có lỗi xảy ra, vui lòng thử lại')
     } finally {
       setPendingActionUserId(prev => (prev === userId ? null : prev))
     }
@@ -158,7 +165,7 @@ export const ChatPopup = () => {
     const isBlocked = status?.isBlocked ?? false
 
     if (!isBlocked) {
-      const confirmed = confirm(`Are you sure you want to block ${conversation.participant.name}? You will not be able to message this person.`)
+      const confirmed = confirm(`Bạn có chắc chắn muốn chặn ${conversation.participant.name}? Bạn sẽ không thể nhắn tin với người này.`)
       if (!confirmed) {
         return
       }
@@ -169,7 +176,7 @@ export const ChatPopup = () => {
       if (isBlocked) {
         await userService.unblockUser(userId)
         setBlockStatuses(prev => ({ ...prev, [userId]: { hasBlocked: prev[userId]?.hasBlocked ?? false, isBlocked: false } }))
-        alert('User unblocked')
+        toast.success('Đã bỏ chặn người dùng')
       } else {
         await userService.blockUser(userId)
         setBlockStatuses(prev => ({ ...prev, [userId]: { hasBlocked: prev[userId]?.hasBlocked ?? false, isBlocked: true } }))
@@ -177,12 +184,12 @@ export const ChatPopup = () => {
         clearConversationsCache()
         closeChatWindow(userId)
         await loadConversations()
-        alert('User blocked')
+        toast.success('Đã chặn người dùng')
       }
       closeMenu()
     } catch (error) {
       console.error('Failed to block/unblock user:', error)
-      alert('An error occurred, please try again')
+      toast.error('Có lỗi xảy ra, vui lòng thử lại')
     } finally {
       setPendingActionUserId(prev => (prev === userId ? null : prev))
     }
@@ -203,7 +210,7 @@ export const ChatPopup = () => {
   const handleDeleteConversation = async (e: React.MouseEvent, conversation: Conversation) => {
     e.stopPropagation()
     const userId = conversation.participantId
-    if (!confirm(`Delete all messages with ${conversation.participant.name}? This action cannot be undone.`)) {
+    if (!confirm(`Xóa tất cả tin nhắn với ${conversation.participant.name}? Hành động này không thể hoàn tác.`)) {
       return
     }
 
@@ -215,9 +222,10 @@ export const ChatPopup = () => {
       closeChatWindow(userId)
       await loadConversations()
       closeMenu()
+      toast.success('Đã xóa cuộc trò chuyện')
     } catch (error) {
       console.error('Failed to delete conversation:', error)
-      alert('An error occurred, please try again')
+      toast.error('Có lỗi xảy ra, vui lòng thử lại')
     } finally {
       setPendingActionUserId(prev => (prev === userId ? null : prev))
     }
@@ -309,11 +317,12 @@ export const ChatPopup = () => {
                           onClick={() => {}}
                         />
                       </div>
-                      <div className="shrink-0 ml-2">
+                      <div className="shrink-0 ml-2 relative z-10">
                         <button
                           data-chat-menu-trigger
                           onClick={(e) => {
                             e.stopPropagation()
+                            e.preventDefault()
                             const isOpening = menuOpen !== conversation.id
                             if (isOpening) {
                               const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
@@ -338,8 +347,9 @@ export const ChatPopup = () => {
                               closeMenu()
                             }
                           }}
-                          className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-orange-100 rounded-full transition-all cursor-pointer"
+                          className="p-2 opacity-60 group-hover:opacity-100 hover:bg-orange-100 rounded-full transition-all cursor-pointer active:scale-95 hover:scale-110"
                           title="Options"
+                          type="button"
                         >
                           <MoreVertical className="w-4 h-4 text-gray-600" />
                         </button>
@@ -357,24 +367,28 @@ export const ChatPopup = () => {
         ? createPortal(
             <div
               ref={menuRef}
-              className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-[9999] min-w-[200px] p-1"
+              className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-9999 min-w-[200px] p-1"
               style={{ top: menuPosition.top, left: menuPosition.left }}
               onClick={e => e.stopPropagation()}
             >
               <button
+                data-menu-item
                 onClick={e => handleViewProfile(e, menuConversation)}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 transition-colors rounded-md cursor-pointer"
+                type="button"
               >
                 <UserIcon className="w-4 h-4 text-orange-500" />
                 <span>View Profile</span>
               </button>
 
               <button
+                data-menu-item
                 onClick={e => handleToggleMute(e, menuConversation)}
                 disabled={pendingActionUserId === menuConversation.participantId}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors rounded-md ${
                   pendingActionUserId === menuConversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-orange-50 cursor-pointer'
                 }`}
+                type="button"
               >
                 {(muteStatusMap[menuConversation.participantId] ?? menuConversation.isMuted) ? (
                   <>
@@ -390,6 +404,7 @@ export const ChatPopup = () => {
               </button>
 
               <button
+                data-menu-item
                 onClick={e => handleBlockUser(e, menuConversation)}
                 disabled={
                   pendingActionUserId === menuConversation.participantId ||
@@ -405,6 +420,7 @@ export const ChatPopup = () => {
                     ? 'text-green-600'
                     : 'text-orange-600'
                 }`}
+                type="button"
               >
                 {blockStatusLoadingId === menuConversation.participantId ? (
                   <>
@@ -427,11 +443,13 @@ export const ChatPopup = () => {
               <div className="my-1 mx-2 border-t border-gray-100" />
 
               <button
+                data-menu-item
                 onClick={e => handleDeleteConversation(e, menuConversation)}
                 disabled={pendingActionUserId === menuConversation.participantId}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors rounded-md ${
                   pendingActionUserId === menuConversation.participantId ? 'opacity-60 cursor-not-allowed' : 'hover:bg-red-50 cursor-pointer'
                 }`}
+                type="button"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete all messages</span>

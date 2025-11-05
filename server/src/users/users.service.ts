@@ -6,10 +6,30 @@ import {
 import { PrismaService } from '../common/prisma/prisma.service';
 import type { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'crypto';
+import { MailService } from '../common/mail/mail.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
+
+  // In-memory email change tokens for development/demo purposes.
+  // token -> { userId, newEmail, expiresAt }
+  private emailChangeTokens = new Map<
+    string,
+    { userId: string; newEmail: string; expiresAt: number }
+  >();
+
+  private generateEmailVerificationCode(): string {
+    let token: string;
+    do {
+      token = randomInt(100000, 1000000).toString();
+    } while (this.emailChangeTokens.has(token));
+    return token;
+  }
 
   async create(userData: {
     email: string;
@@ -141,6 +161,97 @@ export class UsersService {
     });
   }
 
+  /**
+   * Request email change: generate a token and store it in-memory.
+   * In production this should store tokens in a persistent table and send an email.
+   */
+  async requestEmailChange(userId: string, newEmail: string) {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    const trimmedEmail = newEmail.trim();
+    if (!trimmedEmail) {
+      throw new ConflictException('Email không hợp lệ');
+    }
+
+    if (user.email.toLowerCase() === trimmedEmail.toLowerCase()) {
+      throw new ConflictException('Email mới trùng với email hiện tại');
+    }
+
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        email: {
+          equals: trimmedEmail,
+          mode: 'insensitive',
+        },
+      },
+      select: { id: true },
+    });
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('Email is already in use');
+    }
+
+    for (const [token, record] of this.emailChangeTokens.entries()) {
+      if (record.userId === userId) {
+        this.emailChangeTokens.delete(token);
+      }
+    }
+
+    const token = this.generateEmailVerificationCode();
+    const expiresAt = Date.now() + 1000 * 60 * 60; // 1 hour
+
+    this.emailChangeTokens.set(token, {
+      userId,
+      newEmail: trimmedEmail,
+      expiresAt,
+    });
+
+    if (this.mailService.isEnabled()) {
+      try {
+        await this.mailService.sendEmailVerification(trimmedEmail, token);
+      } catch (error) {
+        this.emailChangeTokens.delete(token);
+        throw error;
+      }
+      return { expiresAt, mailSent: true as const };
+    }
+
+    return { expiresAt, mailSent: false as const, debugToken: token };
+  }
+
+  async confirmEmailChange(token: string) {
+    const record = this.emailChangeTokens.get(token);
+    if (!record) {
+      throw new NotFoundException('Invalid or expired token');
+    }
+
+    if (Date.now() > record.expiresAt) {
+      this.emailChangeTokens.delete(token);
+      throw new NotFoundException('Token expired');
+    }
+
+    // Double-check email uniqueness before updating
+    const existing = await this.prisma.user.findUnique({
+      where: { email: record.newEmail },
+    });
+    if (existing) {
+      this.emailChangeTokens.delete(token);
+      throw new ConflictException('Email is already in use');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: record.userId },
+      data: { email: record.newEmail },
+    });
+
+    // Remove token after successful confirmation
+    this.emailChangeTokens.delete(token);
+
+    return updated;
+  }
+
   async delete(id: string): Promise<void> {
     const user = await this.findById(id);
     if (!user) {
@@ -172,6 +283,18 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+  }
+
+  async updatePassword(userId: string, hashedPassword: string): Promise<void> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
     await this.prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Pencil, Settings, UserPlus, MessageCircle, UserCheck, Camera, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -174,7 +175,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
 
     const validation = uploadService.validateImage(file)
     if (!validation.valid) {
-      alert(validation.error)
+      toast.error(validation.error)
       return
     }
 
@@ -201,9 +202,11 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       if (avatarInputRef.current) {
         avatarInputRef.current.value = ''
       }
+      
+      toast.success('Cập nhật ảnh đại diện thành công!')
     } catch (err) {
       console.error('Upload avatar error:', err)
-  alert('Failed to upload avatar')
+      toast.error('Upload ảnh đại diện thất bại')
     } finally {
       setUploadingAvatar(false)
     }
@@ -215,7 +218,7 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
 
     const validation = uploadService.validateImage(file)
     if (!validation.valid) {
-      alert(validation.error)
+      toast.error(validation.error)
       return
     }
 
@@ -242,9 +245,11 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       if (coverInputRef.current) {
         coverInputRef.current.value = ''
       }
+      
+      toast.success('Cập nhật ảnh bìa thành công!')
     } catch (err) {
       console.error('Upload cover error:', err)
-  alert('Failed to upload cover image')
+      toast.error('Upload ảnh bìa thất bại')
     } finally {
       setUploadingCover(false)
     }
@@ -266,9 +271,10 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
       // Xóa trong database
       await userService.updateProfile({ coverImage: '' })
       await refreshUser()
+      toast.success('Đã xóa ảnh bìa')
     } catch (err) {
       console.error('Remove cover error:', err)
-  alert('Failed to remove cover image')
+      toast.error('Xóa ảnh bìa thất bại')
     } finally {
       setUploadingCover(false)
     }

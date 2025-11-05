@@ -17,6 +17,8 @@ export interface User {
   instagram?: string;
   twitter?: string;
   linkedin?: string;
+  emailVerified?: boolean;
+  emailVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   stats?: {
@@ -121,6 +123,29 @@ class AuthService {
   getAccessToken(): string | null {
     return localStorage.getItem('accessToken');
   }
+
+  /**
+   * Request password reset code
+   */
+  async forgotPassword(email: string): Promise<{ message: string; mailSent: boolean; expiresAt?: number; debugCode?: string }> {
+    const response = await api.post<{ message: string; mailSent: boolean; expiresAt?: number; debugCode?: string }>('/auth/forgot-password', { email });
+    return response.data;
+  }
+
+  /**
+   * Reset password with code
+   */
+  async resetPassword(code: string, newPassword: string): Promise<{ message: string }> {
+    const response = await api.post<{ message: string }>('/auth/reset-password', { code, newPassword });
+    return response.data;
+  }
 }
 
-export default new AuthService();
+const authServiceInstance = new AuthService();
+
+export default authServiceInstance;
+
+// Export individual methods for convenience
+export const forgotPassword = (email: string) => authServiceInstance.forgotPassword(email);
+export const resetPassword = (code: string, newPassword: string) => authServiceInstance.resetPassword(code, newPassword);
+

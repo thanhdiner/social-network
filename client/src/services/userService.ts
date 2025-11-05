@@ -64,6 +64,19 @@ class UserService {
   }
 
   /**
+   * Request email change - server will (in dev) return a token. In prod it should send an email.
+   */
+  async requestEmailChange(newEmail: string): Promise<{ message: string; mailSent: boolean; expiresAt: number; debugToken?: string }> {
+    const response = await api.post<{ message: string; mailSent: boolean; expiresAt: number; debugToken?: string }>('/users/request-email-change', { newEmail });
+    return response.data;
+  }
+
+  async confirmEmailChange(token: string): Promise<User> {
+    const response = await api.post<User>('/users/confirm-email-change', { token });
+    return response.data;
+  }
+
+  /**
    * Get suggested users to follow
    */
   async getSuggestedUsers(): Promise<SuggestedUser[]> {

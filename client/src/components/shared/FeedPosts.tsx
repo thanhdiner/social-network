@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { MessageCircle, Share2, MoreHorizontal, Bookmark, Trash2, Pencil, Link as LinkIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 import postService, { type Post } from '@/services/postService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EditPostModal } from './EditPostModal'
@@ -132,15 +133,16 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   }
 
   const handleDelete = async (postId: string) => {
-    if (!confirm('Are you sure you want to delete this post?')) return
+    if (!confirm('Bạn có chắc chắn muốn xóa bài viết này?')) return
 
     try {
       await postService.deletePost(postId)
       setPosts(prev => prev.filter(post => post.id !== postId))
       setMenuOpen(null)
+      toast.success('Đã xóa bài viết')
     } catch (error) {
       console.error('Failed to delete post:', error)
-      alert('Failed to delete post. Please try again.')
+      toast.error('Xóa bài viết thất bại. Vui lòng thử lại.')
     }
   }
 
@@ -157,10 +159,10 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   const handleCopyLink = (postId: string) => {
     const url = `${window.location.origin}/post/${postId}`
     navigator.clipboard.writeText(url).then(() => {
-      alert('Link copied to clipboard!')
+      toast.success('Đã sao chép link vào clipboard!')
       setMenuOpen(null)
     }).catch(() => {
-      alert('Failed to copy link')
+      toast.error('Sao chép link thất bại')
     })
   }
 
@@ -217,9 +219,10 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
       
       // Update viewer images
       setViewerImages(newImages)
+      toast.success('Đã xóa ảnh')
     } catch (error) {
       console.error('Failed to delete image:', error)
-      alert('Failed to delete image. Please try again.')
+      toast.error('Xóa ảnh thất bại. Vui lòng thử lại.')
     }
   }
 

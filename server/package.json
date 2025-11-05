@@ -39,6 +39,7 @@
     "class-validator": "^0.14.2",
     "cloudinary": "^2.8.0",
     "cookie-parser": "^1.4.7",
+    "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "^6.18.0",

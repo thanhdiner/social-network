@@ -15,6 +15,7 @@ export interface AuthContextType {
   register: (data: RegisterData) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  updateUser: (userData: User) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -122,6 +123,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await loadUser()
   }
 
+  const updateUser = (userData: User) => {
+    setUser(userData)
+  }
+
   const value: AuthContextType = {
     user,
     isLoading,
@@ -129,7 +134,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
-    refreshUser
+    refreshUser,
+    updateUser
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

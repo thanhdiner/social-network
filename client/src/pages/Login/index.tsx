@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
+import { toast } from 'sonner'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -19,12 +20,16 @@ export default function Login() {
 
     // Validation
     if (!formData.identifier || !formData.password) {
-      setError('Vui lòng điền đầy đủ thông tin')
+      const msg = 'Vui lòng điền đầy đủ thông tin'
+      setError(msg)
+      toast.error(msg)
       return
     }
 
     if (formData.password.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự')
+      const msg = 'Mật khẩu phải có ít nhất 6 ký tự'
+      setError(msg)
+      toast.error(msg)
       return
     }
 
@@ -33,7 +38,9 @@ export default function Login() {
       navigate('/')
     } catch (err) {
       const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-      setError(errorMessage || 'Đăng nhập thất bại. Vui lòng kiểm tra lại username/email và mật khẩu.')
+      const msg = errorMessage || 'Đăng nhập thất bại. Vui lòng kiểm tra lại username/email và mật khẩu.'
+      setError(msg)
+      toast.error(msg)
     }
   }
 
@@ -72,16 +79,22 @@ export default function Login() {
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
               Mật khẩu
             </label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-            />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+              />
+          </div>
+
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-sm text-orange-500 hover:text-orange-600 font-medium cursor-pointer">
+              Quên mật khẩu?
+            </Link>
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>

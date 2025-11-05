@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import userService from '@/services/userService'
 import uploadService from '@/services/uploadService'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -36,6 +37,15 @@ export default function EditProfile() {
     linkedin: ''
   })
 
+  // Email change / verification states
+  const [emailEditing, setEmailEditing] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [verificationToken, setVerificationToken] = useState('')
+  const [verificationSent, setVerificationSent] = useState(false)
+  const [verificationInput, setVerificationInput] = useState('')
+  const [mailSent, setMailSent] = useState(false)
+  const [resendSeconds, setResendSeconds] = useState(0)
+
   // Password form state
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -63,7 +73,7 @@ export default function EditProfile() {
         firstName: nameParts[nameParts.length - 1] || '',
         lastName: nameParts.slice(0, -1).join(' ') || '',
         bio: user.bio || '',
-        gender: user.gender || '',
+        gender: mapServerGenderToFrontend(user.gender),
         dateOfBirth: formattedDate,
         address: user.address || '',
         phone: user.phone || '',
@@ -76,8 +86,32 @@ export default function EditProfile() {
       // Set image previews
       setAvatarPreview(user.avatar || '')
       setCoverPreview(user.coverImage || '')
+      // Pre-fill newEmail with current email for convenience
+      setNewEmail(user.email || '')
+      setMailSent(false)
+      setVerificationSent(false)
+      setVerificationToken('')
+      setVerificationInput('')
     }
   }, [user])
+
+  // Map server gender (stored as Vietnamese 'Nam'/'Nữ'/'Khác') to frontend values
+  const mapServerGenderToFrontend = (g: string | undefined) => {
+    if (!g) return ''
+    const lower = g.toLowerCase()
+    if (lower === 'nam') return 'Male'
+    if (lower === 'nữ' || lower === 'nữ') return 'Female'
+    if (lower === 'khác') return 'Other'
+    // fallback: try common english values
+    if (lower === 'male' || lower === 'female' || lower === 'other') return g
+    return g
+  }
+
+  const mapFrontendGenderToServer = (g: string) => {
+    // Server expects 'Male'|'Female'|'Other' according to UpdateProfileDto
+    if (!g) return undefined
+    return g
+  }
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -127,6 +161,73 @@ export default function EditProfile() {
   setError('Failed to upload avatar')
     } finally {
       setUploadingAvatar(false)
+    }
+  }
+
+  const handleRequestEmailChange = async () => {
+    try {
+      const trimmedEmail = newEmail.trim()
+      if (!trimmedEmail) {
+        toast.error('Please enter a valid email')
+        return
+      }
+      const res = await userService.requestEmailChange(trimmedEmail)
+      // Store debug token if email is not actually sent
+      setVerificationToken(res.debugToken ?? '')
+      setVerificationInput('')
+      setVerificationSent(true)
+      setMailSent(res.mailSent)
+      setNewEmail(trimmedEmail)
+      // start 60s resend cooldown
+      setResendSeconds(60)
+      toast.success(res.message || 'Verification code has been sent.')
+      if (!res.mailSent && res.debugToken) {
+        toast.message(`Debug code: ${res.debugToken}`)
+      }
+    } catch (err) {
+      console.error('Request email change error:', err)
+      const error = err as unknown as { response?: { data?: { message?: string } }; message?: string }
+      const message = error?.response?.data?.message || error?.message || 'Failed to request email change'
+      toast.error(message)
+      setMailSent(false)
+    }
+  }
+
+  // resend countdown effect
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined
+    const id = setInterval(() => {
+      setResendSeconds((s) => {
+        if (s <= 1) {
+          clearInterval(id)
+          return 0
+        }
+        return s - 1
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [resendSeconds])
+
+  const handleConfirmEmailChange = async () => {
+    try {
+      if (!verificationInput) {
+        toast.error('Please enter the verification token')
+        return
+      }
+      await userService.confirmEmailChange(verificationInput)
+      await refreshUser()
+      setEmailEditing(false)
+      setVerificationSent(false)
+      setVerificationToken('')
+      setVerificationInput('')
+      setMailSent(false)
+    setResendSeconds(0)
+      toast.success('Email changed successfully')
+    } catch (err) {
+      console.error('Confirm email change error:', err)
+      const error = err as unknown as { response?: { data?: { message?: string } }; message?: string }
+      const message = error?.response?.data?.message || error?.message || 'Failed to confirm email change'
+      toast.error(message)
     }
   }
 
@@ -248,7 +349,7 @@ export default function EditProfile() {
       await userService.updateProfile({
         name: fullName,
         bio: formData.bio.trim() || undefined,
-        gender: formData.gender || undefined,
+        gender: formData.gender ? mapFrontendGenderToServer(formData.gender) : undefined,
         dateOfBirth: formData.dateOfBirth || undefined,
         address: formData.address.trim() || undefined,
         phone: formData.phone.trim() || undefined,
@@ -262,7 +363,7 @@ export default function EditProfile() {
       // Refresh user data in context
       await refreshUser()
 
-  alert('Update profile successfully!')
+  toast.success('Profile updated successfully!')
       navigate(`/profile/${user?.username}`)
     } catch (err) {
       console.error('Update error:', err)
@@ -317,7 +418,7 @@ export default function EditProfile() {
         confirmPassword: ''
       })
 
-  alert('Password changed successfully!')
+      toast.success('Đổi mật khẩu thành công!')
       setActiveTab('personal')
     } catch (err) {
       console.error('Change password error:', err)
@@ -474,8 +575,75 @@ export default function EditProfile() {
 
             <div className="col-span-2">
               <Label>Email</Label>
-              <Input type="email" placeholder="Email" value={user?.email || ''} disabled className="bg-gray-100 cursor-not-allowed" />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+              {!emailEditing ? (
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-gray-100 cursor-not-allowed flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEmailEditing(true)
+                      setVerificationSent(false)
+                      setVerificationInput('')
+                      setVerificationToken('')
+                      setMailSent(false)
+                    }}
+                  >
+                    Change
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    type="email"
+                    placeholder="Enter new email"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <Button onClick={handleRequestEmailChange} disabled={resendSeconds > 0}>
+                      {resendSeconds > 0 ? `Send again (${resendSeconds}s)` : 'Send verification'}
+                    </Button>
+                    <Button variant="outline" onClick={() => {
+                      setEmailEditing(false)
+                      setVerificationSent(false)
+                      setVerificationToken('')
+                      setVerificationInput('')
+                      setNewEmail(user?.email || '')
+                      setMailSent(false)
+                      setResendSeconds(0)
+                    }}>
+                      Cancel
+                    </Button>
+                  </div>
+
+                  {verificationSent && (
+                    <div className="mt-2 space-y-2 p-3 border rounded bg-gray-50">
+                      <p className="text-sm text-gray-600">
+                        {mailSent
+                          ? 'Please check your inbox for the verification code and paste it below to confirm your new email.'
+                          : 'Email delivery is disabled, use the debug code below or contact an administrator.'}
+                      </p>
+                      <Input value={verificationInput} onChange={e => setVerificationInput(e.target.value)} placeholder="Enter verification token" />
+                      {resendSeconds > 0 && (
+                        <p className="text-sm text-orange-600">You can resend the code in {resendSeconds}s</p>
+                      )}
+                      <div className="flex gap-2">
+                        <Button onClick={handleConfirmEmailChange} disabled={resendSeconds <= 0 && !verificationToken && !mailSent ? false : false}>Confirm</Button>
+                        <Button variant="outline" onClick={() => { setVerificationSent(false); setVerificationInput(''); setMailSent(false); setResendSeconds(0) }}>Dismiss</Button>
+                      </div>
+                      {verificationToken && (
+                        <p className="text-xs text-gray-500">Debug code: {verificationToken}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-1">You can change your email; a verification step is required.</p>
             </div>
 
             <div className="col-span-2">
@@ -502,6 +670,7 @@ export default function EditProfile() {
                   <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            <p className="text-xs text-gray-500 mt-1">Debug: raw server gender: {user?.gender ?? '---'} | form value: {formData.gender || '---'}</p>
             </div>
 
             <div className="col-span-2">

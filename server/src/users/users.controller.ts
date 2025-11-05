@@ -19,6 +19,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import type { User } from '@prisma/client';
 import { ChatGateway } from '../chat/chat.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -153,6 +154,39 @@ export class UsersController {
     return { message: 'Đổi mật khẩu thành công' };
   }
 
+  // Request email change: send verification token to new email (dev: returns token)
+  @Post('request-email-change')
+  @UseGuards(JwtAuthGuard)
+  async requestEmailChange(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Body() body: { newEmail: string },
+  ) {
+    const { newEmail } = body;
+    const result = await this.usersService.requestEmailChange(
+      currentUser.userId,
+      newEmail,
+    );
+
+    return {
+      message: result.mailSent
+        ? 'Đã gửi mã xác thực tới email mới của bạn.'
+        : 'Email service đang tắt, dùng mã debug để xác nhận.',
+      mailSent: result.mailSent,
+      expiresAt: result.expiresAt,
+      ...(result.debugToken ? { debugToken: result.debugToken } : {}),
+    };
+  }
+
+  @Post('confirm-email-change')
+  @UseGuards(JwtAuthGuard)
+  async confirmEmailChange(@Body() body: { token: string }) {
+    const { token } = body;
+    const updatedUser: User = await this.usersService.confirmEmailChange(token);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = updatedUser;
+    return userWithoutPassword;
+  }
+
   @Post(':userId/follow')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -232,8 +266,14 @@ export class UsersController {
     @CurrentUser() currentUser: CurrentUserData,
     @Param('userId') userId: string,
   ) {
-    const isBlocked = await this.usersService.isBlocked(currentUser.userId, userId);
-    const hasBlocked = await this.usersService.isBlocked(userId, currentUser.userId);
+    const isBlocked = await this.usersService.isBlocked(
+      currentUser.userId,
+      userId,
+    );
+    const hasBlocked = await this.usersService.isBlocked(
+      userId,
+      currentUser.userId,
+    );
     return { isBlocked, hasBlocked };
   }
 }

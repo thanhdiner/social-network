@@ -1,4 +1,4 @@
-﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Settings, Shield } from 'lucide-react'
+﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Shield, Settings } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
@@ -170,21 +170,14 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
                   <span className="text-gray-700 font-medium">Edit Profile</span>
                 </Link>
                 <Link
-                  to="/account-settings"
+                  to="/settings/account"
                   className="flex items-center gap-3 px-5 py-2.5 hover:bg-orange-50 transition"
                   onClick={() => setOpen(false)}
                 >
-                  <Settings className="text-purple-400" />
+                  <Settings className="text-orange-400" />
                   <span className="text-gray-700 font-medium">Account Settings</span>
                 </Link>
-                <Link
-                  to="/privacy"
-                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-orange-50 transition"
-                  onClick={() => setOpen(false)}
-                >
-                  <Shield className="text-red-400" />
-                  <span className="text-gray-700 font-medium">Privacy Settings</span>
-                </Link>
+                {/* Privacy Settings removed per request */}
               </div>
 
               {/* Logout */}
@@ -204,4 +197,6 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
     </header>
   )
 }
+
+
 

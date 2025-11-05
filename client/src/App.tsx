@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ChatProvider } from '@/contexts/ChatContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
@@ -7,6 +8,8 @@ import { MainLayout } from '@/Layout/MainLayout'
 import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
 import Profile from '@/pages/Profile'
 import Chat from '@/pages/Chat'
 import EditProfile from '@/pages/Profile/EditProfile'
@@ -16,6 +19,7 @@ import NotFound from '@/pages/NotFound'
 import UserNotFound from '@/pages/UserNotFound'
 import { PostDetail } from '@/pages/PostDetail'
 import { SearchResults } from '@/pages/Search'
+import AccountSettings from '@/pages/AccountSettings'
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
 import { VideoCallModal } from '@/components/shared/VideoCallModal'
 
@@ -39,6 +43,22 @@ function App() {
             element={
               <GuestRoute>
                 <Register />
+              </GuestRoute>
+            } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={
+              <GuestRoute>
+                <ForgotPassword />
+              </GuestRoute>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <GuestRoute>
+                <ResetPassword />
               </GuestRoute>
             } 
           />
@@ -122,6 +142,17 @@ function App() {
           />
 
           <Route
+            path="/settings/account"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <AccountSettings />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/stories"
             element={
               <ProtectedRoute>
@@ -153,6 +184,8 @@ function App() {
   {/* Global call modals */}
   <VoiceCallModal />
   <VideoCallModal />
+  {/* Toast notifications */}
+  <Toaster position="top-right" richColors closeButton />
         </ChatProvider>
       </AuthProvider>
     </Router>
