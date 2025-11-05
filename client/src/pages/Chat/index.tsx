@@ -689,7 +689,6 @@ export default function Chat() {
   const [infoSectionsOpen, setInfoSectionsOpen] = useState<Record<string, boolean>>({
     customization: false,
     media: false,
-    privacy: false,
     pinned: false
   });
   const [mediaTab, setMediaTab] = useState<'media' | 'files'>('media');
@@ -1811,12 +1810,22 @@ export default function Chat() {
       setShowInfoPanel(sv === '1');
       const sec = localStorage.getItem(`chat:infoSections:${selectedUser.id}`);
       if (sec) {
-        setInfoSectionsOpen(JSON.parse(sec));
+        // only restore known keys to avoid stale entries
+        try {
+          const parsed = JSON.parse(sec);
+          setInfoSectionsOpen({
+            customization: !!parsed.customization,
+            media: !!parsed.media,
+            pinned: !!parsed.pinned
+          });
+        } catch {
+          setInfoSectionsOpen({ customization: false, media: false, pinned: false });
+        }
       } else {
-        setInfoSectionsOpen({ customization: false, media: false, privacy: false, pinned: false });
+        setInfoSectionsOpen({ customization: false, media: false, pinned: false });
       }
     } catch {
-      setInfoSectionsOpen({ customization: false, media: false, privacy: false, pinned: false });
+      setInfoSectionsOpen({ customization: false, media: false, pinned: false });
     }
   }, [selectedUser]);
 
@@ -1865,10 +1874,6 @@ export default function Chat() {
   const handleInfoSearch = useCallback(() => {
     setShowInfoPanel(false);
     alert('Search within conversation is under development.');
-  }, []);
-
-  const handleComingSoon = useCallback((feature: string) => {
-    alert(`${feature} is under development.`);
   }, []);
 
   // Focus input
@@ -2577,35 +2582,6 @@ export default function Chat() {
                   )}
                 </div>
               )}
-            </div>
-          )
-        },
-        {
-          id: 'privacy',
-          title: 'Privacy & support',
-          content: (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={handleBlockUser}
-                className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-orange-50 text-sm text-gray-700 transition-colors cursor-pointer"
-              >
-                {isBlocked ? 'Unblock user' : 'Block user'}
-              </button>
-              <button
-                type="button"
-                onClick={handleConversationDelete}
-                className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-orange-50 text-sm text-gray-700 transition-colors cursor-pointer"
-              >
-                Delete conversation
-              </button>
-              <button
-                type="button"
-                onClick={() => handleComingSoon('Report an issue')}
-                className="w-full text-left px-3 py-2 rounded-lg bg-white hover:bg-orange-50 text-sm text-gray-700 transition-colors cursor-pointer"
-              >
-                Report an issue
-              </button>
             </div>
           )
         }
