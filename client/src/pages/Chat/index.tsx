@@ -28,7 +28,8 @@ import {
   Pin,
   PinOff,
   Download,
-  FileText
+  FileText,
+  ChevronUp
 } from 'lucide-react';
 import RecordRTC from 'recordrtc';
 import clsx from 'clsx';
@@ -695,6 +696,11 @@ export default function Chat() {
   const [isBlocked, setIsBlocked] = useState(false);
   const [hasBlocked, setHasBlocked] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [messageSearchResults, setMessageSearchResults] = useState<string[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const messageSearchInputRef = useRef<HTMLInputElement>(null);
   const activeTheme = useMemo(() => getThemeById(customization.themeId), [customization.themeId]);
   const themeStyleVars = useMemo<CSSProperties>(() => ({
     '--chat-accent': activeTheme.accent,
@@ -1873,7 +1879,68 @@ export default function Chat() {
 
   const handleInfoSearch = useCallback(() => {
     setShowInfoPanel(false);
-    alert('Search within conversation is under development.');
+    setShowMessageSearch(true);
+    setMessageSearchQuery('');
+    setMessageSearchResults([]);
+    setCurrentSearchIndex(0);
+    setTimeout(() => messageSearchInputRef.current?.focus(), 100);
+  }, []);
+
+  const handleMessageSearch = useCallback((query: string) => {
+    setMessageSearchQuery(query);
+    
+    if (!query.trim()) {
+      setMessageSearchResults([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase().trim();
+    const matchedIds = messages
+      .filter(msg => 
+        !msg.unsent && 
+        msg.content && 
+        msg.content.toLowerCase().includes(lowerQuery)
+      )
+      .map(msg => msg.id);
+    
+    setMessageSearchResults(matchedIds);
+    setCurrentSearchIndex(matchedIds.length > 0 ? 0 : -1);
+
+    // Scroll to first result
+    if (matchedIds.length > 0) {
+      const firstMessageId = matchedIds[0];
+      const messageElement = document.getElementById(`message-${firstMessageId}`);
+      if (messageElement) {
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [messages]);
+
+  const handleSearchNavigation = useCallback((direction: 'prev' | 'next') => {
+    if (messageSearchResults.length === 0) return;
+
+    let newIndex = currentSearchIndex;
+    if (direction === 'next') {
+      newIndex = (currentSearchIndex + 1) % messageSearchResults.length;
+    } else {
+      newIndex = currentSearchIndex === 0 ? messageSearchResults.length - 1 : currentSearchIndex - 1;
+    }
+
+    setCurrentSearchIndex(newIndex);
+
+    const messageId = messageSearchResults[newIndex];
+    const messageElement = document.getElementById(`message-${messageId}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [messageSearchResults, currentSearchIndex]);
+
+  const handleCloseMessageSearch = useCallback(() => {
+    setShowMessageSearch(false);
+    setMessageSearchQuery('');
+    setMessageSearchResults([]);
+    setCurrentSearchIndex(0);
   }, []);
 
   // Focus input
@@ -2943,6 +3010,60 @@ export default function Chat() {
               )}
             </div>
 
+            {/* Message Search Bar */}
+            {showMessageSearch && (
+              <div className="bg-orange-50 border-b border-orange-200 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      ref={messageSearchInputRef}
+                      type="text"
+                      placeholder="Search in conversation..."
+                      value={messageSearchQuery}
+                      onChange={(e) => handleMessageSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
+                    />
+                  </div>
+                  {messageSearchResults.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700 whitespace-nowrap">
+                        {currentSearchIndex + 1} / {messageSearchResults.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleSearchNavigation('prev')}
+                          className="p-1.5 hover:bg-orange-100 rounded-full transition-colors cursor-pointer"
+                          title="Previous"
+                          disabled={messageSearchResults.length === 0}
+                        >
+                          <ChevronUp className="w-4 h-4 text-gray-700" />
+                        </button>
+                        <button
+                          onClick={() => handleSearchNavigation('next')}
+                          className="p-1.5 hover:bg-orange-100 rounded-full transition-colors cursor-pointer"
+                          title="Next"
+                          disabled={messageSearchResults.length === 0}
+                        >
+                          <ChevronDown className="w-4 h-4 text-gray-700" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleCloseMessageSearch}
+                    className="p-1.5 hover:bg-orange-100 rounded-full transition-colors cursor-pointer"
+                    title="Close search"
+                  >
+                    <X className="w-4 h-4 text-gray-700" />
+                  </button>
+                </div>
+                {messageSearchQuery && messageSearchResults.length === 0 && (
+                  <p className="text-sm text-gray-600 mt-2">No messages found</p>
+                )}
+              </div>
+            )}
+
             {/* Messages */}
             <div
               ref={messagesContainerRef}
@@ -3199,9 +3320,21 @@ export default function Chat() {
                                     <p
                                       className={`text-sm wrap-break-word ${
                                         message.imageUrl || message.videoUrl || message.audioUrl || message.fileUrl ? 'px-3 py-2' : ''
-                                      }`}
+                                      } ${messageSearchResults.includes(message.id) && messageSearchResults[currentSearchIndex] === message.id ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''}`}
                                     >
-                                      {message.content}
+                                      {messageSearchQuery && messageSearchResults.includes(message.id) ? (
+                                        <>
+                                          {message.content.split(new RegExp(`(${messageSearchQuery})`, 'gi')).map((part, idx) => 
+                                            part.toLowerCase() === messageSearchQuery.toLowerCase() ? (
+                                              <mark key={idx} className="bg-yellow-300 text-gray-900">{part}</mark>
+                                            ) : (
+                                              <span key={idx}>{part}</span>
+                                            )
+                                          )}
+                                        </>
+                                      ) : (
+                                        message.content
+                                      )}
                                     </p>
                                   )}
                               </>
