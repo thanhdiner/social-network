@@ -26,7 +26,9 @@ import {
   Play,
   Pause,
   Pin,
-  PinOff
+  PinOff,
+  Download,
+  FileText
 } from 'lucide-react';
 import RecordRTC from 'recordrtc';
 import clsx from 'clsx';
@@ -690,6 +692,7 @@ export default function Chat() {
     privacy: false,
     pinned: false
   });
+  const [mediaTab, setMediaTab] = useState<'media' | 'files'>('media');
   const [isBlocked, setIsBlocked] = useState(false);
   const [hasBlocked, setHasBlocked] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -2256,6 +2259,36 @@ export default function Chat() {
       });
   }, [messages]);
 
+  const mediaItems = useMemo(() => {
+    return messages
+      .filter(message => !message.unsent && (message.imageUrl || message.videoUrl))
+      .map(message => ({
+        id: message.id,
+        url: message.imageUrl || message.videoUrl || '',
+        type: message.imageUrl ? 'image' : 'video',
+        createdAt: message.createdAt
+      }))
+      .reverse();
+  }, [messages]);
+
+  const fileItems = useMemo(() => {
+    return messages
+      .filter(message => !message.unsent && message.fileUrl)
+      .map(message => {
+        const fileUrls = message.fileUrl!.split(',').map(s => s.trim()).filter(Boolean);
+        const fileNames = (message.fileName || '').split(',').map(s => s.trim()).filter(Boolean);
+        return fileUrls.map((url, idx) => ({
+          id: `${message.id}-${idx}`,
+          url,
+          name: fileNames[idx] || 'file',
+          size: message.fileSize,
+          createdAt: message.createdAt
+        }));
+      })
+      .flat()
+      .reverse();
+  }, [messages]);
+
   const quickActions = selectedUser
     ? [
         {
@@ -2403,15 +2436,147 @@ export default function Chat() {
           id: 'media',
           title: 'Media & files',
           content: (
-            <div className="space-y-3 text-sm text-gray-600">
-              <p>Quick access to photos, videos and files shared in this conversation.</p>
-              <button
-                type="button"
-                onClick={() => handleComingSoon('Media library')}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors cursor-pointer"
-              >
-                Open gallery
-              </button>
+            <div className="space-y-3">
+              {/* Tabs */}
+              <div className="flex gap-2 border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setMediaTab('media')}
+                  className={clsx(
+                    'flex-1 px-4 py-2 text-sm font-medium transition-colors cursor-pointer',
+                    mediaTab === 'media'
+                      ? 'text-orange-600 border-b-2 border-orange-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  )}
+                >
+                  Media ({mediaItems.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMediaTab('files')}
+                  className={clsx(
+                    'flex-1 px-4 py-2 text-sm font-medium transition-colors cursor-pointer',
+                    mediaTab === 'files'
+                      ? 'text-orange-600 border-b-2 border-orange-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  )}
+                >
+                  Files ({fileItems.length})
+                </button>
+              </div>
+
+              {/* Media Tab */}
+              {mediaTab === 'media' && (
+                <div>
+                  {mediaItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No media shared yet</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1">
+                      {mediaItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="aspect-square relative group cursor-pointer overflow-hidden rounded-lg bg-gray-100"
+                          onClick={() => {
+                            if (item.type === 'image') {
+                              const imageUrls = mediaItems.filter(m => m.type === 'image').map(m => m.url);
+                              const imageIndex = imageUrls.indexOf(item.url);
+                              setViewerImages(imageUrls);
+                              setViewerIndex(imageIndex);
+                              setViewerOpen(true);
+                            } else {
+                              // Open video in new tab
+                              window.open(item.url, '_blank');
+                            }
+                          }}
+                        >
+                          {item.type === 'image' ? (
+                            <img
+                              src={item.url}
+                              alt="Media"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full relative">
+                              <video
+                                src={item.url}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Play className="w-8 h-8 text-white" />
+                              </div>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Files Tab */}
+              {mediaTab === 'files' && (
+                <div>
+                  {fileItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No files shared yet</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {fileItems.map((file) => (
+                        <div
+                          key={file.id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="shrink-0 w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-orange-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {file.size
+                                ? file.size >= 1024 * 1024
+                                  ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                                  : `${(file.size / 1024).toFixed(2)} KB`
+                                : 'Unknown size'}
+                            </p>
+                          </div>
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              fetch(file.url)
+                                .then(response => response.blob())
+                                .then(blob => {
+                                  const downloadUrl = window.URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = downloadUrl;
+                                  a.download = file.name;
+                                  document.body.appendChild(a);
+                                  a.click();
+                                  window.URL.revokeObjectURL(downloadUrl);
+                                  document.body.removeChild(a);
+                                })
+                                .catch(err => console.error('Download failed:', err));
+                            }}
+                            className="shrink-0 p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                            title="Download"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         },
