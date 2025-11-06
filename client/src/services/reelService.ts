@@ -97,3 +97,14 @@ export const deleteReelComment = async (commentId: string): Promise<void> => {
 export const shareReel = async (id: string): Promise<void> => {
   await api.post(`/reels/${id}/share`);
 };
+
+// Increment view count for a reel (called when user watched enough)
+export const viewReel = async (id: string): Promise<{ views: number } | void> => {
+  try {
+    const response = await api.post(`/reels/${id}/view`);
+    return response.data;
+  } catch (err) {
+    // non-fatal
+    console.error('Error incrementing reel view:', err);
+  }
+};

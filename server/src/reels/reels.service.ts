@@ -1,12 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { UpdateReelDto } from './dto/update-reel.dto';
 import { CreateReelCommentDto } from './dto/create-reel-comment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class ReelsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private chatGateway: ChatGateway,
+  ) {}
 
   // Tạo reel mới
   async create(userId: string, createReelDto: CreateReelDto) {
@@ -192,6 +203,19 @@ export class ReelsService {
     };
   }
 
+  // Increment view count (called when user watched video enough)
+  async view(id: string, userId: string) {
+    const reel = await this.prisma.reel.findUnique({ where: { id } });
+    if (!reel) throw new NotFoundException('Reel not found');
+
+    const updated = await this.prisma.reel.update({
+      where: { id },
+      data: { views: { increment: 1 } },
+    });
+
+    return { views: updated.views };
+  }
+
   // Cập nhật reel
   async update(id: string, userId: string, updateReelDto: UpdateReelDto) {
     const reel = await this.prisma.reel.findUnique({
@@ -356,6 +380,10 @@ export class ReelsService {
 
   // Create comment
   async createComment(reelId: string, userId: string, createCommentDto: CreateReelCommentDto) {
+    if (!createCommentDto.content?.trim() && !createCommentDto.imageUrl) {
+      throw new BadRequestException('Comment content or image is required');
+    }
+
     const reel = await this.prisma.reel.findUnique({
       where: { id: reelId },
     });
@@ -374,12 +402,13 @@ export class ReelsService {
       }
     }
 
-    return this.prisma.reelComment.create({
+    const comment = await this.prisma.reelComment.create({
       data: {
-        content: createCommentDto.content,
+        content: createCommentDto.content?.trim() ?? '',
         reelId,
         userId,
         parentId: createCommentDto.parentId,
+        imageUrl: createCommentDto.imageUrl ?? null,
       },
       include: {
         user: {
@@ -397,12 +426,70 @@ export class ReelsService {
         },
       },
     });
+
+    // Notify reel owner (if not the commenter)
+    try {
+      if (reel.userId !== userId) {
+        const notification = await this.notificationsService.create({
+          type: 'comment',
+          content: `commented on your reel`,
+          userId: reel.userId,
+          actorId: userId,
+          actorName: comment.user.name,
+          actorAvatar: comment.user.avatar || undefined,
+          relatedId: reelId,
+        });
+
+        // Emit realtime notification and a specific reel_comment_created event
+        this.chatGateway.notifyUser(reel.userId, notification);
+      }
+
+      // If this is a reply, notify the parent comment owner (if different)
+      if (createCommentDto.parentId) {
+        const parent = await this.prisma.reelComment.findUnique({
+          where: { id: createCommentDto.parentId },
+          include: { user: { select: { id: true } } },
+        });
+
+        if (parent && parent.user.id !== userId && parent.user.id !== reel.userId) {
+          const notification = await this.notificationsService.create({
+            type: 'comment',
+            content: `replied to your comment`,
+            userId: parent.user.id,
+            actorId: userId,
+            actorName: comment.user.name,
+            actorAvatar: comment.user.avatar || undefined,
+            relatedId: reelId,
+          });
+
+          this.chatGateway.notifyUser(parent.user.id, notification);
+        }
+      }
+    } catch (err) {
+      // If notification sending fails, don't block comment creation
+      console.error('Failed to create/emit reel comment notification', err);
+    }
+
+    try {
+      this.chatGateway.broadcast('reel_comment_created', comment);
+    } catch (err) {
+      console.error('Failed to broadcast reel comment', err);
+    }
+
+    return comment;
   }
 
   // Delete comment
   async deleteComment(commentId: string, userId: string) {
     const comment = await this.prisma.reelComment.findUnique({
       where: { id: commentId },
+      include: {
+        _count: {
+          select: {
+            replies: true,
+          },
+        },
+      },
     });
 
     if (!comment) {
@@ -416,6 +503,21 @@ export class ReelsService {
     await this.prisma.reelComment.delete({
       where: { id: commentId },
     });
+
+    const removedReplies = comment._count?.replies ?? 0;
+    const payload = {
+      reelId: comment.reelId,
+      commentId,
+      parentId: comment.parentId,
+      removedCount: 1 + removedReplies,
+      removedReplies,
+    };
+
+    try {
+      this.chatGateway.broadcast('reel_comment_deleted', payload);
+    } catch (err) {
+      console.error('Failed to broadcast reel_comment_deleted', err);
+    }
 
     return { message: 'Comment deleted successfully' };
   }

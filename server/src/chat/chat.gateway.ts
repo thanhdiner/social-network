@@ -138,6 +138,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  // Emit arbitrary event payload to a specific user's socket (if connected)
+  emitToUser(userId: string, event: string, payload: any) {
+    const socketId = this.userSockets.get(userId);
+    if (socketId) {
+      this.server.to(socketId).emit(event, payload);
+    }
+  }
+
+  // Broadcast an event to all connected sockets (optionally skipping users)
+  broadcast(event: string, payload: any, options?: { excludeUserIds?: string[] }) {
+    const exclude = new Set(options?.excludeUserIds ?? []);
+    if (exclude.size === 0) {
+      this.server.emit(event, payload);
+      return;
+    }
+
+    this.userSockets.forEach((socketId, userId) => {
+      if (!exclude.has(userId)) {
+        this.server.to(socketId).emit(event, payload);
+      }
+    });
+  }
+
   // Chat events
   sendMessage(
     receiverId: string,

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import type { Reel } from '../../types';
+import type { Reel, ReelComment } from '../../types';
 import { getReelsByUser } from '../../services/reelService';
 import { Video, Play, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import socketService from '../../services/socketService';
 
 interface UserReelsProps {
   userId: string;
@@ -29,6 +30,56 @@ export default function UserReels({ userId }: UserReelsProps) {
     }
   };
 
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    const handleCommentCreated = (comment: ReelComment) => {
+      if (!comment?.reelId) return;
+      setReels((prev) =>
+        prev.map((item) => {
+          if (item.id !== comment.reelId) return item;
+          const nextCount = item._count
+            ? { ...item._count, comments: (item._count.comments ?? 0) + 1 }
+            : { likes: 0, comments: 1, shares: 0 };
+          return {
+            ...item,
+            _count: nextCount,
+          };
+        }),
+      );
+    };
+
+    const handleCommentDeleted = (payload: {
+      reelId: string;
+      removedCount?: number;
+    }) => {
+      if (!payload?.reelId) return;
+      const removed = Math.max(payload.removedCount ?? 1, 1);
+      setReels((prev) =>
+        prev.map((item) => {
+          if (item.id !== payload.reelId) return item;
+          const current = item._count?.comments ?? 0;
+          const nextCount = item._count
+            ? { ...item._count, comments: Math.max(current - removed, 0) }
+            : { likes: 0, comments: Math.max(current - removed, 0), shares: 0 };
+          return {
+            ...item,
+            _count: nextCount,
+          };
+        }),
+      );
+    };
+
+    socket.on('reel_comment_created', handleCommentCreated);
+    socket.on('reel_comment_deleted', handleCommentDeleted);
+
+    return () => {
+      socket.off('reel_comment_created', handleCommentCreated);
+      socket.off('reel_comment_deleted', handleCommentDeleted);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -37,11 +88,11 @@ export default function UserReels({ userId }: UserReelsProps) {
     );
   }
 
-  if (reels.length === 0) {
+    if (reels.length === 0) {
     return (
       <div className="text-center py-12">
         <Video className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500">Chưa có reel nào</p>
+        <p className="text-gray-500">No reels yet</p>
       </div>
     );
   }

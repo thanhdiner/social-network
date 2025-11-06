@@ -328,6 +328,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const [messages, setMessages] = useState<Message[]>([])
   const [, startTransition] = useTransition()
   const [newMessage, setNewMessage] = useState('')
+  const composingRef = useRef(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [loading, setLoading] = useState(true) // Bắt đầu với loading = true
   const [initialLoadDone, setInitialLoadDone] = useState(false) // Track xem đã load xong chưa
@@ -1321,6 +1322,10 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
+    // If the user is in IME composition (e.g., typing Vietnamese with accents), don't send on Enter
+  // Check composition state (isComposing exists on nativeEvent for some browsers)
+  if ((composingRef && composingRef.current) || ('isComposing' in e.nativeEvent && (e.nativeEvent as unknown as { isComposing?: boolean }).isComposing)) return
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
@@ -2435,6 +2440,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                         }, 2000)
                       }}
                       onKeyPress={handleKeyPress}
+                      onCompositionStart={() => { composingRef.current = true }}
+                      onCompositionEnd={() => { composingRef.current = false }}
                       placeholder="Aa"
                       rows={1}
                       className="flex-1 bg-transparent resize-none outline-none text-sm max-h-20"

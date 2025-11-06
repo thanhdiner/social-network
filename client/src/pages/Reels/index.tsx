@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Reel } from '../../types';
+import type { Reel, ReelComment } from '../../types';
 import { getReels, getReel } from '../../services/reelService';
 import ReelPlayer from '../../components/Reels/ReelPlayer';
 import ReelComments from '../../components/Reels/ReelComments';
 import { ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
 import { useNavigate, useParams } from 'react-router-dom';
+import socketService from '../../services/socketService';
 
 export default function ReelsPage() {
   useTitle('Reels');
@@ -166,6 +167,59 @@ export default function ReelsPage() {
     }
   };
 
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    const handleCommentCreated = (comment: ReelComment) => {
+      if (!comment?.reelId) return;
+      setReels((prev) =>
+        prev.map((item) => {
+          if (item.id !== comment.reelId) return item;
+          const nextCount = item._count
+            ? { ...item._count, comments: (item._count.comments ?? 0) + 1 }
+            : { likes: 0, comments: 1, shares: 0 };
+          return {
+            ...item,
+            _count: nextCount,
+          };
+        }),
+      );
+    };
+
+    const handleCommentDeleted = (payload: {
+      reelId: string;
+      removedCount?: number;
+    }) => {
+      if (!payload?.reelId) return;
+      const removed = Math.max(payload.removedCount ?? 1, 1);
+      setReels((prev) =>
+        prev.map((item) => {
+          if (item.id !== payload.reelId) return item;
+          const current = item._count?.comments ?? 0;
+          const nextCount = item._count
+            ? { ...item._count, comments: Math.max(current - removed, 0) }
+            : { likes: 0, comments: 0, shares: 0 };
+          if (!item._count) {
+            nextCount.comments = Math.max(current - removed, 0);
+          }
+          return {
+            ...item,
+            _count: nextCount,
+          };
+        }),
+      );
+    };
+
+    socket.on('reel_comment_created', handleCommentCreated);
+    socket.on('reel_comment_deleted', handleCommentDeleted);
+
+    return () => {
+      socket.off('reel_comment_created', handleCommentCreated);
+      socket.off('reel_comment_deleted', handleCommentDeleted);
+    };
+  }, []);
+
   if (reels.length === 0 && !loading && !paramReelId) {
     return (
       <div className="relative h-screen bg-black">
@@ -198,39 +252,45 @@ export default function ReelsPage() {
 
       <div
         ref={containerRef}
-        className="h-full w-full"
+        className="h-full w-full transition-transform duration-300"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
       >
-        {reels.map((reel, index) => (
-          <div
-            key={reel.id}
-            className={`absolute inset-0 ${!skipTransition ? 'transition-transform duration-300' : ''} ${
-              index === currentIndex
-                ? 'translate-y-0'
-                : index < currentIndex
-                  ? '-translate-y-full'
-                  : 'translate-y-full'
-            }`}
-            style={{ zIndex: index === currentIndex ? 10 : 1 }}
-          >
-            <ReelPlayer
-              reel={reel}
+        {reels.map((reel, index) => {
+          const vertical = index === currentIndex ? '0%' : index < currentIndex ? '-100%' : '100%';
+          const transform = `translateY(${vertical})`;
+
+          return (
+            <div
+              key={reel.id}
+              className={`${!skipTransition ? 'transition-transform duration-300' : ''} absolute top-0 left-0 bottom-0 right-0 ${
+                showComments ? 'sm:right-[436px]' : ''
+              }`}
+              style={{ zIndex: index === currentIndex ? 10 : 1, transform }}
+            >
+              <ReelPlayer
+                reel={reel}
                 isActive={index === currentIndex}
-                onCommentClick={() => setShowComments(true)}
+                onCommentClick={() => setShowComments((prev) => !prev)}
+                showComments={showComments}
                 onDelete={handleReelDelete}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-            />
-          </div>
-        ))}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Navigation Buttons (moved further right so action icons sit left of them) */}
-      <div className="fixed right-2 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-30">
+      <div
+        className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-4 z-30 right-2 transition-[right] duration-300 ${
+          showComments ? 'sm:right-[436px]' : ''
+        }`}
+      >
         {currentIndex > 0 && (
           <button
             onClick={handlePrevious}
@@ -256,11 +316,12 @@ export default function ReelsPage() {
         </div>
       )}
 
-      {/* Comments Modal */}
+      {/* Comments Drawer/Modal */}
       {showComments && reels[currentIndex] && (
         <ReelComments
           reelId={reels[currentIndex].id}
           onClose={() => setShowComments(false)}
+          isDrawer
         />
       )}
     </div>

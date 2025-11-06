@@ -1,0 +1,1815 @@
+// Clean temporary ReelComments component (atomic overwrite to fix parser errors)
+import React from 'react';
+
+interface ReelCommentsProps {
+  reelId: string;
+  onClose: () => void;
+  isDrawer?: boolean;
+}
+
+export default function ReelComments(_: ReelCommentsProps) {
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-semibold">Comments</h2>
+      <p className="text-sm text-gray-500">Comments component (temporary stub)</p>
+    </div>
+  );
+}
+import React from 'react';import { useCallback, useEffect, useRef, useState } from 'react';import { useCallback, useEffect, useRef, useState } from 'react';import { useCallback, useEffect, useRef, useState } from 'react';
+
+
+
+interface ReelCommentsProps {import type { ReelComment } from '../../types';
+
+  reelId: string;
+
+  onClose: () => void;import {import type { ReelComment } from '../../types';import type { ReelComment } from '../../types';
+
+  isDrawer?: boolean;
+
+}  getReelComments,
+
+
+
+export default function ReelComments(_: ReelCommentsProps) {  getReelCommentReplies,import {import {
+
+  return (
+
+    <div className="p-4">  createReelComment,
+
+      <h2 className="text-lg font-semibold">Comments</h2>
+
+      <p className="text-sm text-gray-500">Comments component (temporary stub)</p>  deleteReelComment,  getReelComments,  getReelComments,
+
+    </div>
+
+  );} from '../../services/reelService';
+
+}
+
+import { useCurrentUser } from '../../hooks/useCurrentUser';  getReelCommentReplies,  getReelCommentReplies,
+
+import { formatDistanceToNow } from 'date-fns';
+
+import { enUS } from 'date-fns/locale';  createReelComment,  createReelComment,
+
+import { Send, Trash2, MessageCircle } from 'lucide-react';
+
+import { Button } from '../ui/button';  deleteReelComment,  deleteReelComment,
+
+import { Textarea } from '../ui/textarea';
+
+} from '../../services/reelService';} from '../../services/reelService';
+
+interface ReelCommentsProps {
+
+  reelId: string;import { useCurrentUser } from '../../hooks/useCurrentUser';import { useCurrentUser } from '../../hooks/useCurrentUser';
+
+  onClose: () => void;
+
+  isDrawer?: boolean;import { formatDistanceToNow } from 'date-fns';import { formatDistanceToNow } from 'date-fns';
+
+}
+
+import { enUS } from 'date-fns/locale';import { enUS } from 'date-fns/locale';
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
+
+  const { user: currentUser } = useCurrentUser();import { Send, Trash2, MessageCircle } from 'lucide-react';import { Send, Trash2, MessageCircle } from 'lucide-react';
+
+
+
+  // comments stateimport { Button } from '../ui/button';import { Button } from '../ui/button';
+
+  const [comments, setComments] = useState<ReelComment[]>([]);
+
+  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});import { Textarea } from '../ui/textarea';import { Textarea } from '../ui/textarea';
+
+
+
+  // pagination / loading
+
+  const [page, setPage] = useState(1);
+
+  const [limit] = useState(10);interface ReelCommentsProps {interface ReelCommentsProps {
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [isLoadingMore, setIsLoadingMore] = useState(false);  reelId: string;  reelId: string;
+
+  const [hasMore, setHasMore] = useState(false);
+
+  onClose: () => void;  onClose: () => void;
+
+  // reply state
+
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);  isDrawer?: boolean;  isDrawer?: boolean;
+
+  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);
+
+  const [replyContent, setReplyContent] = useState('');}}
+
+
+
+  // new comment
+
+  const [newComment, setNewComment] = useState('');
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
+
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  const { user: currentUser } = useCurrentUser();  const { user: currentUser } = useCurrentUser();
+
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+
+
+  const loadComments = useCallback(
+
+    async (pageNum = 1) => {  // comments state  // comments state
+
+      if (pageNum === 1) setIsLoading(true);
+
+      try {  const [comments, setComments] = useState<ReelComment[]>([]);  const [comments, setComments] = useState<ReelComment[]>([]);
+
+        const data = await getReelComments(reelId, pageNum, limit);
+
+        if (pageNum === 1) {  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});
+
+          setComments(data);
+
+          setPage(1);
+
+          setHasMore(data.length === limit);
+
+        } else {  // pagination / loading  // pagination / loading
+
+          setComments((prev) => [...prev, ...data]);
+
+          setHasMore(data.length === limit);  const [page, setPage] = useState(1);  const [page, setPage] = useState(1);
+
+          setPage(pageNum);
+
+        }  const [limit] = useState(10);  const [limit] = useState(10);
+
+      } catch (err) {
+
+        console.error('Error loading comments', err);  const [isLoading, setIsLoading] = useState(true);  const [isLoading, setIsLoading] = useState(true);
+
+        if (pageNum === 1) setComments([]);
+
+      } finally {  import { useCallback, useEffect, useRef, useState } from 'react';
+
+        setIsLoading(false);  import type { ReelComment } from '../../types';
+
+        setIsLoadingMore(false);  import {
+
+      }
+
+    },
+
+    [reelId, limit]
+
+  );  // reply state  // reply state
+
+
+
+  useEffect(() => {  const [replyingTo, setReplyingTo] = useState<string | null>(null);  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+
+    loadComments(1);
+
+  }, [reelId, loadComments]);  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);
+
+
+
+  const loadReplies = async (commentId: string) => {  const [replyContent, setReplyContent] = useState('');  const [replyContent, setReplyContent] = useState('');
+
+    try {
+
+      const replies = await getReelCommentReplies(commentId);
+
+      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
+
+    } catch (err) {  // new comment  // new comment
+
+      console.error('Error loading replies', err);
+
+    }  const [newComment, setNewComment] = useState('');  const [newComment, setNewComment] = useState('');
+
+  };
+
+
+
+  const toggleReplies = (commentId: string) => {
+
+    const next = new Set(expandedComments);  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+    if (next.has(commentId)) {
+
+      next.delete(commentId);
+
+    } else {
+
+      next.add(commentId);  const replyInputRef = useRef<HTMLInputElement | null>(null);  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+      if (!repliesMap[commentId]) loadReplies(commentId);
+
+    }
+
+    setExpandedComments(next);
+
+  };  const loadComments = useCallback(  const loadComments = useCallback(
+
+
+
+  const handleSubmitComment = async (e: React.FormEvent) => {    async (pageNum = 1) => {    async (pageNum = 1) => {
+
+    e.preventDefault();
+
+    if (!newComment.trim()) return;      if (pageNum === 1) setIsLoading(true);      if (pageNum === 1) setIsLoading(true);
+
+    try {
+
+      const created = await createReelComment(reelId, { content: newComment.trim() });      try {      try {
+
+      setComments((prev) => [created, ...prev]);
+
+      setNewComment('');        const data = await getReelComments(reelId, pageNum, limit);        const data = await getReelComments(reelId, pageNum, limit);
+
+    } catch (err) {
+
+      console.error('Error creating comment', err);        if (pageNum === 1) {        if (pageNum === 1) {
+
+    }
+
+  };          setComments(data);          setComments(data);
+
+
+
+  const handleSubmitReply = async (e: React.FormEvent | undefined, parentId: string) => {          setPage(1);          setPage(1);
+
+    e?.preventDefault();
+
+    if (!replyContent.trim()) return;          setHasMore(data.length === limit);          setHasMore(data.length === limit);
+
+    try {
+
+      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim();        } else {        } else {
+
+      const reply = await createReelComment(reelId, { content, parentId });
+
+      setRepliesMap((prev) => ({ ...prev, [parentId]: [reply, ...(prev[parentId] || [])] }));          setComments((prev) => [...prev, ...data]);          setComments((prev) => [...prev, ...data]);
+
+      setReplyContent('');
+
+      setReplyingTo(null);          setHasMore(data.length === limit);          setHasMore(data.length === limit);
+
+      setReplyingToUser(null);
+
+    } catch (err) {          setPage(pageNum);          setPage(pageNum);
+
+      console.error('Error creating reply', err);
+
+    }        }        }
+
+  };
+
+      } catch (err) {      } catch (err) {
+
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
+
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;        console.error('Error loading comments', err);        console.error('Error loading comments', err);
+
+    try {
+
+      await deleteReelComment(commentId);        if (pageNum === 1) setComments([]);        if (pageNum === 1) setComments([]);
+
+      if (parentId) {
+
+        setRepliesMap((prev) => ({ ...prev, [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId) }));      } finally {      } finally {
+
+      } else {
+
+        setComments((prev) => prev.filter((c) => c.id !== commentId));        setIsLoading(false);        setIsLoading(false);
+
+      }
+
+    } catch (err) {        setIsLoadingMore(false);        setIsLoadingMore(false);
+
+      console.error('Error deleting comment', err);
+
+    }      }      }
+
+  };
+
+    },    },
+
+  const loadMoreComments = async () => {
+
+    if (!hasMore) return;    [reelId, limit]    [reelId, limit]
+
+    setIsLoadingMore(true);
+
+    await loadComments(page + 1);  );  );
+
+  };
+
+
+
+  const drawer = !!isDrawer;
+
+  const alignmentClasses = drawer ? 'items-start justify-end' : 'items-end justify-center sm:items-center';  useEffect(() => {  useEffect(() => {
+
+  const overlayClasses = drawer ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none' : 'bg-black/50 pointer-events-auto';
+
+    loadComments(1);    loadComments(1);
+
+  return (
+
+    <div className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}>  }, [reelId, loadComments]);  }, [reelId, loadComments]);
+
+      <div className={drawer ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]' : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'}>
+
+        <div className="flex items-center justify-between p-4 border-b">
+
+          <h2 className="text-lg font-semibold">Comments</h2>
+
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>  const loadReplies = async (commentId: string) => {  const loadReplies = async (commentId: string) => {
+
+        </div>
+
+    try {    try {
+
+        <div className="flex-1 overflow-y-auto p-4">
+
+          {isLoading ? (      const replies = await getReelCommentReplies(commentId);      const replies = await getReelCommentReplies(commentId);
+
+            <p className="text-center text-gray-500 py-8">Loading comments...</p>
+
+          ) : comments.length === 0 ? (      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
+
+            <p className="text-center text-gray-500 py-8">No comments yet</p>
+
+          ) : (    } catch (err) {    } catch (err) {
+
+            <div className="space-y-4">
+
+              {comments.map((comment) => (      console.error('Error loading replies', err);      console.error('Error loading replies', err);
+
+                <div key={comment.id}>
+
+                  <div className="flex gap-3">    }    }
+
+                    <img src={comment.user?.avatar || '/default-avatar.png'} alt={comment.user?.name} className="w-8 h-8 rounded-full object-cover" />
+
+                    <div className="flex-1">  };  };
+
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
+
+                        <p className="font-semibold text-sm">{comment.user?.name}</p>
+
+                        <p className="text-sm">{comment.content}</p>
+
+                      </div>  const toggleReplies = (commentId: string) => {  const toggleReplies = (commentId: string) => {
+
+
+
+                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">    const next = new Set(expandedComments);    const next = new Set(expandedComments);
+
+                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
+
+                        <button    if (next.has(commentId)) {    if (next.has(commentId)) {
+
+                          onClick={() => {
+
+                            setReplyingTo(comment.id);      next.delete(commentId);      next.delete(commentId);
+
+                            setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+
+                            setTimeout(() => replyInputRef.current?.focus(), 120);    } else {    } else {
+
+                          }}
+
+                          className="hover:underline cursor-pointer"      next.add(commentId);      next.add(commentId);
+
+                        >
+
+                          Reply      if (!repliesMap[commentId]) loadReplies(commentId);      if (!repliesMap[commentId]) loadReplies(commentId);
+
+                        </button>
+
+                        {currentUser?.id === comment.userId && (    }    }
+
+                          <button onClick={() => handleDeleteComment(comment.id)} className="hover:underline text-red-500 cursor-pointer">
+
+                            <Trash2 className="w-3 h-3" />    setExpandedComments(next);    setExpandedComments(next);
+
+                          </button>
+
+                        )}  };  };
+
+                      </div>
+
+
+
+                      {comment._count?.replies > 0 && (
+
+                        <button onClick={() => toggleReplies(comment.id)} className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer">  const handleSubmitComment = async (e: React.FormEvent) => {  const handleSubmitComment = async (e: React.FormEvent) => {
+
+                          <MessageCircle className="w-4 h-4" />
+
+                          {expandedComments.has(comment.id) ? 'Hide replies' : `View ${comment._count.replies} replies`}    e.preventDefault();    e.preventDefault();
+
+                        </button>
+
+                      )}    if (!newComment.trim()) return;    if (!newComment.trim()) return;
+
+
+
+                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (    try {    try {
+
+                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+
+                          {repliesMap[comment.id].map((reply) => (      const created = await createReelComment(reelId, { content: newComment.trim() });      const created = await createReelComment(reelId, { content: newComment.trim() });
+
+                            <div key={reply.id} className="flex gap-3">
+
+                              <img src={reply.user?.avatar || '/default-avatar.png'} alt={reply.user?.name} className="w-7 h-7 rounded-full object-cover" />      setComments((prev) => [created, ...prev]);      setComments((prev) => [created, ...prev]);
+
+                              <div className="flex-1">
+
+                                <div className="bg-gray-100 rounded-2xl px-3 py-2">      setNewComment('');      setNewComment('');
+
+                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
+
+                                  <p className="text-sm">    } catch (err) {    } catch (err) {
+
+                                    {reply.content.startsWith('@') ? (() => {
+
+                                      const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);      console.error('Error creating comment', err);      console.error('Error creating comment', err);
+
+                                      if (match) {
+
+                                        const [, taggedName, remainingContent] = match;    }    }
+
+                                        return (<><span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>{remainingContent}</>);
+
+                                      }  };  };
+
+                                      return reply.content;
+
+                                    })() : reply.content}
+
+                                  </p>
+
+                                </div>  const handleSubmitReply = async (e: React.FormEvent | undefined, parentId: string) => {  const handleSubmitReply = async (e: React.FormEvent | undefined, parentId: string) => {
+
+                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+
+                                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>    e?.preventDefault();    e?.preventDefault();
+
+                                  {currentUser?.id === reply.userId && (
+
+                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="hover:underline text-red-500 cursor-pointer"><Trash2 className="w-3 h-3" /></button>    if (!replyContent.trim()) return;    if (!replyContent.trim()) return;
+
+                                  )}
+
+                                </div>    try {    try {
+
+                              </div>
+
+                            </div>      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim();      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim();
+
+                          ))}
+
+                        </div>      const reply = await createReelComment(reelId, { content, parentId });      const reply = await createReelComment(reelId, { content, parentId });
+
+                      )}
+
+      setRepliesMap((prev) => ({ ...prev, [parentId]: [reply, ...(prev[parentId] || [])] }));      setRepliesMap((prev) => ({ ...prev, [parentId]: [reply, ...(prev[parentId] || [])] }));
+
+                      {replyingTo === comment.id && (
+
+                        <div className="mt-3 flex gap-2">      setReplyContent('');      setReplyContent('');
+
+                          <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-7 h-7 rounded-full object-cover" />
+
+                          <div className="flex-1 flex gap-2">      setReplyingTo(null);      setReplyingTo(null);
+
+                            <input
+
+                              ref={replyInputRef}      setReplyingToUser(null);      setReplyingToUser(null);
+
+                              type="text"
+
+                              value={replyContent}    } catch (err) {    } catch (err) {
+
+                              onChange={(e) => setReplyContent(e.target.value)}
+
+                              placeholder={`Reply ${replyingToUser?.name}...`}      console.error('Error creating reply', err);      console.error('Error creating reply', err);
+
+                              className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+
+                              onKeyPress={(e) => { if (e.key === 'Enter' && replyContent.trim()) handleSubmitReply(undefined, comment.id); }}    }    }
+
+                            />
+
+                            <div className="flex flex-col gap-2">  };  };
+
+                              <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer" onClick={() => handleSubmitReply(undefined, comment.id)}>
+
+                                <Send className="w-4 h-4" />
+
+                              </Button>
+
+                              <Button type="button" size="sm" variant="outline" onClick={() => { setReplyingTo(null); setReplyContent(''); setReplyingToUser(null); }} className="cursor-pointer">Cancel</Button>  const handleDeleteComment = async (commentId: string, parentId?: string) => {  const handleDeleteComment = async (commentId: string, parentId?: string) => {
+
+                            </div>
+
+                          </div>    if (!window.confirm('Are you sure you want to delete this comment?')) return;    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+
+                        </div>
+
+                      )}    try {    try {
+
+                    </div>
+
+                  </div>      await deleteReelComment(commentId);      await deleteReelComment(commentId);
+
+                </div>
+
+              ))}      if (parentId) {      if (parentId) {
+
+            </div>
+
+          )}        setRepliesMap((prev) => ({ ...prev, [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId) }));        setRepliesMap((prev) => ({ ...prev, [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId) }));
+
+        </div>
+
+      } else {      } else {
+
+        {hasMore && (
+
+          <div className="p-3 text-center">        setComments((prev) => prev.filter((c) => c.id !== commentId));        setComments((prev) => prev.filter((c) => c.id !== commentId));
+
+            <button onClick={loadMoreComments} disabled={isLoadingMore} className="text-sm text-orange-600 hover:text-orange-700 font-medium cursor-pointer disabled:opacity-50">{isLoadingMore ? 'Loading...' : `View more comments`}</button>
+
+          </div>      }      }
+
+        )}
+
+    } catch (err) {    } catch (err) {
+
+        <form onSubmit={handleSubmitComment} className="border-t p-4">
+
+          <div className="flex gap-3">      console.error('Error deleting comment', err);      console.error('Error deleting comment', err);
+
+            <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover" />
+
+            <div className="flex-1 flex gap-2">    }    }
+
+              <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." className="flex-1 min-h-[60px] resize-none" />
+
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer"><Send className="w-4 h-4" /></Button>  };  };
+
+            </div>
+
+          </div>
+
+        </form>
+
+      </div>  const loadMoreComments = async () => {  const loadMoreComments = async () => {
+
+    </div>
+
+  );    if (!hasMore) return;    if (!hasMore) return;
+
+}
+
+    setIsLoadingMore(true);    setIsLoadingMore(true);
+
+    await loadComments(page + 1);    await loadComments(page + 1);
+
+  };  };
+
+
+
+  const drawer = !!isDrawer;  const drawer = !!isDrawer;
+
+  const alignmentClasses = drawer ? 'items-start justify-end' : 'items-end justify-center sm:items-center';  const alignmentClasses = drawer ? 'items-start justify-end' : 'items-end justify-center sm:items-center';
+
+  const overlayClasses = drawer ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none' : 'bg-black/50 pointer-events-auto';  const overlayClasses = drawer ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none' : 'bg-black/50 pointer-events-auto';
+
+
+
+  return (  return (
+
+    <div className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}>    <div className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}>
+
+      <div className={drawer ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]' : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'}>      <div className={drawer ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]' : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'}>
+
+        <div className="flex items-center justify-between p-4 border-b">        <div className="flex items-center justify-between p-4 border-b">
+
+          <h2 className="text-lg font-semibold">Comments</h2>          <h2 className="text-lg font-semibold">Comments</h2>
+
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+
+        </div>        </div>
+
+
+
+        <div className="flex-1 overflow-y-auto p-4">        <div className="flex-1 overflow-y-auto p-4">
+
+          {isLoading ? (          {isLoading ? (
+
+            <p className="text-center text-gray-500 py-8">Loading comments...</p>            <p className="text-center text-gray-500 py-8">Loading comments...</p>
+
+          ) : comments.length === 0 ? (          ) : comments.length === 0 ? (
+
+            <p className="text-center text-gray-500 py-8">No comments yet</p>            <p className="text-center text-gray-500 py-8">No comments yet</p>
+
+          ) : (          ) : (
+
+            <div className="space-y-4">            <div className="space-y-4">
+
+              {comments.map((comment) => (              {comments.map((comment) => (
+
+                <div key={comment.id}>                <div key={comment.id}>
+
+                  <div className="flex gap-3">                  <div className="flex gap-3">
+
+                    <img src={comment.user?.avatar || '/default-avatar.png'} alt={comment.user?.name} className="w-8 h-8 rounded-full object-cover" />                    <img src={comment.user?.avatar || '/default-avatar.png'} alt={comment.user?.name} className="w-8 h-8 rounded-full object-cover" />
+
+                    <div className="flex-1">                    <div className="flex-1">
+
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2">                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
+
+                        <p className="font-semibold text-sm">{comment.user?.name}</p>                        <p className="font-semibold text-sm">{comment.user?.name}</p>
+
+                        <p className="text-sm">{comment.content}</p>                        <p className="text-sm">{comment.content}</p>
+
+                      </div>                      </div>
+
+
+
+                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+
+                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
+
+                        <button                        <button
+
+                          onClick={() => {                          onClick={() => {
+
+                            setReplyingTo(comment.id);                            setReplyingTo(comment.id);
+
+                            setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });                            setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+
+                            setTimeout(() => replyInputRef.current?.focus(), 120);                            setTimeout(() => replyInputRef.current?.focus(), 120);
+
+                          }}                          }}
+
+                          className="hover:underline cursor-pointer"                          className="hover:underline cursor-pointer"
+
+                        >                        >
+
+                          Reply                          Reply
+
+                        </button>                        </button>
+
+                        {currentUser?.id === comment.userId && (                        {currentUser?.id === comment.userId && (
+
+                          <button onClick={() => handleDeleteComment(comment.id)} className="hover:underline text-red-500 cursor-pointer">                          <button onClick={() => handleDeleteComment(comment.id)} className="hover:underline text-red-500 cursor-pointer">
+
+                            <Trash2 className="w-3 h-3" />                            <Trash2 className="w-3 h-3" />
+
+                          </button>                          </button>
+
+                        )}                        )}
+
+                      </div>                      </div>
+
+
+
+                      {comment._count?.replies > 0 && (                      {comment._count?.replies > 0 && (
+
+                        <button onClick={() => toggleReplies(comment.id)} className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer">                        <button onClick={() => toggleReplies(comment.id)} className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer">
+
+                          <MessageCircle className="w-4 h-4" />                          <MessageCircle className="w-4 h-4" />
+
+                          {expandedComments.has(comment.id) ? 'Hide replies' : `View ${comment._count.replies} replies`}                          {expandedComments.has(comment.id) ? 'Hide replies' : `View ${comment._count.replies} replies`}
+
+                        </button>                        </button>
+
+                      )}                      )}
+
+
+
+                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (
+
+                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+
+                          {repliesMap[comment.id].map((reply) => (                          {repliesMap[comment.id].map((reply) => (
+
+                            <div key={reply.id} className="flex gap-3">                            <div key={reply.id} className="flex gap-3">
+
+                              <img src={reply.user?.avatar || '/default-avatar.png'} alt={reply.user?.name} className="w-7 h-7 rounded-full object-cover" />                              <img src={reply.user?.avatar || '/default-avatar.png'} alt={reply.user?.name} className="w-7 h-7 rounded-full object-cover" />
+
+                              <div className="flex-1">                              <div className="flex-1">
+
+                                <div className="bg-gray-100 rounded-2xl px-3 py-2">                                <div className="bg-gray-100 rounded-2xl px-3 py-2">
+
+                                  <p className="font-semibold text-sm">{reply.user?.name}</p>                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
+
+                                  <p className="text-sm">                                  <p className="text-sm">
+
+                                    {reply.content.startsWith('@') ? (() => {                                    {reply.content.startsWith('@') ? (() => {
+
+                                      const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);                                      const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);
+
+                                      if (match) {                                      if (match) {
+
+                                        const [, taggedName, remainingContent] = match;                                        const [, taggedName, remainingContent] = match;
+
+                                        return (<><span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>{remainingContent}</>);                                        return (<><span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>{remainingContent}</>);
+
+                                      }                                      }
+
+                                      return reply.content;                                      return reply.content;
+
+                                    })() : reply.content}                                    })() : reply.content}
+
+                                  </p>                                  </p>
+
+                                </div>                                </div>
+
+                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+
+                                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>                                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
+
+                                  {currentUser?.id === reply.userId && (                                  {currentUser?.id === reply.userId && (
+
+                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="hover:underline text-red-500 cursor-pointer"><Trash2 className="w-3 h-3" /></button>                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="hover:underline text-red-500 cursor-pointer"><Trash2 className="w-3 h-3" /></button>
+
+                                  )}                                  )}
+
+                                </div>                                </div>
+
+                              </div>                              </div>
+
+                            </div>                            </div>
+
+                          ))}                          ))}
+
+                        </div>                        </div>
+
+                      )}                      )}
+
+
+
+                      {replyingTo === comment.id && (                      {replyingTo === comment.id && (
+
+                        <div className="mt-3 flex gap-2">                        <div className="mt-3 flex gap-2">
+
+                          <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-7 h-7 rounded-full object-cover" />                          <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-7 h-7 rounded-full object-cover" />
+
+                          <div className="flex-1 flex gap-2">                          <div className="flex-1 flex gap-2">
+
+                            <input                            <input
+
+                              ref={replyInputRef}                              ref={replyInputRef}
+
+                              type="text"                              type="text"
+
+                              value={replyContent}                              value={replyContent}
+
+                              onChange={(e) => setReplyContent(e.target.value)}                              onChange={(e) => setReplyContent(e.target.value)}
+
+                              placeholder={`Reply ${replyingToUser?.name}...`}                              placeholder={`Reply ${replyingToUser?.name}...`}
+
+                              className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"                              className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+
+                              onKeyPress={(e) => { if (e.key === 'Enter' && replyContent.trim()) handleSubmitReply(undefined, comment.id); }}                              onKeyPress={(e) => { if (e.key === 'Enter' && replyContent.trim()) handleSubmitReply(undefined, comment.id); }}
+
+                            />                            />
+
+                            <div className="flex flex-col gap-2">                            <div className="flex flex-col gap-2">
+
+                              <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer" onClick={() => handleSubmitReply(undefined, comment.id)}>                              <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer" onClick={() => handleSubmitReply(undefined, comment.id)}>
+
+                                <Send className="w-4 h-4" />                                <Send className="w-4 h-4" />
+
+                              </Button>                              </Button>
+
+                              <Button type="button" size="sm" variant="outline" onClick={() => { setReplyingTo(null); setReplyContent(''); setReplyingToUser(null); }} className="cursor-pointer">Cancel</Button>                              <Button type="button" size="sm" variant="outline" onClick={() => { setReplyingTo(null); setReplyContent(''); setReplyingToUser(null); }} className="cursor-pointer">Cancel</Button>
+
+                            </div>                            </div>
+
+                          </div>                          </div>
+
+                        </div>                        </div>
+
+                      )}                      )}
+
+                    </div>                    </div>
+
+                  </div>                  </div>
+
+                </div>                </div>
+
+              ))}              ))}
+
+            </div>            </div>
+
+          )}          )}
+
+        </div>        </div>
+
+
+
+        {hasMore && (        {hasMore && (
+
+          <div className="p-3 text-center">          <div className="p-3 text-center">
+
+            <button onClick={loadMoreComments} disabled={isLoadingMore} className="text-sm text-orange-600 hover:text-orange-700 font-medium cursor-pointer disabled:opacity-50">{isLoadingMore ? 'Loading...' : `View more comments`}</button>            <button onClick={loadMoreComments} disabled={isLoadingMore} className="text-sm text-orange-600 hover:text-orange-700 font-medium cursor-pointer disabled:opacity-50">{isLoadingMore ? 'Loading...' : `View more comments`}</button>
+
+          </div>          </div>
+
+        )}        )}
+
+
+
+        <form onSubmit={handleSubmitComment} className="border-t p-4">        <form onSubmit={handleSubmitComment} className="border-t p-4">
+
+          <div className="flex gap-3">          <div className="flex gap-3">
+
+            <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover" />            <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover" />
+
+            <div className="flex-1 flex gap-2">            <div className="flex-1 flex gap-2">
+
+              <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." className="flex-1 min-h-[60px] resize-none" />              <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." className="flex-1 min-h-[60px] resize-none" />
+
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer"><Send className="w-4 h-4" /></Button>              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer"><Send className="w-4 h-4" /></Button>
+
+            </div>            </div>
+
+          </div>          </div>
+
+        </form>        </form>
+
+      </div>      </div>
+
+    </div>    </div>
+
+  );  );
+
+}}
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReelComment } from '../../types';
+import {
+  getReelComments,
+  getReelCommentReplies,
+  createReelComment,
+  deleteReelComment,
+} from '../../services/reelService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { formatDistanceToNow } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { Send, Trash2, MessageCircle } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+
+interface ReelCommentsProps {
+  reelId: string;
+  onClose: () => void;
+  isDrawer?: boolean;
+}
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
+  const { user: currentUser } = useCurrentUser();
+
+  // comments state
+  const [comments, setComments] = useState<ReelComment[]>([]);
+  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});
+
+  // pagination / loading
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+
+  // reply state
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+
+  // new comment
+  const [newComment, setNewComment] = useState('');
+
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadComments = useCallback(
+    async (pageNum = 1) => {
+      if (pageNum === 1) setIsLoading(true);
+      try {
+        const data = await getReelComments(reelId, pageNum, limit);
+        if (pageNum === 1) {
+          setComments(data);
+          setPage(1);
+          setHasMore(data.length === limit);
+        } else {
+          setComments((prev) => [...prev, ...data]);
+          setHasMore(data.length === limit);
+          setPage(pageNum);
+        }
+      } catch (err) {
+        console.error('Error loading comments', err);
+        if (pageNum === 1) setComments([]);
+      } finally {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+      }
+    },
+    [reelId, limit]
+  );
+
+  useEffect(() => {
+    loadComments(1);
+  }, [reelId, loadComments]);
+
+  const loadReplies = async (commentId: string) => {
+    try {
+      const replies = await getReelCommentReplies(commentId);
+      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
+    } catch (err) {
+      console.error('Error loading replies', err);
+    }
+  };
+
+  const toggleReplies = (commentId: string) => {
+    const next = new Set(expandedComments);
+    if (next.has(commentId)) {
+      next.delete(commentId);
+    } else {
+      next.add(commentId);
+      if (!repliesMap[commentId]) loadReplies(commentId);
+    }
+    setExpandedComments(next);
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    try {
+      const created = await createReelComment(reelId, { content: newComment.trim() });
+      setComments((prev) => [created, ...prev]);
+      setNewComment('');
+    } catch (err) {
+      console.error('Error creating comment', err);
+    }
+  };
+
+  const handleSubmitReply = async (e: React.FormEvent | undefined, parentId: string) => {
+    e?.preventDefault();
+    if (!replyContent.trim()) return;
+    try {
+      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim();
+      const reply = await createReelComment(reelId, { content, parentId });
+      setRepliesMap((prev) => ({ ...prev, [parentId]: [reply, ...(prev[parentId] || [])] }));
+      setReplyContent('');
+      setReplyingTo(null);
+      setReplyingToUser(null);
+    } catch (err) {
+      console.error('Error creating reply', err);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+    try {
+      await deleteReelComment(commentId);
+      if (parentId) {
+        setRepliesMap((prev) => ({ ...prev, [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId) }));
+      } else {
+        setComments((prev) => prev.filter((c) => c.id !== commentId));
+      }
+    } catch (err) {
+      console.error('Error deleting comment', err);
+    }
+  };
+
+  const loadMoreComments = async () => {
+    if (!hasMore) return;
+    setIsLoadingMore(true);
+    await loadComments(page + 1);
+  };
+
+  const drawer = !!isDrawer;
+  const alignmentClasses = drawer ? 'items-start justify-end' : 'items-end justify-center sm:items-center';
+  const overlayClasses = drawer ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none' : 'bg-black/50 pointer-events-auto';
+
+  return (
+    <div className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}>
+      <div className={drawer ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]' : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'}>
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold">Comments</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <p className="text-center text-gray-500 py-8">Loading comments...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No comments yet</p>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id}>
+                  <div className="flex gap-3">
+                    <img src={comment.user?.avatar || '/default-avatar.png'} alt={comment.user?.name} className="w-8 h-8 rounded-full object-cover" />
+                    <div className="flex-1">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                        <p className="font-semibold text-sm">{comment.user?.name}</p>
+                        <p className="text-sm">{comment.content}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
+                        <button
+                          onClick={() => {
+                            setReplyingTo(comment.id);
+                            setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+                            setTimeout(() => replyInputRef.current?.focus(), 120);
+                          }}
+                          className="hover:underline cursor-pointer"
+                        >
+                          Reply
+                        </button>
+                        {currentUser?.id === comment.userId && (
+                          <button onClick={() => handleDeleteComment(comment.id)} className="hover:underline text-red-500 cursor-pointer">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {comment._count?.replies > 0 && (
+                        <button onClick={() => toggleReplies(comment.id)} className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer">
+                          <MessageCircle className="w-4 h-4" />
+                          {expandedComments.has(comment.id) ? 'Hide replies' : `View ${comment._count.replies} replies`}
+                        </button>
+                      )}
+
+                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (
+                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+                          {repliesMap[comment.id].map((reply) => (
+                            <div key={reply.id} className="flex gap-3">
+                              <img src={reply.user?.avatar || '/default-avatar.png'} alt={reply.user?.name} className="w-7 h-7 rounded-full object-cover" />
+                              <div className="flex-1">
+                                <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
+                                  <p className="text-sm">
+                                    {reply.content.startsWith('@') ? (() => {
+                                      const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);
+                                      if (match) {
+                                        const [, taggedName, remainingContent] = match;
+                                        return (<><span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>{remainingContent}</>);
+                                      }
+                                      return reply.content;
+                                    })() : reply.content}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
+                                  {currentUser?.id === reply.userId && (
+                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="hover:underline text-red-500 cursor-pointer">
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {replyingTo === comment.id && (
+                        <div className="mt-3 flex gap-2">
+                          <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-7 h-7 rounded-full object-cover" />
+                          <div className="flex-1 flex gap-2">
+                            <input
+                              ref={replyInputRef}
+                              type="text"
+                              value={replyContent}
+                              onChange={(e) => setReplyContent(e.target.value)}
+                              placeholder={`Reply ${replyingToUser?.name}...`}
+                              className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && replyContent.trim()) handleSubmitReply(undefined, comment.id);
+                              }}
+                            />
+                            <div className="flex flex-col gap-2">
+                              <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer" onClick={() => handleSubmitReply(undefined, comment.id)}>
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => { setReplyingTo(null); setReplyContent(''); setReplyingToUser(null); }} className="cursor-pointer">Cancel</Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {hasMore && (
+          <div className="p-3 text-center">
+            <button onClick={loadMoreComments} disabled={isLoadingMore} className="text-sm text-orange-600 hover:text-orange-700 font-medium cursor-pointer disabled:opacity-50">{isLoadingMore ? 'Loading...' : `View more comments`}</button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmitComment} className="border-t p-4">
+          <div className="flex gap-3">
+            <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover" />
+            <div className="flex-1 flex gap-2">
+              <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." className="flex-1 min-h-[60px] resize-none" />
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer"><Send className="w-4 h-4" /></Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ReelComment } from '../../types';
+import {
+  getReelComments,
+  createReelComment,
+  deleteReelComment,
+  getReelCommentReplies,
+} from '../../services/reelService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { formatDistanceToNow } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { Send, Trash2, MessageCircle } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+
+interface ReelCommentsProps {
+  reelId: string;
+  onClose: () => void;
+  isDrawer?: boolean;
+}
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
+  const [comments, setComments] = useState<ReelComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});
+  const { user: currentUser } = useCurrentUser();
+
+  // pagination / loading
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+  const loadComments = useCallback(async (pageNum = 1) => {
+    if (pageNum === 1) setIsLoading(true);
+    try {
+      const data = await getReelComments(reelId, pageNum, limit);
+      if (pageNum === 1) {
+        setComments(data);
+        setPage(1);
+        setHasMore(data.length === limit);
+      } else {
+        setComments((prev) => [...prev, ...data]);
+        setHasMore(data.length === limit);
+        setPage(pageNum);
+      }
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      if (pageNum === 1) setComments([]);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [reelId, limit]);
+
+  useEffect(() => {
+    loadComments(1);
+  }, [reelId, loadComments]);
+
+  const loadReplies = async (commentId: string) => {
+    try {
+      const replies = await getReelCommentReplies(commentId);
+      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
+    } catch (error) {
+      console.error('Error loading replies:', error);
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+
+    try {
+      const comment = await createReelComment(reelId, { content: newComment.trim() });
+      // prepend to list
+      setComments((prev) => [comment, ...prev]);
+      setNewComment('');
+    } catch (error) {
+      console.error('Error creating comment:', error);
+    }
+  };
+
+  const handleSubmitReply = async (e: React.FormEvent | undefined, parentId: string) => {
+    e?.preventDefault();
+    if (!replyContent.trim()) return;
+
+    try {
+      const content = replyingToUser ? `@${replyingToUser.name} ${replyContent.trim()}` : replyContent.trim();
+      const reply = await createReelComment(reelId, { content, parentId });
+
+      setRepliesMap((prev) => ({
+        ...prev,
+        [parentId]: [reply, ...(prev[parentId] || [])],
+      }));
+
+      setReplyContent('');
+      setReplyingTo(null);
+      setReplyingToUser(null);
+    } catch (error) {
+      console.error('Error creating reply:', error);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
+    try {
+      await deleteReelComment(commentId);
+      if (parentId) {
+        setRepliesMap((prev) => ({
+          ...prev,
+          [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId),
+        }));
+      } else {
+        setComments((c) => c.filter((x) => x.id !== commentId));
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+    }
+  };
+
+  const toggleReplies = (commentId: string) => {
+    const newExpanded = new Set(expandedComments);
+    if (newExpanded.has(commentId)) {
+      newExpanded.delete(commentId);
+    } else {
+      newExpanded.add(commentId);
+      if (!repliesMap[commentId]) loadReplies(commentId);
+    }
+    setExpandedComments(newExpanded);
+  };
+
+  const loadMoreComments = async () => {
+    if (!hasMore) return;
+    setIsLoadingMore(true);
+    await loadComments(page + 1);
+  };
+
+  const drawer = !!isDrawer;
+  const alignmentClasses = drawer
+    ? 'items-start justify-end'
+    : 'items-end justify-center sm:items-center';
+  const overlayClasses = drawer
+    ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none'
+    : 'bg-black/50 pointer-events-auto';
+
+  return (
+    <div
+      className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}
+    >
+      <div
+        className={
+          drawer
+            ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]'
+            : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'
+        }
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold">Comments</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+            ✕
+          </button>
+        </div>
+
+        {/* Comments List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoading ? (
+            <p className="text-center text-gray-500 py-8">Loading comments...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No comments yet</p>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id}>
+                  {/* Main Comment */}
+                  <div className="flex gap-3">
+                    <img
+                      src={comment.user?.avatar || '/default-avatar.png'}
+                      alt={comment.user?.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                        <p className="font-semibold text-sm">{comment.user?.name}</p>
+                        <p className="text-sm">{comment.content}</p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                        <span>
+                          {formatDistanceToNow(new Date(comment.createdAt), {
+                            addSuffix: true,
+                            locale: enUS,
+                          })}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setReplyingTo(comment.id);
+                            setReplyingToUser({ id: comment.userId, name: comment.user?.name || 'User' });
+                            setTimeout(() => replyInputRef.current?.focus(), 120);
+                          }}
+                          className="hover:underline cursor-pointer"
+                        >
+                          Reply
+                        </button>
+                        {currentUser?.id === comment.userId && (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="hover:underline text-red-500 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Show replies button */}
+                      {comment._count && comment._count.replies > 0 && (
+                        <button
+                          onClick={() => toggleReplies(comment.id)}
+                          className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          {expandedComments.has(comment.id)
+                            ? 'Hide replies'
+                            : `View ${comment._count.replies} replies`}
+                        </button>
+                      )}
+
+                      {/* Replies */}
+                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (
+                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+                          {repliesMap[comment.id].map((reply) => (
+                            <div key={reply.id} className="flex gap-3">
+                              <img
+                                src={reply.user?.avatar || '/default-avatar.png'}
+                                alt={reply.user?.name}
+                                className="w-7 h-7 rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
+                                  <p className="text-sm">
+                                    {reply.content.startsWith('@') ? (
+                                      (() => {
+                                        const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);
+                                        if (match) {
+                                          const [, taggedName, remainingContent] = match;
+                                          return (
+                                            <>
+                                              <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
+                                              {remainingContent}
+                                            </>
+                                          );
+                                        }
+                                        return reply.content;
+                                      })()
+                                    ) : (
+                                      reply.content
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
+                                  {currentUser?.id === reply.userId && (
+                                    <button onClick={() => handleDeleteComment(reply.id, comment.id)} className="hover:underline text-red-500 cursor-pointer"><Trash2 className="w-3 h-3" /></button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply Form */}
+                      {replyingTo === comment.id && (
+                        <div className="mt-3 flex gap-2">
+                          <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-7 h-7 rounded-full object-cover" />
+                          <div className="flex-1 flex gap-2">
+                            <input ref={replyInputRef} type="text" value={replyContent} onChange={(e) => setReplyContent(e.target.value)} placeholder={`Reply ${replyingToUser?.name}...`} className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" onKeyPress={(e) => { if (e.key === 'Enter' && replyContent.trim()) handleSubmitReply(undefined, comment.id); }} />
+                            <div className="flex flex-col gap-2">
+                              <Button type="button" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer" onClick={() => handleSubmitReply(undefined, comment.id)}>
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={() => { setReplyingTo(null); setReplyContent(''); setReplyingToUser(null); }} className="cursor-pointer">Cancel</Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Load more */}
+        {hasMore && (
+          <div className="p-3 text-center">
+            <button onClick={loadMoreComments} disabled={isLoadingMore} className="text-sm text-orange-600 hover:text-orange-700 font-medium cursor-pointer disabled:opacity-50">{isLoadingMore ? 'Loading...' : `View more comments`}</button>
+          </div>
+        )}
+
+        {/* Comment Input */}
+        <form onSubmit={handleSubmitComment} className="border-t p-4">
+          <div className="flex gap-3">
+            <img src={currentUser?.avatar || '/default-avatar.png'} alt={currentUser?.name} className="w-8 h-8 rounded-full object-cover" />
+            <div className="flex-1 flex gap-2">
+              <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." className="flex-1 min-h-[60px] resize-none" />
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer"><Send className="w-4 h-4" /></Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import type { ReelComment } from '../../types';
+import {
+  getReelComments,
+  createReelComment,
+  deleteReelComment,
+  getReelCommentReplies,
+} from '../../services/reelService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
+import { formatDistanceToNow } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { Send, Trash2, MessageCircle } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
+
+interface ReelCommentsProps {
+  reelId: string;
+  onClose: () => void;
+  isDrawer?: boolean;
+}
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
+  const [comments, setComments] = useState<ReelComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingToUser, setReplyingToUser] = useState<{ id: string; name: string } | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});
+  const { user: currentUser } = useCurrentUser();
+
+  // pagination / loading
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getReelComments(reelId);
+        setComments(data);
+      } catch (error) {
+        console.error('Error loading comments:', error);
+      }
+    })();
+  }, [reelId]);
+
+  const loadReplies = async (commentId: string) => {
+    try {
+      const replies = await getReelCommentReplies(commentId);
+      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
+    } catch (error) {
+      console.error('Error loading replies:', error);
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+  const loadComments = useCallback(async (pageNum = 1) => {
+    if (pageNum === 1) setIsLoading(true);
+    try {
+      const data = await getReelComments(reelId, pageNum, limit);
+      if (pageNum === 1) {
+        setComments(data);
+        setPage(1);
+        setHasMore(data.length === limit);
+      } else {
+        setComments((prev) => [...prev, ...data]);
+        setHasMore(data.length === limit);
+        setPage(pageNum);
+      }
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      if (pageNum === 1) setComments([]);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [reelId, limit]);
+
+  useEffect(() => {
+    loadComments(1);
+  }, [reelId, loadComments]);
+    }
+  };
+
+  const handleSubmitReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    if (!replyContent.trim()) return;
+
+    try {
+      const reply = await createReelComment(reelId, {
+        content: replyContent,
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+      // Add to replies map
+      setRepliesMap((prev) => ({
+        ...prev,
+        [parentId]: [reply, ...(prev[parentId] || [])],
+      }));
+
+      setReplyContent('');
+      setReplyingTo(null);
+    } catch (error) {
+      console.error('Error creating reply:', error);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string, parentId?: string) => {
+    if (window.confirm('Are you sure you want to delete this comment?')) {
+      try {
+        await deleteReelComment(commentId);
+        if (parentId) {
+          // Remove from replies
+          setRepliesMap((prev) => ({
+            ...prev,
+            [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId),
+          }));
+        } else {
+          // Remove from main comments
+          setComments(comments.filter((c) => c.id !== commentId));
+        }
+      } catch (error) {
+        console.error('Error deleting comment:', error);
+      }
+    }
+  };
+
+  const toggleReplies = (commentId: string) => {
+    const newExpanded = new Set(expandedComments);
+    if (newExpanded.has(commentId)) {
+      newExpanded.delete(commentId);
+    } else {
+      newExpanded.add(commentId);
+      if (!repliesMap[commentId]) {
+        loadReplies(commentId);
+      }
+    }
+    setExpandedComments(newExpanded);
+  };
+
+  const drawer = !!isDrawer;
+  const alignmentClasses = drawer
+    ? 'items-start justify-end'
+    : 'items-end justify-center sm:items-center';
+  const overlayClasses = drawer
+    ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none'
+    : 'bg-black/50 pointer-events-auto';
+
+  return (
+    <div
+      className={`fixed inset-0 z-[45] flex ${alignmentClasses} ${overlayClasses}`}
+    >
+      <div
+        className={
+          drawer
+            ? 'bg-white fixed right-0 top-0 bottom-0 w-full sm:w-[420px] flex flex-col shadow-xl overflow-auto pointer-events-auto sm:top-[65px]'
+            : 'bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col'
+        }
+      >
+        {/* Header */}
+  const loadMoreComments = async () => {
+    if (!hasMore) return;
+    setIsLoadingMore(true);
+    await loadComments(page + 1);
+  };
+        <div className="flex items-center justify-between p-4 border-b">
+    <h2 className="text-lg font-semibold">Comments</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
+            ✕
+          </button>
+        </div>
+
+        {/* Comments List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {comments.length === 0 ? (
+            <p className="text-center text-gray-500 py-8">No comments yet</p>
+          ) : (
+            <div className="space-y-4">
+              {comments.map((comment) => (
+                <div key={comment.id}>
+                  {/* Main Comment */}
+                  <div className="flex gap-3">
+                    <img
+                      src={comment.user?.avatar || '/default-avatar.png'}
+                      alt={comment.user?.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                        <p className="font-semibold text-sm">{comment.user?.name}</p>
+                        <p className="text-sm">{comment.content}</p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                        <span>
+                          {formatDistanceToNow(new Date(comment.createdAt), {
+                            addSuffix: true,
+                            locale: enUS,
+                          })}
+                        </span>
+                        <button
+                          onClick={() => setReplyingTo(comment.id)}
+                          className="hover:underline cursor-pointer"
+                        >
+                          Reply
+                        </button>
+                        {currentUser?.id === comment.userId && (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="hover:underline text-red-500 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Show replies button */}
+                      {comment._count && comment._count.replies > 0 && (
+                        <button
+                          onClick={() => toggleReplies(comment.id)}
+                          className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          {expandedComments.has(comment.id)
+                ? 'Hide replies'
+                  : `View ${comment._count.replies} replies`}
+                        </button>
+                      )}
+
+                      {/* Replies */}
+                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (
+                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
+                          {repliesMap[comment.id].map((reply) => (
+                            <div key={reply.id} className="flex gap-3">
+                              <img
+                                src={reply.user?.avatar || '/default-avatar.png'}
+                                alt={reply.user?.name}
+                                className="w-7 h-7 rounded-full object-cover"
+                              />
+                              <div className="flex-1">
+                                <div className="bg-gray-100 rounded-2xl px-3 py-2">
+                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
+                                  <p className="text-sm">{reply.content}</p>
+                                </div>
+                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
+                                  <span>
+                                    {formatDistanceToNow(new Date(reply.createdAt), {
+                                      addSuffix: true,
+                                      locale: enUS,
+                                    })}
+                                  </span>
+                                  {currentUser?.id === reply.userId && (
+                                    <button
+                                      onClick={() => handleDeleteComment(reply.id, comment.id)}
+                                      className="hover:underline text-red-500 cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reply Form */}
+                      {replyingTo === comment.id && (
+                        <form
+                          onSubmit={(e) => handleSubmitReply(e, comment.id)}
+                          className="mt-3 flex gap-2"
+                        >
+                          <img
+                            src={currentUser?.avatar || '/default-avatar.png'}
+                            alt={currentUser?.name}
+                            className="w-7 h-7 rounded-full object-cover"
+                          />
+                          <div className="flex-1 flex gap-2">
+                            <Textarea
+                              value={replyContent}
+                              onChange={(e) => setReplyContent(e.target.value)}
+                              placeholder="Write a reply..."
+                              className="flex-1 min-h-[60px] resize-none"
+                              autoFocus
+                            />
+                            <div className="flex flex-col gap-2">
+                              <Button type="submit" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer">
+                                <Send className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setReplyingTo(null);
+                                  setReplyContent('');
+                                }}
+                                className="cursor-pointer"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Comment Input */}
+        <form onSubmit={handleSubmitComment} className="border-t p-4">
+          <div className="flex gap-3">
+            <img
+              src={currentUser?.avatar || '/default-avatar.png'}
+              alt={currentUser?.name}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+            <div className="flex-1 flex gap-2">
+              <Textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Write a comment..."
+                className="flex-1 min-h-[60px] resize-none"
+              />
+              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

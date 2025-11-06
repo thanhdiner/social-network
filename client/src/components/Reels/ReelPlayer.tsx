@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Reel } from '../../types';
 import { Heart, MessageCircle, Share2, MoreVertical, Play, Pause, Volume2, VolumeX } from 'lucide-react';
-import { toggleLikeReel, shareReel, deleteReel } from '../../services/reelService';
+import { toggleLikeReel, shareReel, deleteReel, viewReel } from '../../services/reelService';
 import { notificationSound } from '../../utils/notificationSound';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useVolumeSettings } from '../../hooks/useVolumeSettings';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,9 +23,10 @@ interface ReelPlayerProps {
   onTouchStart?: (e: React.TouchEvent) => void;
   onTouchMove?: (e: React.TouchEvent) => void;
   onTouchEnd?: (e: React.TouchEvent) => void;
+  showComments?: boolean;
 }
 
-export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, onTouchStart, onTouchMove, onTouchEnd }: ReelPlayerProps) {
+export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, onTouchStart, onTouchMove, onTouchEnd, showComments }: ReelPlayerProps) {
   const [isLiked, setIsLiked] = useState(reel.isLiked || false);
   const [likesCount, setLikesCount] = useState(reel._count?.likes || 0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -39,6 +40,10 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
   const containerRef = useRef<HTMLDivElement>(null);
   const { user: currentUser } = useCurrentUser();
   const navigate = useNavigate();
+
+  // views tracking state
+  const [viewsCount, setViewsCount] = useState<number>(reel.views || 0);
+  const [hasCountedView, setHasCountedView] = useState(false);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -107,14 +112,14 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
   const handleShare = async () => {
     try {
       await shareReel(reel.id);
-      alert('Đã chia sẻ reel!');
+      alert('Reel shared!');
     } catch (error) {
       console.error('Error sharing reel:', error);
     }
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Bạn có chắc muốn xóa reel này?')) {
+    if (window.confirm('Are you sure you want to delete this reel?')) {
       try {
         await deleteReel(reel.id);
         onDelete?.();
@@ -138,6 +143,7 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
 
   // Track actual rendered video size so progress bar matches visible video (handles letterboxing)
   const [displayedSize, setDisplayedSize] = useState<{ width: number; height: number; offsetTop: number } | null>(null);
+  const [actionLeft, setActionLeft] = useState<number | null>(null);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -166,6 +172,46 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
     };
   }, [reel.videoUrl]);
 
+  // compute action buttons left position so they sit right of the displayed video (outside video area)
+  useEffect(() => {
+    const computePos = () => {
+      const c = containerRef.current;
+      if (!c || !displayedSize) {
+        setActionLeft(null);
+        return;
+      }
+
+      const rect = c.getBoundingClientRect();
+      // left offset of displayed video inside container
+      const innerLeft = Math.max(0, Math.round((rect.width - displayedSize.width) / 2));
+      const videoRight = rect.left + innerLeft + displayedSize.width;
+      const viewportGap =
+        typeof window !== 'undefined'
+          ? window.innerWidth >= 1280
+            ? 56
+            : window.innerWidth >= 1024
+              ? 48
+              : 32
+          : 32;
+      const gap = showComments ? 8 : Math.max(24, viewportGap);
+      // place actions just to the right of video
+      setActionLeft(Math.round(videoRight + gap));
+    };
+
+    computePos();
+    window.addEventListener('resize', computePos);
+    const ro = new ResizeObserver(computePos);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => {
+      window.removeEventListener('resize', computePos);
+      try {
+        ro.disconnect();
+      } catch {
+        // ignore
+      }
+    };
+  }, [displayedSize, showComments]);
+
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -181,6 +227,34 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
       v.removeEventListener('loadedmetadata', onLoaded);
     };
   }, []);
+
+  // Reset view-tracking when reel changes
+  useEffect(() => {
+    setHasCountedView(false);
+    setViewsCount(reel.views || 0);
+  }, [reel.id, reel.views]);
+
+  // When user watches >= 3 seconds, count a view (once per reel per session)
+  useEffect(() => {
+    if (!isActive) return;
+    if (hasCountedView) return;
+    if (currentTime >= 3) {
+      setHasCountedView(true);
+      // optimistic UI
+      setViewsCount((v) => v + 1);
+      // fire-and-forget API call
+      (async () => {
+        try {
+          const res = await viewReel(reel.id);
+          if (res && typeof res.views === 'number') {
+            setViewsCount(res.views);
+          }
+        } catch {
+          // ignore
+        }
+      })();
+    }
+  }, [currentTime, isActive, hasCountedView, reel.id]);
 
   // Double-click: left half -> rewind 10s, right half -> forward 10s
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -233,20 +307,31 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
 
   return (
     <div
-      className="relative w-full h-full bg-black flex items-center justify-center"
+      className={`relative w-full h-full bg-black flex items-center justify-center ${
+        showComments ? 'sm:justify-end' : ''
+      }`}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
       {/* Video (portrait box on desktop, full-screen on small screens) */}
-      <div className="w-full h-full flex items-center justify-center">
+      <div
+        className={`w-full h-full flex items-center justify-center ${
+          showComments ? 'sm:justify-center sm:pr-20' : ''
+        }`}
+      >
         {/*
           Layout strategy:
           - Mobile/small screens: full-bleed experience (object-cover)
           - Desktop (md and up): fixed portrait container but preserve full video (object-contain)
         */}
-  {/* Make desktop container max-width/max-height so video can scale without cropping */}
-  <div ref={containerRef} className="w-full h-full md:max-w-[880px] md:max-h-[500px] flex items-center justify-center relative">
+        {/* Make desktop container max-width/max-height so video can scale without cropping */}
+        <div
+          ref={containerRef}
+          className={`w-full h-full md:max-w-[880px] md:max-h-[500px] flex items-center justify-center relative ${
+            showComments ? 'sm:w-auto sm:mr-12' : ''
+          }`}
+        >
           <video
             ref={videoRef}
             src={reel.videoUrl}
@@ -389,7 +474,7 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
                 />
                 <div>
                   <h3 className="text-white font-semibold">{reel.user?.name}</h3>
-                  <p className="text-white/80 text-sm">{formatDistanceToNow(new Date(reel.createdAt), { addSuffix: true, locale: vi })}</p>
+                  <p className="text-white/80 text-sm">{formatDistanceToNow(new Date(reel.createdAt), { addSuffix: true, locale: enUS })}</p>
                 </div>
               </div>
 
@@ -400,11 +485,11 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
                     onClick={(e) => { e.stopPropagation(); setDescExpanded((s) => !s); }}
                     className="text-white/80 text-sm mt-1 cursor-pointer"
                   >
-                    {descExpanded ? 'Ẩn bớt' : 'Xem thêm'}
+                    {descExpanded ? 'Show less' : 'See more'}
                   </button>
                 </div>
               )}
-              <p className="text-white/60 text-sm mt-1 pointer-events-none">{reel.views.toLocaleString()} lượt xem</p>
+              <p className="text-white/60 text-sm mt-1 pointer-events-none">{viewsCount.toLocaleString()} views</p>
             </div>
           ) : null}
 
@@ -419,15 +504,26 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={handleDelete} className="text-red-600 cursor-pointer">
-                  Xóa reel
+                  Delete reel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         )}
 
-        {/* Right-side vertical action buttons centered (moved left to avoid nav buttons) */}
-        <div className="absolute right-20 top-1/2 -translate-y-1/2 pointer-events-auto">
+        {/* Right-side vertical action buttons centered (fixed to viewport so they don't move when comments open) */}
+        <div
+          className="fixed top-1/2 -translate-y-1/2 pointer-events-auto z-40"
+          style={
+            actionLeft
+              ? { left: `${actionLeft}px` }
+              : {
+                  right: showComments
+                    ? 'clamp(24px, 6vw, 180px)'
+                    : 'clamp(64px, 14vw, 200px)',
+                }
+          }
+        >
           <div className="flex flex-col items-center gap-6">
             <button onClick={handleLike} className="flex flex-col items-center gap-1 cursor-pointer">
               <div className="bg-black/40 rounded-full p-2">

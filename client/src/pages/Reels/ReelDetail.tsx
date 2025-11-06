@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Reel } from '../../types';
+import type { Reel, ReelComment } from '../../types';
 import { getReel } from '../../services/reelService';
 import ReelPlayer from '../../components/Reels/ReelPlayer';
 import ReelComments from '../../components/Reels/ReelComments';
 import { X } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
+import socketService from '../../services/socketService';
 
 export default function ReelDetailPage() {
   const { reelId } = useParams<{ reelId: string }>();
@@ -37,6 +38,56 @@ export default function ReelDetailPage() {
     }
   };
 
+  useEffect(() => {
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    const handleCommentCreated = (comment: ReelComment) => {
+      if (!comment?.reelId) return;
+      setReel((prev) => {
+        if (!prev || prev.id !== comment.reelId) return prev;
+        const nextCount = prev._count
+          ? { ...prev._count, comments: (prev._count.comments ?? 0) + 1 }
+          : { likes: 0, comments: 1, shares: 0 };
+        return {
+          ...prev,
+          _count: nextCount,
+        };
+      });
+    };
+
+    const handleCommentDeleted = (payload: {
+      reelId: string;
+      removedCount?: number;
+    }) => {
+      if (!payload?.reelId) return;
+      const removed = Math.max(payload.removedCount ?? 1, 1);
+      setReel((prev) => {
+        if (!prev || prev.id !== payload.reelId) return prev;
+        const current = prev._count?.comments ?? 0;
+        const nextCount = prev._count
+          ? { ...prev._count, comments: Math.max(current - removed, 0) }
+          : {
+              likes: 0,
+              comments: Math.max(current - removed, 0),
+              shares: 0,
+            };
+        return {
+          ...prev,
+          _count: nextCount,
+        };
+      });
+    };
+
+    socket.on('reel_comment_created', handleCommentCreated);
+    socket.on('reel_comment_deleted', handleCommentDeleted);
+
+    return () => {
+      socket.off('reel_comment_created', handleCommentCreated);
+      socket.off('reel_comment_deleted', handleCommentDeleted);
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className="h-screen bg-black flex items-center justify-center">
@@ -50,7 +101,7 @@ export default function ReelDetailPage() {
   }
 
   return (
-    <div className="relative h-screen bg-black">
+    <div className="relative h-screen bg-black overflow-hidden">
       {/* Close Button */}
       <button
         onClick={() => navigate('/reels')}
@@ -60,18 +111,22 @@ export default function ReelDetailPage() {
       </button>
 
       {/* Reel Player */}
-      <ReelPlayer
-        reel={reel}
-        isActive={true}
-        onCommentClick={() => setShowComments(true)}
-        onDelete={() => navigate('/reels')}
-      />
+      <div className={`h-full w-full transition-[padding] duration-300 ${showComments ? 'sm:pr-[436px]' : ''}`}>
+        <ReelPlayer
+          reel={reel}
+          isActive={true}
+          onCommentClick={() => setShowComments((prev) => !prev)}
+          onDelete={() => navigate('/reels')}
+          showComments={showComments}
+        />
+      </div>
 
       {/* Comments Modal */}
       {showComments && (
         <ReelComments
           reelId={reel.id}
           onClose={() => setShowComments(false)}
+          isDrawer
         />
       )}
     </div>

@@ -268,6 +268,7 @@ export interface ReelComment {
   reelId: string;
   userId: string;
   parentId?: string;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;
@@ -280,4 +281,5 @@ export interface ReelComment {
 export interface CreateReelCommentData {
   content: string;
   parentId?: string;
+  imageUrl?: string;
 }

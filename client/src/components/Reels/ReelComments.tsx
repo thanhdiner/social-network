@@ -1,292 +1,1075 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { enUS } from 'date-fns/locale';
+import { X, Send, MessageCircle, Loader2, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import socketService from '../../services/socketService';
+import type { Notification } from '../../services/notificationService';
 import type { ReelComment } from '../../types';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 import {
-  getReelComments,
   createReelComment,
   deleteReelComment,
   getReelCommentReplies,
+  getReelComments,
 } from '../../services/reelService';
-import { useCurrentUser } from '../../hooks/useCurrentUser';
-import { formatDistanceToNow } from 'date-fns';
-import { vi } from 'date-fns/locale';
-import { Send, Trash2, MessageCircle } from 'lucide-react';
+import { Avatar } from '../shared/Avatar';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import uploadService from '../../services/uploadService';
 
 interface ReelCommentsProps {
   reelId: string;
   onClose: () => void;
+  isDrawer?: boolean;
 }
 
-export default function ReelComments({ reelId, onClose }: ReelCommentsProps) {
-  const [comments, setComments] = useState<ReelComment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
-  const [repliesMap, setRepliesMap] = useState<Record<string, ReelComment[]>>({});
+type ReplyCacheEntry = {
+  items: ReelComment[];
+  page: number;
+  hasMore: boolean;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+};
+
+type ReelCommentDeletedPayload = {
+  reelId: string;
+  commentId: string;
+  parentId?: string | null;
+  removedCount?: number;
+  removedReplies?: number;
+};
+
+const COMMENTS_PAGE_SIZE = 10;
+const REPLIES_PAGE_SIZE = 10;
+
+export default function ReelComments({ reelId, onClose, isDrawer }: ReelCommentsProps) {
   const { user: currentUser } = useCurrentUser();
+  const [comments, setComments] = useState<ReelComment[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<{ parentId: string; mention?: string } | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [repliesState, setRepliesState] = useState<Record<string, ReplyCacheEntry>>({});
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(() => new Set());
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const commentImageInputRef = useRef<HTMLInputElement>(null);
+  const replyImageInputRef = useRef<HTMLInputElement>(null);
+  const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
+  const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
+  const [isUploadingCommentImage, setIsUploadingCommentImage] = useState(false);
+  const [isUploadingReplyImage, setIsUploadingReplyImage] = useState(false);
+
+  const loadComments = useCallback(
+    async (pageToLoad = 1) => {
+      if (pageToLoad === 1) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      try {
+        const data = await getReelComments(reelId, pageToLoad, COMMENTS_PAGE_SIZE);
+        setComments((prev) => (pageToLoad === 1 ? data : [...prev, ...data]));
+        setHasMore(data.length === COMMENTS_PAGE_SIZE);
+        setPage(pageToLoad);
+      } catch (error) {
+        console.error('Failed to load reel comments', error);
+        if (pageToLoad === 1) {
+          setComments([]);
+          setHasMore(false);
+        }
+      } finally {
+        if (pageToLoad === 1) {
+          setIsLoading(false);
+        } else {
+          setIsLoadingMore(false);
+        }
+      }
+    },
+    [reelId],
+  );
+
+  const loadReplies = useCallback(async (commentId: string, pageToLoad = 1) => {
+    setRepliesState((prev) => {
+      const current =
+        prev[commentId] ?? {
+          items: [],
+          page: 0,
+          hasMore: false,
+          isLoading: false,
+          isLoadingMore: false,
+        };
+
+      return {
+        ...prev,
+        [commentId]: {
+          ...current,
+          isLoading: pageToLoad === 1,
+          isLoadingMore: pageToLoad > 1,
+        },
+      };
+    });
+
+    try {
+      const data = await getReelCommentReplies(commentId, pageToLoad, REPLIES_PAGE_SIZE);
+      setRepliesState((prev) => {
+        const current =
+          prev[commentId] ?? {
+            items: [],
+            page: 0,
+            hasMore: false,
+            isLoading: false,
+            isLoadingMore: false,
+          };
+        const items = pageToLoad === 1 ? data : [...current.items, ...data];
+
+        return {
+          ...prev,
+          [commentId]: {
+            items,
+            page: pageToLoad,
+            hasMore: data.length === REPLIES_PAGE_SIZE,
+            isLoading: false,
+            isLoadingMore: false,
+          },
+        };
+      });
+    } catch (error) {
+      console.error('Failed to load reel comment replies', error);
+      setRepliesState((prev) => {
+        const current =
+          prev[commentId] ?? {
+            items: [],
+            page: 0,
+            hasMore: false,
+            isLoading: false,
+            isLoadingMore: false,
+          };
+
+        return {
+          ...prev,
+          [commentId]: {
+            ...current,
+            isLoading: false,
+            isLoadingMore: false,
+          },
+        };
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    loadComments();
-  }, [reelId]);
+    setRepliesState({});
+    setExpandedComments(() => new Set());
+    setReplyTarget(null);
+    setReplyContent('');
+    setNewComment('');
+    loadComments(1);
 
-  const loadComments = async () => {
-    try {
-      const data = await getReelComments(reelId);
-      setComments(data);
-    } catch (error) {
-      console.error('Error loading comments:', error);
+    // Realtime: listen for socket events for new comments/replies or notifications
+    const socket = socketService.getSocket();
+
+    const onNewNotification = (notif: Notification) => {
+      try {
+        if (!notif) return;
+        // If notification references this reel and is a comment, refresh comments
+        if (notif.type === 'comment' && notif.relatedId === reelId) {
+          void loadComments(1);
+        }
+      } catch (err) {
+        console.error('Error handling incoming notification', err);
+      }
+    };
+
+    const onReelCommentCreated = (payload: ReelComment) => {
+      try {
+        if (!payload) return;
+        if (payload.reelId !== reelId) return;
+
+        // If it's a root comment, prepend
+        if (!payload.parentId) {
+          setComments((prev) => {
+            if (prev.some((comment) => comment.id === payload.id)) {
+              return prev;
+            }
+            return [payload, ...prev];
+          });
+        } else {
+          // It's a reply — ensure we add to replies cache and increment count
+          const parentId = payload.parentId as string;
+          let inserted = false;
+          setRepliesState((prev) => {
+            const current = prev[parentId] ?? { items: [], page: 0, hasMore: false, isLoading: false, isLoadingMore: false };
+            if (current.items.some((reply) => reply.id === payload.id)) {
+              return prev;
+            }
+            inserted = true;
+            return {
+              ...prev,
+              [parentId]: {
+                ...current,
+                items: [...current.items, payload],
+              },
+            };
+          });
+
+          if (inserted) {
+            setComments((prev) =>
+              prev.map((c) =>
+                c.id === parentId
+                  ? {
+                      ...c,
+                      _count: {
+                        replies: (c._count?.replies || 0) + 1,
+                      },
+                    }
+                  : c,
+              ),
+            );
+          }
+        }
+      } catch (err) {
+        console.error('Failed to apply realtime reel comment', err);
+      }
+    };
+
+    socket?.on('new_notification', onNewNotification);
+    socket?.on('reel_comment_created', onReelCommentCreated);
+    const onReelCommentDeleted = (payload: ReelCommentDeletedPayload) => {
+      try {
+        if (!payload || payload.reelId !== reelId) return;
+
+        if (!payload.parentId) {
+          setComments((prev) => prev.filter((comment) => comment.id !== payload.commentId));
+          setRepliesState((prev) => {
+            if (!(payload.commentId in prev)) {
+              return prev;
+            }
+            const next = { ...prev };
+            delete next[payload.commentId];
+            return next;
+          });
+          setExpandedComments((prev) => {
+            if (!prev.has(payload.commentId)) return prev;
+            const next = new Set(prev);
+            next.delete(payload.commentId);
+            return next;
+          });
+        } else {
+          const parentId = payload.parentId;
+          setRepliesState((prev) => {
+            const current = prev[parentId];
+            if (!current) return prev;
+            return {
+              ...prev,
+              [parentId]: {
+                ...current,
+                items: current.items.filter((reply) => reply.id !== payload.commentId),
+              },
+            };
+          });
+
+          setComments((prev) =>
+            prev.map((comment) =>
+              comment.id === parentId
+                ? {
+                    ...comment,
+                    _count: {
+                      replies: Math.max(
+                        (comment._count?.replies || 1) - Math.max(payload.removedCount ?? 1, 1),
+                        0,
+                      ),
+                    },
+                  }
+                : comment,
+            ),
+          );
+        }
+      } catch (err) {
+        console.error('Failed to apply realtime reel comment deletion', err);
+      }
+    };
+    socket?.on('reel_comment_deleted', onReelCommentDeleted);
+
+    return () => {
+      socket?.off('new_notification', onNewNotification);
+      socket?.off('reel_comment_created', onReelCommentCreated);
+      socket?.off('reel_comment_deleted', onReelCommentDeleted);
+    };
+  }, [loadComments, reelId]);
+
+  useEffect(() => {
+    if (replyTarget) {
+      const handle = window.setTimeout(() => replyInputRef.current?.focus(), 120);
+      return () => window.clearTimeout(handle);
+    }
+    return undefined;
+  }, [replyTarget]);
+
+  const handleLoadMoreComments = async () => {
+    if (!hasMore || isLoadingMore) return;
+    await loadComments(page + 1);
+  };
+
+  const handleStartReply = (parentId: string, mention?: string | null) => {
+    const alreadyExpanded = expandedComments.has(parentId);
+    const trimmedMention = mention?.trim() || undefined;
+    setReplyTarget({ parentId, mention: trimmedMention });
+    setReplyContent(trimmedMention ? `@${trimmedMention} ` : '');
+    setReplyImageUrl(null);
+    if (replyImageInputRef.current) {
+      replyImageInputRef.current.value = '';
+    }
+
+    if (!alreadyExpanded) {
+      setExpandedComments((prev) => {
+        const next = new Set(prev);
+        next.add(parentId);
+        return next;
+      });
+      if (!repliesState[parentId] || (repliesState[parentId]?.page ?? 0) < 1) {
+        void loadReplies(parentId, 1);
+      }
     }
   };
 
-  const loadReplies = async (commentId: string) => {
-    try {
-      const replies = await getReelCommentReplies(commentId);
-      setRepliesMap((prev) => ({ ...prev, [commentId]: replies }));
-    } catch (error) {
-      console.error('Error loading replies:', error);
+  const handleToggleReplies = (commentId: string) => {
+    const alreadyExpanded = expandedComments.has(commentId);
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (alreadyExpanded) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+
+    if (
+      !alreadyExpanded &&
+      (!repliesState[commentId] || (repliesState[commentId]?.page ?? 0) < 1)
+    ) {
+      void loadReplies(commentId, 1);
     }
   };
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
+  const handleSelectCommentImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
 
+    const validation = uploadService.validateImage(file);
+    if (!validation.valid) {
+      alert(validation.error || 'Invalid image file');
+      input.value = '';
+      return;
+    }
+
+    setIsUploadingCommentImage(true);
     try {
-      const comment = await createReelComment(reelId, { content: newComment });
-      setComments([comment, ...comments]);
+      const url = await uploadService.uploadImage(file);
+      setCommentImageUrl(url);
+    } catch (error) {
+      console.error('Failed to upload comment image', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingCommentImage(false);
+      input.value = '';
+    }
+  };
+
+  const handleRemoveCommentImage = () => {
+    setCommentImageUrl(null);
+    if (commentImageInputRef.current) {
+      commentImageInputRef.current.value = '';
+    }
+  };
+
+  const handleSelectReplyImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const validation = uploadService.validateImage(file);
+    if (!validation.valid) {
+      alert(validation.error || 'Invalid image file');
+      input.value = '';
+      return;
+    }
+
+    setIsUploadingReplyImage(true);
+    try {
+      const url = await uploadService.uploadImage(file);
+      setReplyImageUrl(url);
+    } catch (error) {
+      console.error('Failed to upload reply image', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingReplyImage(false);
+      input.value = '';
+    }
+  };
+
+  const handleRemoveReplyImage = () => {
+    setReplyImageUrl(null);
+    if (replyImageInputRef.current) {
+      replyImageInputRef.current.value = '';
+    }
+  };
+
+  const handleSubmitComment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (isSubmittingComment || isUploadingCommentImage) return;
+    if (!newComment.trim() && !commentImageUrl) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const payload = {
+        content: newComment.trim(),
+        imageUrl: commentImageUrl ?? undefined,
+      };
+      const created = await createReelComment(reelId, payload);
+      setComments((prev) => {
+        if (prev.some((comment) => comment.id === created.id)) {
+          return prev;
+        }
+        return [created, ...prev];
+      });
       setNewComment('');
+      setCommentImageUrl(null);
+      if (commentImageInputRef.current) {
+        commentImageInputRef.current.value = '';
+      }
     } catch (error) {
-      console.error('Error creating comment:', error);
+      console.error('Failed to post comment', error);
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
-  const handleSubmitReply = async (e: React.FormEvent, parentId: string) => {
-    e.preventDefault();
-    if (!replyContent.trim()) return;
+  const handleSubmitReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!replyTarget || isSubmittingReply || isUploadingReplyImage) return;
+    if (!replyContent.trim() && !replyImageUrl) return;
 
+    setIsSubmittingReply(true);
     try {
-      const reply = await createReelComment(reelId, {
-        content: replyContent,
-        parentId,
+      const trimmedContent = replyContent.trim();
+      const mentionName = replyTarget.mention;
+
+      // Preserve the user's typed content. Only ensure the intended mention is
+      // present as a prefix — do not try to strip mentions with a greedy regex
+      // which can accidentally remove words. Behavior:
+      // - If the user already started the reply with the exact mention (e.g.
+      //   "@Name ..."), keep the content as-is.
+      // - If the user started with a different @-mention, keep as-is (respect
+      //   user's choice).
+      // - Otherwise, prefix the intended mention (if provided).
+      let contentToSend = trimmedContent;
+      if (mentionName) {
+        const wantedPrefix = `@${mentionName}`;
+        if (trimmedContent.startsWith(wantedPrefix)) {
+          // already has the correct mention at start, keep as-is
+          contentToSend = trimmedContent;
+        } else if (trimmedContent.startsWith('@')) {
+          // starts with some other mention, don't overwrite user's text
+          contentToSend = trimmedContent;
+        } else {
+          contentToSend = `${wantedPrefix} ${trimmedContent}`.trim();
+        }
+      }
+
+      const created = await createReelComment(reelId, {
+        content: contentToSend,
+        parentId: replyTarget.parentId,
+        imageUrl: replyImageUrl ?? undefined,
       });
 
-      // Add to replies map
-      setRepliesMap((prev) => ({
-        ...prev,
-        [parentId]: [reply, ...(prev[parentId] || [])],
-      }));
+      let inserted = false;
+      setRepliesState((prev) => {
+        const current =
+          prev[replyTarget.parentId] ?? {
+            items: [],
+            page: 0,
+            hasMore: false,
+            isLoading: false,
+            isLoadingMore: false,
+          };
+        if (current.items.some((reply) => reply.id === created.id)) {
+          return prev;
+        }
+        inserted = true;
+        return {
+          ...prev,
+          [replyTarget.parentId]: {
+            ...current,
+            items: [...current.items, created],
+            hasMore: current.hasMore,
+            isLoading: false,
+            isLoadingMore: false,
+          },
+        };
+      });
 
+      if (inserted) {
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === replyTarget.parentId
+              ? {
+                  ...comment,
+                  _count: {
+                    replies: (comment._count?.replies || 0) + 1,
+                  },
+                }
+              : comment,
+          ),
+        );
+      }
+
+      setReplyTarget(null);
       setReplyContent('');
-      setReplyingTo(null);
+      setReplyImageUrl(null);
+      if (replyImageInputRef.current) {
+        replyImageInputRef.current.value = '';
+      }
     } catch (error) {
-      console.error('Error creating reply:', error);
+      console.error('Failed to post reply', error);
+    } finally {
+      setIsSubmittingReply(false);
     }
   };
 
   const handleDeleteComment = async (commentId: string, parentId?: string) => {
-    if (window.confirm('Bạn có chắc muốn xóa bình luận này?')) {
-      try {
-        await deleteReelComment(commentId);
-        if (parentId) {
-          // Remove from replies
-          setRepliesMap((prev) => ({
+    if (!window.confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+
+    try {
+      await deleteReelComment(commentId);
+
+      if (parentId) {
+        setRepliesState((prev) => {
+          const current = prev[parentId];
+          if (!current) return prev;
+          return {
             ...prev,
-            [parentId]: (prev[parentId] || []).filter((r) => r.id !== commentId),
-          }));
-        } else {
-          // Remove from main comments
-          setComments(comments.filter((c) => c.id !== commentId));
-        }
-      } catch (error) {
-        console.error('Error deleting comment:', error);
+            [parentId]: {
+              ...current,
+              items: current.items.filter((reply) => reply.id !== commentId),
+            },
+          };
+        });
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === parentId
+              ? {
+                  ...comment,
+                  _count: {
+                    replies: Math.max((comment._count?.replies || 1) - 1, 0),
+                  },
+                }
+              : comment,
+          ),
+        );
+      } else {
+        setComments((prev) => prev.filter((comment) => comment.id !== commentId));
+        setRepliesState((prev) => {
+          const rest = { ...prev };
+          delete rest[commentId];
+          return rest;
+        });
+        setExpandedComments((prev) => {
+          if (!prev.has(commentId)) return prev;
+          const next = new Set(prev);
+          next.delete(commentId);
+          return next;
+        });
       }
+    } catch (error) {
+      console.error('Failed to delete comment', error);
     }
   };
 
-  const toggleReplies = (commentId: string) => {
-    const newExpanded = new Set(expandedComments);
-    if (newExpanded.has(commentId)) {
-      newExpanded.delete(commentId);
-    } else {
-      newExpanded.add(commentId);
-      if (!repliesMap[commentId]) {
-        loadReplies(commentId);
+  const handleCancelReply = () => {
+    setReplyTarget(null);
+    setReplyContent('');
+    setReplyImageUrl(null);
+    if (replyImageInputRef.current) {
+      replyImageInputRef.current.value = '';
+    }
+  };
+
+  const findUserByName = (name: string) => {
+    const target = name.trim();
+    for (const commentItem of comments) {
+      if (commentItem.user?.name?.trim() === target) {
+        return commentItem.user;
+      }
+
+      const replyPool = repliesState[commentItem.id]?.items ?? commentItem.replies ?? [];
+      for (const reply of replyPool) {
+        if (reply.user?.name?.trim() === target) {
+          return reply.user;
+        }
       }
     }
-    setExpandedComments(newExpanded);
+    return undefined;
+  };
+
+  const renderContentWithMention = (content: string) => {
+    // If content doesn't start with '@' just render raw
+    if (!content || !content.trim().startsWith('@')) return content;
+
+    // Try to parse a multi-word mention by comparing progressive tokens
+    // against known users (prefer longest match). This avoids greedy
+    // regex that can accidentally swallow parts of the message.
+    const afterAt = content.trim().slice(1);
+    const tokens = afterAt.split(/\s+/);
+
+    let foundName: string | null = null;
+    let foundUser: ReturnType<typeof findUserByName> | undefined;
+    let consumedTokens = 0;
+
+    // Try longest-first to capture full multi-word names
+    for (let i = tokens.length; i >= 1; i--) {
+      const candidate = tokens.slice(0, i).join(' ').trim();
+      const user = findUserByName(candidate);
+      if (user) {
+        foundName = candidate;
+        foundUser = user;
+        consumedTokens = i;
+        break;
+      }
+    }
+
+    // Fallback: use the first token as mention name if no user matched
+    if (!foundName) {
+      foundName = tokens[0] || null;
+      consumedTokens = 1;
+    }
+
+    if (!foundName) return content;
+
+    const remaining = tokens.slice(consumedTokens).join(' ');
+
+    const mentionElement = foundUser?.username ? (
+      <Link
+        to={`/profile/${foundUser.username}`}
+        className="mr-1 font-semibold text-orange-500 hover:underline cursor-pointer"
+      >
+        @{foundName}
+      </Link>
+    ) : (
+      <span className="mr-1 font-semibold text-orange-500">@{foundName}</span>
+    );
+
+    return (
+      <>
+        {mentionElement}
+        {remaining ? <span> {remaining}</span> : null}
+      </>
+    );
+  };
+
+  const drawer = Boolean(isDrawer);
+  const alignmentClasses = drawer
+    ? 'items-start justify-end'
+    : 'items-end justify-center sm:items-center';
+  const overlayClasses = drawer
+    ? 'bg-black/50 sm:bg-transparent pointer-events-auto sm:pointer-events-none'
+    : 'bg-black/50 pointer-events-auto';
+
+  const renderReplies = (comment: ReelComment) => {
+    const entry = repliesState[comment.id];
+    const isExpanded = expandedComments.has(comment.id);
+    const replies = entry?.items ?? comment.replies ?? [];
+
+    if (!isExpanded) {
+      return null;
+    }
+
+    return (
+      <div className="mt-3 space-y-3 border-l border-gray-200 pl-4">
+        {entry?.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading replies...
+          </div>
+        ) : replies.length === 0 ? (
+          <p className="text-sm text-gray-500">No replies yet.</p>
+        ) : (
+          replies.map((reply) => (
+            <div key={reply.id} className="flex gap-3">
+              <Link to={reply.user?.username ? `/profile/${reply.user.username}` : '#'} className="cursor-pointer">
+                <Avatar
+                  src={reply.user?.avatar || undefined}
+                  name={reply.user?.name || 'User'}
+                  size="sm"
+                />
+              </Link>
+              <div className="flex-1">
+                <div className="inline-block max-w-full rounded-2xl bg-gray-100 px-3 py-2">
+                  <Link
+                    to={reply.user?.username ? `/profile/${reply.user.username}` : '#'}
+                    className="text-sm font-semibold text-gray-800 hover:text-orange-500 cursor-pointer"
+                  >
+                    {reply.user?.name}
+                  </Link>
+                {reply.content?.trim() ? (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
+                    {renderContentWithMention(reply.content)}
+                  </p>
+                ) : null}
+                {reply.imageUrl ? (
+                  <img
+                    src={reply.imageUrl}
+                    alt="Reply attachment"
+                    className="mt-2 max-h-52 w-auto rounded-xl border border-gray-200 object-cover"
+                  />
+                ) : null}
+              </div>
+                <div className="mt-1 flex flex-wrap items-center gap-3 px-2 text-xs text-gray-500">
+                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleStartReply(comment.id, reply.user?.name)}
+                    className="font-semibold text-gray-600 hover:text-orange-500 cursor-pointer"
+                  >
+                    Reply
+                  </button>
+                  {currentUser?.id === reply.userId && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteComment(reply.id, comment.id)}
+                      className="flex items-center gap-1 text-gray-500 hover:text-red-500 cursor-pointer"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        {entry && entry.hasMore && !entry.isLoading && (
+          <button
+            type="button"
+            onClick={() => loadReplies(comment.id, entry.page + 1)}
+            className="flex items-center gap-2 text-sm text-orange-500 hover:text-orange-600 cursor-pointer"
+            disabled={entry.isLoadingMore}
+          >
+            {entry.isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+            Load more replies
+          </button>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center sm:items-center">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Bình luận</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 cursor-pointer">
-            ✕
+  <div className={`fixed inset-0 z-45 flex ${alignmentClasses} ${overlayClasses}`}>
+      <div
+        className={
+          drawer
+            ? 'pointer-events-auto fixed right-0 top-0 bottom-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl sm:top-[65px] sm:w-[420px]'
+            : 'pointer-events-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl'
+        }
+      >
+        <div className="flex items-center justify-between border-b p-4">
+          <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 cursor-pointer"
+            aria-label="Close comments"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Comments List */}
         <div className="flex-1 overflow-y-auto p-4">
-          {comments.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">Chưa có bình luận nào</p>
-          ) : (
+          {isLoading ? (
             <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id}>
-                  {/* Main Comment */}
-                  <div className="flex gap-3">
-                    <img
-                      src={comment.user?.avatar || '/default-avatar.png'}
-                      alt={comment.user?.name}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="bg-gray-100 rounded-2xl px-3 py-2">
-                        <p className="font-semibold text-sm">{comment.user?.name}</p>
-                        <p className="text-sm">{comment.content}</p>
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="flex gap-3">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-gray-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-1/4 animate-pulse rounded bg-gray-200" />
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-500">No comments yet. Be the first to say something!</p>
+          ) : (
+            <div className="space-y-5">
+              {comments.map((comment) => {
+                const isExpanded = expandedComments.has(comment.id);
+                const repliesCount = comment._count?.replies || repliesState[comment.id]?.items.length || 0;
+
+                return (
+                  <div key={comment.id} className="flex gap-3">
+            <Link to={comment.user?.username ? `/profile/${comment.user.username}` : '#'} className="cursor-pointer">
+              <Avatar
+                src={comment.user?.avatar || undefined}
+                name={comment.user?.name || 'User'}
+                size="md"
+              />
+            </Link>
+            <div className="flex-1">
+              <div className="inline-block max-w-full rounded-2xl bg-gray-100 px-3 py-2">
+                <Link
+                  to={comment.user?.username ? `/profile/${comment.user.username}` : '#'}
+                  className="text-sm font-semibold text-gray-900 hover:text-orange-500 cursor-pointer"
+                >
+                  {comment.user?.name}
+                </Link>
+                        {comment.content?.trim() ? (
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
+                            {renderContentWithMention(comment.content)}
+                          </p>
+                        ) : null}
+                        {comment.imageUrl ? (
+                          <img
+                            src={comment.imageUrl}
+                            alt="Comment attachment"
+                            className="mt-2 max-h-64 w-auto rounded-xl border border-gray-200 object-cover"
+                          />
+                        ) : null}
                       </div>
-                      <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
-                        <span>
-                          {formatDistanceToNow(new Date(comment.createdAt), {
-                            addSuffix: true,
-                            locale: vi,
-                          })}
-                        </span>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 px-2 text-xs text-gray-500">
+                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
                         <button
-                          onClick={() => setReplyingTo(comment.id)}
-                          className="hover:underline cursor-pointer"
+                          type="button"
+                          onClick={() => handleStartReply(comment.id, comment.user?.name)}
+                          className="font-semibold text-gray-600 hover:text-orange-500 cursor-pointer"
                         >
-                          Trả lời
+                          Reply
                         </button>
                         {currentUser?.id === comment.userId && (
                           <button
+                            type="button"
                             onClick={() => handleDeleteComment(comment.id)}
-                            className="hover:underline text-red-500 cursor-pointer"
+                            className="flex items-center gap-1 text-gray-500 hover:text-red-500 cursor-pointer"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        )}
+                        {repliesCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReplies(comment.id)}
+                            className="flex items-center gap-1 text-gray-600 hover:text-orange-500 cursor-pointer"
+                          >
+                            <MessageCircle className="h-3 w-3" />
+                            {isExpanded ? 'Hide replies' : `View replies (${repliesCount})`}
                           </button>
                         )}
                       </div>
 
-                      {/* Show replies button */}
-                      {comment._count && comment._count.replies > 0 && (
-                        <button
-                          onClick={() => toggleReplies(comment.id)}
-                          className="flex items-center gap-1 mt-2 px-3 text-sm text-orange-600 hover:text-orange-700 cursor-pointer"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          {expandedComments.has(comment.id)
-                            ? 'Ẩn phản hồi'
-                            : `Xem ${comment._count.replies} phản hồi`}
-                        </button>
-                      )}
-
-                      {/* Replies */}
-                      {expandedComments.has(comment.id) && repliesMap[comment.id] && (
-                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-gray-200">
-                          {repliesMap[comment.id].map((reply) => (
-                            <div key={reply.id} className="flex gap-3">
+                      {replyTarget?.parentId === comment.id && (
+                        <form onSubmit={handleSubmitReply} className="mt-3 space-y-3">
+                          {replyImageUrl && (
+                            <div className="relative inline-block">
                               <img
-                                src={reply.user?.avatar || '/default-avatar.png'}
-                                alt={reply.user?.name}
-                                className="w-7 h-7 rounded-full object-cover"
+                                src={replyImageUrl}
+                                alt="Reply attachment"
+                                className="max-h-40 w-auto rounded-xl border border-gray-200 object-cover"
                               />
-                              <div className="flex-1">
-                                <div className="bg-gray-100 rounded-2xl px-3 py-2">
-                                  <p className="font-semibold text-sm">{reply.user?.name}</p>
-                                  <p className="text-sm">{reply.content}</p>
-                                </div>
-                                <div className="flex items-center gap-3 mt-1 px-3 text-xs text-gray-500">
-                                  <span>
-                                    {formatDistanceToNow(new Date(reply.createdAt), {
-                                      addSuffix: true,
-                                      locale: vi,
-                                    })}
-                                  </span>
-                                  {currentUser?.id === reply.userId && (
-                                    <button
-                                      onClick={() => handleDeleteComment(reply.id, comment.id)}
-                                      className="hover:underline text-red-500 cursor-pointer"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={handleRemoveReplyImage}
+                                className="absolute -right-2 -top-2 rounded-full bg-black/70 p-1 text-white hover:bg-black/80 cursor-pointer"
+                                aria-label="Remove attached image"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
                             </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Reply Form */}
-                      {replyingTo === comment.id && (
-                        <form
-                          onSubmit={(e) => handleSubmitReply(e, comment.id)}
-                          className="mt-3 flex gap-2"
-                        >
-                          <img
-                            src={currentUser?.avatar || '/default-avatar.png'}
-                            alt={currentUser?.name}
-                            className="w-7 h-7 rounded-full object-cover"
+                          )}
+                          <Textarea
+                            ref={replyInputRef}
+                            value={replyContent}
+                            onChange={(event) => setReplyContent(event.target.value)}
+                            placeholder={replyTarget.mention ? `Reply to ${replyTarget.mention}...` : 'Write a reply...'}
+                            className="min-h-20 resize-none"
+                            disabled={isUploadingReplyImage}
+                            onFocus={(e) => {
+                              // Ensure caret is placed after the prefilled mention when focused
+                              const el = e.currentTarget as HTMLTextAreaElement;
+                              const len = el.value.length;
+                              // schedule after default focus/click handling
+                              setTimeout(() => {
+                                try {
+                                  el.setSelectionRange(len, len);
+                                } catch {
+                                  /* ignore */
+                                }
+                              }, 0);
+                            }}
+                            onMouseUp={(e) => {
+                              // Override mouse selection to keep caret at end when clicking into the textarea
+                              const el = e.currentTarget as HTMLTextAreaElement;
+                              const len = el.value.length;
+                              setTimeout(() => {
+                                try {
+                                  el.setSelectionRange(len, len);
+                                } catch {
+                                  /* ignore */
+                                }
+                              }, 0);
+                            }}
                           />
-                          <div className="flex-1 flex gap-2">
-                            <Textarea
-                              value={replyContent}
-                              onChange={(e) => setReplyContent(e.target.value)}
-                              placeholder="Viết phản hồi..."
-                              className="flex-1 min-h-[60px] resize-none"
-                              autoFocus
-                            />
-                            <div className="flex flex-col gap-2">
-                              <Button type="submit" size="sm" className="bg-orange-500 hover:bg-orange-600 cursor-pointer">
-                                <Send className="w-4 h-4" />
-                              </Button>
+                          <input
+                            ref={replyImageInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleSelectReplyImage}
+                            className="hidden"
+                          />
+                          <div className="flex items-center justify-between gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => replyImageInputRef.current?.click()}
+                              disabled={!currentUser || isSubmittingReply || isUploadingReplyImage}
+                              className="flex items-center gap-2 cursor-pointer"
+                            >
+                              {isUploadingReplyImage ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ImageIcon className="h-4 w-4" />
+                              )}
+                              Attach image
+                            </Button>
+                            <div className="flex items-center justify-end gap-2">
                               <Button
                                 type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setReplyingTo(null);
-                                  setReplyContent('');
-                                }}
+                                variant="ghost"
+                                onClick={handleCancelReply}
                                 className="cursor-pointer"
                               >
-                                Hủy
+                                Cancel
+                              </Button>
+                              <Button
+                                type="submit"
+                                disabled={
+                                  !currentUser ||
+                                  isSubmittingReply ||
+                                  isUploadingReplyImage ||
+                                  (!replyContent.trim() && !replyImageUrl)
+                                }
+                                className="cursor-pointer"
+                              >
+                                {(isSubmittingReply || isUploadingReplyImage) && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                Send
                               </Button>
                             </div>
                           </div>
                         </form>
                       )}
+
+                      {renderReplies(comment)}
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
+
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={handleLoadMoreComments}
+                  className="flex items-center gap-2 w-full justify-center rounded-full border border-orange-500 px-4 py-2 text-sm font-medium text-orange-500 hover:bg-orange-50 cursor-pointer"
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Load more comments
+                </button>
+              )}
             </div>
           )}
         </div>
 
-        {/* Comment Input */}
-        <form onSubmit={handleSubmitComment} className="border-t p-4">
-          <div className="flex gap-3">
-            <img
-              src={currentUser?.avatar || '/default-avatar.png'}
-              alt={currentUser?.name}
-              className="w-8 h-8 rounded-full object-cover"
+        <form onSubmit={handleSubmitComment} className="border-t bg-white p-4">
+          <div className="flex items-start gap-3">
+            <Avatar
+              src={currentUser?.avatar || undefined}
+              name={currentUser?.name || 'User'}
+              size="sm"
             />
-            <div className="flex-1 flex gap-2">
+            <div className="flex-1 space-y-3">
+              {commentImageUrl && (
+                <div className="relative inline-block">
+                  <img
+                    src={commentImageUrl}
+                    alt="Comment attachment"
+                    className="max-h-48 w-auto rounded-xl border border-gray-200 object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveCommentImage}
+                    className="absolute -right-2 -top-2 rounded-full bg-black/70 p-1 text-white hover:bg-black/80 cursor-pointer"
+                    aria-label="Remove attached image"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               <Textarea
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Viết bình luận..."
-                className="flex-1 min-h-[60px] resize-none"
+                onChange={(event) => setNewComment(event.target.value)}
+                placeholder={currentUser ? 'Share your thoughts...' : 'You need to sign in to comment.'}
+                disabled={!currentUser || isUploadingCommentImage}
+                className="min-h-24 resize-none"
               />
-              <Button type="submit" className="bg-orange-500 hover:bg-orange-600 cursor-pointer">
-                <Send className="w-4 h-4" />
-              </Button>
+              <input
+                ref={commentImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleSelectCommentImage}
+                className="hidden"
+              />
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => commentImageInputRef.current?.click()}
+                  disabled={!currentUser || isSubmittingComment || isUploadingCommentImage}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  {isUploadingCommentImage ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="h-4 w-4" />
+                  )}
+                  Attach image
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    !currentUser ||
+                    (isSubmittingComment || isUploadingCommentImage) ||
+                    (!newComment.trim() && !commentImageUrl)
+                  }
+                  className="cursor-pointer"
+                >
+                  {(isSubmittingComment || isUploadingCommentImage) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  <Send className="mr-2 h-4 w-4" />
+                  Comment
+                </Button>
+              </div>
             </div>
           </div>
         </form>

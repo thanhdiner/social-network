@@ -193,8 +193,11 @@ export const NotificationsDropdown = () => {
       // For follow notifications, navigate to the follower's profile
       navigate(`/profile/${notification.actorUsername}`)
     } else if ((notification.type === 'like' || notification.type === 'comment' || notification.type === 'share') && notification.relatedId) {
-      // Navigate to related post
-      navigate(`/post/${notification.relatedId}`)
+      // Navigate based on content type (default to reels if content mentions reel)
+      const path = notification.content?.toLowerCase().includes('reel')
+        ? `/reels/${notification.relatedId}`
+        : `/post/${notification.relatedId}`;
+      navigate(path);
     }
   }
 

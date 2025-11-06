@@ -105,4 +105,9 @@ export class ReelsController {
   share(@Request() req, @Param('id') id: string) {
     return this.reelsService.share(id, req.user.userId);
   }
+
+  @Post(':id/view')
+  view(@Request() req, @Param('id') id: string) {
+    return this.reelsService.view(id, req.user.userId);
+  }
 }
