@@ -56,6 +56,43 @@ class NotificationSound {
     }
   }
 
+  // Play a custom tone
+  private playTone(frequency: number, duration = 0.25, volume = 0.25) {
+    if (!this.audioContext || !this.isEnabled) return;
+
+    try {
+      if (this.audioContext.state === 'suspended') this.audioContext.resume();
+
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.connect(gain);
+      gain.connect(this.audioContext.destination);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime);
+      gain.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration);
+
+      osc.start(this.audioContext.currentTime);
+      osc.stop(this.audioContext.currentTime + duration);
+    } catch (err) {
+      console.warn('Could not play tone:', err);
+    }
+  }
+
+  // Positive feedback (e.g., like)
+  playPositive() {
+    this.playTone(1000, 0.18, 0.28);
+  }
+
+  // Negative feedback (e.g., unlike)
+  playNegative() {
+    // lower pitch and shorter
+    this.playTone(600, 0.14, 0.18);
+  }
+
   // Bật/tắt âm thanh
   setEnabled(enabled: boolean) {
     this.isEnabled = enabled;

@@ -14,23 +14,6 @@ export default function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showComments, setShowComments] = useState(false);
-  const [globalMuted, setGlobalMuted] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem('reels_global_muted');
-      return raw ? JSON.parse(raw) : true;
-    } catch {
-      return true;
-    }
-  });
-
-  // persist global mute to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('reels_global_muted', JSON.stringify(globalMuted));
-    } catch {
-      // ignore storage errors
-    }
-  }, [globalMuted]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -241,8 +224,6 @@ export default function ReelsPage() {
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
-              isMuted={globalMuted}
-              onToggleGlobalMute={() => setGlobalMuted((v) => !v)}
             />
           </div>
         ))}
