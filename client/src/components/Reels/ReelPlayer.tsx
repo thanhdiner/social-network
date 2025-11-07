@@ -58,6 +58,9 @@ export default function ReelPlayer({
   // views tracking state
   const [viewsCount, setViewsCount] = useState<number>(reel.views || 0);
   const [hasCountedView, setHasCountedView] = useState(false);
+  
+  // aspect ratio detection
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
 
   useEffect(() => {
     setIsLiked(!!reel.isLiked);
@@ -186,6 +189,9 @@ export default function ReelPlayer({
       // if we have both intrinsic and container, compute displayed size
       const cSize = containerRef.current?.getBoundingClientRect();
       if (cSize && v.videoWidth && v.videoHeight) {
+        const ratio = v.videoWidth / v.videoHeight;
+        setAspectRatio(ratio);
+        
         const scale = Math.min(cSize.width / v.videoWidth, cSize.height / v.videoHeight);
         const dispW = Math.round(v.videoWidth * scale);
         const dispH = Math.round(v.videoHeight * scale);
@@ -225,7 +231,7 @@ export default function ReelPlayer({
               ? 48
               : 32
           : 32;
-      const gap = showComments ? 8 : Math.max(24, viewportGap);
+      const gap = showComments ? -100 : Math.max(24, viewportGap);
       // place actions just to the right of video
       setActionLeft(Math.round(videoRight + gap));
     };
@@ -340,7 +346,7 @@ export default function ReelPlayer({
   return (
     <div
       className={`relative w-full h-full bg-black flex items-center justify-center ${
-        showComments ? 'sm:justify-end' : ''
+        showComments ? 'sm:justify-center' : ''
       }`}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -348,9 +354,7 @@ export default function ReelPlayer({
     >
       {/* Video (portrait box on desktop, full-screen on small screens) */}
       <div
-        className={`w-full h-full flex items-center justify-center ${
-          showComments ? 'sm:justify-center sm:pr-20' : ''
-        }`}
+        className="w-full h-full flex items-center justify-center"
       >
         {/*
           Layout strategy:
@@ -360,9 +364,13 @@ export default function ReelPlayer({
         {/* Make desktop container max-width/max-height so video can scale without cropping */}
         <div
           ref={containerRef}
-          className={`w-full h-full md:max-w-[880px] md:max-h-[500px] flex items-center justify-center relative ${
-            showComments ? 'sm:w-auto sm:mr-12' : ''
+          className={`w-full h-full flex items-center justify-center relative ${
+            showComments ? 'sm:mr-0' : ''
           }`}
+          style={{
+            maxWidth: aspectRatio && aspectRatio > 1.5 ? '650px' : '800px',
+            maxHeight: '500px',
+          }}
         >
           <video
             ref={videoRef}
