@@ -1,4 +1,4 @@
-﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Shield, Settings } from 'lucide-react'
+﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Settings } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
@@ -78,8 +78,12 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         </Link>
         <TextAlignJustify
           size={22}
-          className="text-gray-600 mt-0.5 cursor-pointer hover:text-orange-500 transition"
-          onClick={onToggleSidebar}
+          className={`text-gray-600 mt-0.5 cursor-pointer hover:text-orange-500 transition ${location.pathname.startsWith('/reels') ? 'opacity-40 cursor-not-allowed' : ''}`}
+          onClick={() => {
+            // Prevent toggling the left sidebar while on the Reels page
+            if (location.pathname.startsWith('/reels')) return
+            onToggleSidebar?.()
+          }}
         />
       </div>
 

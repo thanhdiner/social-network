@@ -231,7 +231,9 @@ export default function ReelPlayer({
               ? 48
               : 32
           : 32;
-      const gap = showComments ? -100 : Math.max(24, viewportGap);
+  // when comments are closed, nudge the action buttons further left
+  // to sit closer to the video (reduce default right gap). Tuned smaller.
+  const gap = showComments ? -100 : Math.max(4, viewportGap - 50);
       // place actions just to the right of video
       setActionLeft(Math.round(videoRight + gap));
     };
@@ -368,8 +370,15 @@ export default function ReelPlayer({
             showComments ? 'sm:mr-0' : ''
           }`}
           style={{
-            maxWidth: aspectRatio && aspectRatio > 1.5 ? '650px' : '800px',
+            maxWidth: aspectRatio && aspectRatio > 1.5 ? '800px' : '880px',
             maxHeight: '500px',
+            // If comments are open and this is a wide (16:9+) video,
+            // shift the video slightly left so it moves toward the
+            // comments panel (user requested left shift).
+            transform:
+              showComments && aspectRatio && aspectRatio > 1.5
+                ? 'translateX(-10px)'
+                : undefined,
           }}
         >
           <video
