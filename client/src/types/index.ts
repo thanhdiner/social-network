@@ -53,6 +53,8 @@ export interface Post {
   likes?: Like[];
   sharedPostId?: string;
   sharedPost?: Post;
+  sharedReelId?: string;
+  sharedReel?: Reel;
   isLiked?: boolean;
   reactionType?: ReactionType | null;
   isSaved?: boolean;
@@ -234,22 +236,29 @@ export interface Notification {
 }
 
 // Reel Types
-export interface Reel {
+export interface ReelStats {
+  likes: number;
+  comments: number;
+  shares: number;
+}
+
+export interface ReelSummary {
   id: string;
   videoUrl: string;
   thumbnailUrl?: string;
   description?: string;
+  shareContent?: string | null;
   userId: string;
-  views: number;
   createdAt: string;
   updatedAt: string;
   user?: User;
+  _count?: ReelStats;
+}
+
+export interface Reel extends ReelSummary {
+  views: number;
   isLiked?: boolean;
-  _count?: {
-    likes: number;
-    comments: number;
-    shares: number;
-  };
+  sharedFrom?: ReelSummary | null;
 }
 
 export interface CreateReelData {

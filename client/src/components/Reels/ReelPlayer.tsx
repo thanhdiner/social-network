@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Reel } from '../../types';
 import { Heart, MessageCircle, Share2, MoreVertical, Play, Pause, Volume2, VolumeX } from 'lucide-react';
-import { toggleLikeReel, shareReel, deleteReel, viewReel } from '../../services/reelService';
+import { toggleLikeReel, deleteReel, viewReel } from '../../services/reelService';
 import { notificationSound } from '../../utils/notificationSound';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useVolumeSettings } from '../../hooks/useVolumeSettings';
@@ -24,15 +24,29 @@ interface ReelPlayerProps {
   onTouchMove?: (e: React.TouchEvent) => void;
   onTouchEnd?: (e: React.TouchEvent) => void;
   showComments?: boolean;
+  onShareClick?: (reel: Reel) => void;
 }
 
-export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, onTouchStart, onTouchMove, onTouchEnd, showComments }: ReelPlayerProps) {
+export default function ReelPlayer({
+  reel,
+  isActive,
+  onCommentClick,
+  onDelete,
+  onTouchStart,
+  onTouchMove,
+  onTouchEnd,
+  showComments,
+  onShareClick,
+}: ReelPlayerProps) {
+  const contentReel = reel.sharedFrom ?? reel;
+
   const [isLiked, setIsLiked] = useState(reel.isLiked || false);
   const [likesCount, setLikesCount] = useState(reel._count?.likes || 0);
+  const [sharesCount, setSharesCount] = useState(contentReel._count?.shares || 0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  
+
   // Use volume settings from localStorage
   const { isMuted, volume, setIsMuted, setVolume } = useVolumeSettings();
   
@@ -44,6 +58,29 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
   // views tracking state
   const [viewsCount, setViewsCount] = useState<number>(reel.views || 0);
   const [hasCountedView, setHasCountedView] = useState(false);
+
+  useEffect(() => {
+    setIsLiked(!!reel.isLiked);
+  }, [reel.isLiked]);
+
+  useEffect(() => {
+    setLikesCount(reel._count?.likes || 0);
+  }, [reel._count?.likes]);
+
+  useEffect(() => {
+    const nextShares =
+      reel.sharedFrom?._count?.shares ?? contentReel._count?.shares ?? 0;
+    setSharesCount(nextShares);
+  }, [contentReel._count?.shares, reel.sharedFrom?._count?.shares, reel.sharedFrom?.id]);
+
+  useEffect(() => {
+    setViewsCount(reel.views || 0);
+    setHasCountedView(false);
+  }, [reel.id, reel.views]);
+
+  useEffect(() => {
+    setDescExpanded(false);
+  }, [reel.id]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -109,13 +146,8 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
     }
   };
 
-  const handleShare = async () => {
-    try {
-      await shareReel(reel.id);
-      alert('Reel shared!');
-    } catch (error) {
-      console.error('Error sharing reel:', error);
-    }
+  const handleShareClick = () => {
+    onShareClick?.(reel);
   };
 
   const handleDelete = async () => {
@@ -334,7 +366,7 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
         >
           <video
             ref={videoRef}
-            src={reel.videoUrl}
+            src={contentReel.videoUrl}
             // use object-contain and full both width+height so video is never cropped
             className="w-full h-full object-contain cursor-pointer rounded-sm"
             loop
@@ -456,42 +488,69 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
           ) : null}
 
           {/* Bottom-left profile + description (constrained to displayed video area) + volume control */}
-          {displayedSize ? (
-            <div
-              className="absolute"
-              style={{
-                left: `${Math.max(0, Math.round(((containerRef.current?.clientWidth || displayedSize.width) - displayedSize.width) / 2) ) + 24}px`,
-                bottom: '24px',
-                width: `${Math.max(0, Math.round((displayedSize.width - 48) * 0.66))}px`,
-                pointerEvents: 'none' as const,
-              }}
-            >
-              <div className="pointer-events-auto" style={{ display: 'flex', gap: 12, alignItems: 'center' }} onClick={() => navigate(`/profile/${reel.user?.username}`)}>
-                <img
-                  src={reel.user?.avatar || '/default-avatar.png'}
-                  alt={reel.user?.name}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-                <div>
-                  <h3 className="text-white font-semibold">{reel.user?.name}</h3>
-                  <p className="text-white/80 text-sm">{formatDistanceToNow(new Date(reel.createdAt), { addSuffix: true, locale: enUS })}</p>
-                </div>
-              </div>
+          {displayedSize ? (() => {
+            const offsetLeft = Math.max(
+              0,
+              Math.round(
+                ((containerRef.current?.clientWidth || displayedSize.width) - displayedSize.width) / 2,
+              ),
+            );
+            const contentWidth = Math.max(0, Math.round((displayedSize.width - 48) * 0.66));
+            return (
+              <>
+                {/* Share owner notification removed */}
 
-              {reel.description && (
-                <div className="pointer-events-auto mt-2">
-                  <p className={`text-white ${descExpanded ? '' : 'line-clamp-3'} max-w-full wrap-break-word whitespace-normal`}>{reel.description}</p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDescExpanded((s) => !s); }}
-                    className="text-white/80 text-sm mt-1 cursor-pointer"
+                <div
+                  className="absolute"
+                  style={{
+                    left: `${offsetLeft + 24}px`,
+                    bottom: '24px',
+                    width: `${contentWidth}px`,
+                    pointerEvents: 'none' as const,
+                  }}
+                >
+                  <div
+                    className="pointer-events-auto flex items-center gap-3"
+                    onClick={() => {
+                      if (contentReel.user?.username) {
+                        navigate(`/profile/${contentReel.user.username}`);
+                      }
+                    }}
                   >
-                    {descExpanded ? 'Show less' : 'See more'}
-                  </button>
+                    <img
+                      src={contentReel.user?.avatar || '/default-avatar.png'}
+                      alt={contentReel.user?.name || 'User'}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                    <div>
+                      <h3 className="text-white font-semibold">{contentReel.user?.name}</h3>
+                      <p className="text-white/80 text-sm">
+                        {formatDistanceToNow(new Date(contentReel.createdAt), { addSuffix: true, locale: enUS })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {contentReel.description ? (
+                    <div className="pointer-events-auto mt-2">
+                      <p className={`text-white ${descExpanded ? '' : 'line-clamp-3'} max-w-full wrap-break-word whitespace-normal`}>
+                        {contentReel.description}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDescExpanded((s) => !s);
+                        }}
+                        className="text-white/80 text-sm mt-1 cursor-pointer"
+                      >
+                        {descExpanded ? 'Show less' : 'See more'}
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="text-white/60 text-sm mt-1 pointer-events-none">{viewsCount.toLocaleString()} views</p>
                 </div>
-              )}
-              <p className="text-white/60 text-sm mt-1 pointer-events-none">{viewsCount.toLocaleString()} views</p>
-            </div>
-          ) : null}
+              </>
+            );
+          })() : null}
 
         </div>
 
@@ -541,11 +600,14 @@ export default function ReelPlayer({ reel, isActive, onCommentClick, onDelete, o
               <span className="text-white text-xs mt-1">{reel._count?.comments || 0}</span>
             </button>
 
-            <button onClick={handleShare} className="flex flex-col items-center gap-1 cursor-pointer">
+            <button
+              onClick={handleShareClick}
+              className="flex flex-col items-center gap-1 cursor-pointer"
+            >
               <div className="bg-black/40 rounded-full p-2">
                 <Share2 className="w-8 h-8 text-white" />
               </div>
-              <span className="text-white text-xs mt-1">{reel._count?.shares || 0}</span>
+              <span className="text-white text-xs mt-1">{sharesCount}</span>
             </button>
 
 

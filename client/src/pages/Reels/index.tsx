@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Reel, ReelComment } from '../../types';
-import { getReels, getReel } from '../../services/reelService';
+import type { Reel, ReelComment, ReelSummary, Post } from '../../types';
+import { getReels, getReel, type ShareReelResponse } from '../../services/reelService';
 import ReelPlayer from '../../components/Reels/ReelPlayer';
 import ReelComments from '../../components/Reels/ReelComments';
+import { ShareReelModal } from '../../components/Reels/ShareReelModal';
 import { ChevronUp, ChevronDown, Plus } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
 import { useNavigate, useParams } from 'react-router-dom';
 import socketService from '../../services/socketService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 
 export default function ReelsPage() {
   useTitle('Reels');
@@ -18,32 +20,43 @@ export default function ReelsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [hasAttemptedInitialLoad, setHasAttemptedInitialLoad] = useState(false);
   const [skipTransition, setSkipTransition] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastWheelAt = useRef<number>(0);
+  const { user: currentUser } = useCurrentUser();
+  const [sharingReel, setSharingReel] = useState<ReelSummary | null>(null);
 
-  const loadReels = useCallback(async () => {
-    if (loading || !hasMore) return;
+  const fetchReelsPage = useCallback(
+    async (pageToLoad: number) => {
+      setHasAttemptedInitialLoad(true);
+      setLoading(true);
+      try {
+        const data = await getReels(pageToLoad, 10);
+        if (data.length === 0) {
+          setHasMore(false);
+          return;
+        }
 
-    setLoading(true);
-    try {
-      const data = await getReels(page, 10);
-      if (data.length === 0) {
-        setHasMore(false);
-      } else {
-        setReels((prev) => [...prev, ...data]);
-        setPage((prev) => prev + 1);
+        setReels((prev) => (pageToLoad === 1 ? data : [...prev, ...data]));
+        setPage(pageToLoad + 1);
+      } catch (error) {
+        console.error('Error loading reels:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading reels:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading, hasMore, page]);
+    },
+    [],
+  );
 
   useEffect(() => {
-    loadReels();
-  }, [loadReels]);
+    void fetchReelsPage(1);
+  }, [fetchReelsPage]);
+
+  const loadMoreReels = useCallback(async () => {
+    if (loading || !hasMore) return;
+    await fetchReelsPage(page);
+  }, [fetchReelsPage, hasMore, loading, page]);
 
   // when reels change, if there's a param reelId, try to focus it
   useEffect(() => {
@@ -84,10 +97,10 @@ export default function ReelsPage() {
       setCurrentIndex((prev) => prev + 1);
       // Load more when reaching near the end
       if (currentIndex >= reels.length - 3) {
-        loadReels();
+        void loadMoreReels();
       }
     }
-  }, [currentIndex, reels.length, loadReels]);
+  }, [currentIndex, loadMoreReels, reels.length]);
 
   const handlePrevious = useCallback(() => {
     if (currentIndex > 0) {
@@ -167,6 +180,54 @@ export default function ReelsPage() {
     }
   };
 
+  const handleShareRequest = useCallback(
+    (reelToShare: Reel) => {
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+      setSharingReel(reelToShare.sharedFrom ?? reelToShare);
+    },
+    [currentUser, navigate],
+  );
+
+  const handleShareCreated = useCallback((response: ShareReelResponse) => {
+    const { share, shares, reelId, post } = response;
+    setReels((prev) => {
+      const withoutDuplicate = prev.filter((item) => item.id !== share.id);
+      const withShare = [share, ...withoutDuplicate];
+      return withShare.map((item) => {
+        if (item.id === reelId) {
+          const baseCount = item._count ?? { likes: 0, comments: 0, shares: 0 };
+          return {
+            ...item,
+            _count: {
+              ...baseCount,
+              shares,
+            },
+          };
+        }
+        if (item.sharedFrom && item.sharedFrom.id === reelId) {
+        window.dispatchEvent(
+          new CustomEvent<Post>('post:shared-reel-created', { detail: post }),
+        );
+          return {
+            ...item,
+            sharedFrom: {
+              ...item.sharedFrom,
+              _count: {
+                ...(item.sharedFrom._count ?? { likes: 0, comments: 0, shares: 0 }),
+                shares,
+              },
+            },
+          };
+        }
+        return item;
+      });
+    });
+    setSharingReel(null);
+  }, []);
+
   useEffect(() => {
     const socket = socketService.getSocket();
     if (!socket) return;
@@ -214,13 +275,21 @@ export default function ReelsPage() {
     socket.on('reel_comment_created', handleCommentCreated);
     socket.on('reel_comment_deleted', handleCommentDeleted);
 
+    const handleShareCreatedSocket = (payload: ShareReelResponse) => {
+      if (!payload?.share) return;
+      handleShareCreated(payload);
+    };
+
+    socket.on('reel_share_created', handleShareCreatedSocket);
+
     return () => {
       socket.off('reel_comment_created', handleCommentCreated);
       socket.off('reel_comment_deleted', handleCommentDeleted);
+      socket.off('reel_share_created', handleShareCreatedSocket);
     };
-  }, []);
+  }, [handleShareCreated]);
 
-  if (reels.length === 0 && !loading && !paramReelId) {
+  if (reels.length === 0 && !loading && !paramReelId && hasAttemptedInitialLoad) {
     return (
       <div className="relative h-screen bg-black">
         {/* Create Reel Button - still show when no reels */}
@@ -279,6 +348,7 @@ export default function ReelsPage() {
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                onShareClick={handleShareRequest}
               />
             </div>
           );
@@ -322,6 +392,19 @@ export default function ReelsPage() {
           reelId={reels[currentIndex].id}
           onClose={() => setShowComments(false)}
           isDrawer
+        />
+      )}
+
+      {sharingReel && currentUser && (
+        <ShareReelModal
+          reel={sharingReel}
+          open={!!sharingReel}
+          onClose={() => setSharingReel(null)}
+          onShared={(response) => {
+            handleShareCreated(response);
+          }}
+          currentUserName={currentUser.name}
+          currentUserAvatar={currentUser.avatar}
         />
       )}
     </div>

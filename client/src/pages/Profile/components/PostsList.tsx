@@ -10,6 +10,7 @@ import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionP
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
 import { SharePostModal } from '@/components/shared/SharePostModal'
+import { SharedReelPreview } from '@/components/shared/SharedReelPreview'
 import { Avatar } from '@/components/shared/Avatar'
 
 interface PostsListProps {
@@ -72,44 +73,68 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
     loadPosts()
   }, [loadPosts, refresh])
 
+  useEffect(() => {
+    const handleSharedReelPost = (event: Event) => {
+      if (!userId) return
+      const newPost = (event as CustomEvent<Post>).detail
+      if (newPost.userId !== userId) return
+
+      setPosts((prev) => {
+        if (prev.some((item) => item.id === newPost.id)) {
+          return prev
+        }
+        return [newPost, ...prev]
+      })
+    }
+
+    window.addEventListener('post:shared-reel-created', handleSharedReelPost as EventListener)
+    return () => {
+      window.removeEventListener('post:shared-reel-created', handleSharedReelPost as EventListener)
+    }
+  }, [userId])
+
   const handleLike = async (postId: string, type: ReactionType = 'like') => {
     try {
-      // Optimistic update
-      setPosts(prev => prev.map(post => {
-        if (post.id === postId) {
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id !== postId) {
+            return post
+          }
+
           const isSameReaction = post.reactionType === type
-          const currentLikes = post._count?.likes || 0
+          const currentLikes = post._count?.likes ?? 0
+
           return {
             ...post,
             isLiked: !isSameReaction,
             reactionType: isSameReaction ? null : type,
             _count: {
               ...post._count,
-              likes: isSameReaction ? currentLikes - 1 : (post.isLiked ? currentLikes : currentLikes + 1)
-            }
+              likes: isSameReaction
+                ? currentLikes - 1
+                : post.isLiked
+                  ? currentLikes
+                  : currentLikes + 1,
+            },
           }
-        }
-        return post
-      }))
+        }),
+      )
 
-      // Call API
       const result = await postService.toggleLike(postId, type)
-      
-      // Update with server response (keep the optimistic count)
-      setPosts(prev => prev.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            isLiked: result.liked,
-            reactionType: result.type,
-            // Keep the _count from optimistic update
-          }
-        }
-        return post
-      }))
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === postId
+            ? {
+                ...post,
+                isLiked: result.liked,
+                reactionType: result.type,
+              }
+            : post,
+        ),
+      )
     } catch (error) {
       console.error('Failed to toggle like:', error)
-      // Reload posts on error
       loadPosts()
     }
   }
@@ -183,45 +208,6 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
       window.history.replaceState(null, '', originalUrlRef.current)
     }
     originalUrlRef.current = null
-  }
-
-  const handleDeleteImage = async (postId: string, imageIndex: number) => {
-    try {
-      // Get current post
-      const post = posts.find(p => p.id === postId)
-      if (!post || !post.imageUrl) return
-
-      // Get all images
-      const images = post.imageUrl.split(',').filter(url => url.trim())
-      
-      // Remove the image at the specified index
-      const newImages = images.filter((_, i) => i !== imageIndex)
-      
-      // Update post with new images
-      const newImageUrl = newImages.length > 0 ? newImages.join(',') : undefined
-      
-      await postService.updatePost(postId, {
-        content: post.content,
-        imageUrl: newImageUrl,
-      })
-      
-      // Update local state
-      setPosts(prev => prev.map(p => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            imageUrl: newImageUrl
-          }
-        }
-        return p
-      }))
-      
-      // Update viewer images
-      setViewerImages(newImages)
-    } catch (error) {
-      console.error('Failed to delete image:', error)
-      alert('Failed to delete image. Please try again.')
-    }
   }
 
   if (isLoading) {
@@ -393,6 +379,9 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
               )}
             </div>
           )}
+
+          {/* Shared Reel */}
+          {post.sharedReel && <SharedReelPreview reel={post.sharedReel} />}
 
           {/* Post Images */}
           {post.imageUrl && (() => {

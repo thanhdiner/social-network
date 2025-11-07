@@ -1,4 +1,5 @@
 import api from './api';
+import type { Reel } from '@/types';
 
 export interface Post {
   id: string;
@@ -7,6 +8,7 @@ export interface Post {
   videoUrl?: string;
   userId: string;
   sharedPostId?: string;
+  sharedReelId?: string | null;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -16,6 +18,7 @@ export interface Post {
     avatar: string | null;
   };
   sharedPost?: Post;
+  sharedReel?: Reel | null;
   _count: {
     comments: number;
     likes: number;

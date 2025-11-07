@@ -9,6 +9,7 @@ import { ReactionPicker } from '@/components/shared/ReactionPicker'
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
 import { SharePostModal } from '@/components/shared/SharePostModal'
+import { SharedReelPreview } from '@/components/shared/SharedReelPreview'
 
 export const SavedPosts = () => {
   const { user: currentUser } = useAuth()
@@ -271,6 +272,9 @@ export const SavedPosts = () => {
               )}
             </div>
           )}
+
+          {/* Shared Reel */}
+          {post.sharedReel && <SharedReelPreview reel={post.sharedReel} />}
 
           {/* Post Images */}
           {post.imageUrl && (() => {

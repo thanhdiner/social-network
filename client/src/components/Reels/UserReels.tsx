@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import type { Reel, ReelComment } from '../../types';
-import { getReelsByUser } from '../../services/reelService';
+import { getReelsByUser, type ShareReelResponse } from '../../services/reelService';
 import { Video, Play, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import socketService from '../../services/socketService';
@@ -74,11 +74,51 @@ export default function UserReels({ userId }: UserReelsProps) {
     socket.on('reel_comment_created', handleCommentCreated);
     socket.on('reel_comment_deleted', handleCommentDeleted);
 
+    const handleShareCreatedSocket = (payload: ShareReelResponse) => {
+      if (!payload?.share) return;
+      const { share, shares, reelId } = payload;
+      setReels((prev) => {
+        let updatedList = prev;
+        if (share.userId === userId) {
+          const withoutDuplicate = prev.filter((item) => item.id !== share.id);
+          updatedList = [share, ...withoutDuplicate];
+        }
+        return updatedList.map((item) => {
+          if (item.id === reelId) {
+            const baseCount = item._count ?? { likes: 0, comments: 0, shares: 0 };
+            return {
+              ...item,
+              _count: {
+                ...baseCount,
+                shares,
+              },
+            };
+          }
+          if (item.sharedFrom && item.sharedFrom.id === reelId) {
+            return {
+              ...item,
+              sharedFrom: {
+                ...item.sharedFrom,
+                _count: {
+                  ...(item.sharedFrom._count ?? { likes: 0, comments: 0, shares: 0 }),
+                  shares,
+                },
+              },
+            };
+          }
+          return item;
+        });
+      });
+    };
+
+    socket.on('reel_share_created', handleShareCreatedSocket);
+
     return () => {
       socket.off('reel_comment_created', handleCommentCreated);
       socket.off('reel_comment_deleted', handleCommentDeleted);
+      socket.off('reel_share_created', handleShareCreatedSocket);
     };
-  }, []);
+  }, [userId]);
 
   if (loading) {
     return (
@@ -97,57 +137,79 @@ export default function UserReels({ userId }: UserReelsProps) {
     );
   }
 
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-      {reels.map((reel) => (
-        <div
-          key={reel.id}
-          className="relative aspect-[9/16] bg-gray-200 rounded-lg overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/reels')}
-        >
-          {/* Thumbnail or video preview */}
-          {reel.thumbnailUrl ? (
-            <img
-              src={reel.thumbnailUrl}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <video
-              src={reel.videoUrl}
-              className="w-full h-full object-cover"
-              muted
-            />
-          )}
+      {reels.map((reel) => {
+        const contentReel = reel.sharedFrom ?? reel;
+        const shareOwner = reel.sharedFrom ? reel.user : null;
+        const shareMessage = reel.shareContent;
+        const shareCount = contentReel._count?.shares ?? 0;
 
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Play className="w-12 h-12 text-white" />
-          </div>
+        return (
+          <div
+            key={reel.id}
+            className="relative aspect-[9/16] bg-gray-200 rounded-lg overflow-hidden group cursor-pointer"
+            onClick={() => navigate('/reels')}
+          >
+            {contentReel.thumbnailUrl ? (
+              <img src={contentReel.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <video src={contentReel.videoUrl} className="w-full h-full object-cover" muted />
+            )}
 
-          {/* Stats */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-            <div className="flex items-center gap-3 text-white text-sm">
-              <div className="flex items-center gap-1">
-                <Eye className="w-4 h-4" />
-                <span>{reel.views.toLocaleString()}</span>
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Play className="w-12 h-12 text-white" />
+            </div>
+
+            {shareOwner ? (
+              <div className="absolute top-2 left-2 right-2 rounded-xl bg-black/60 p-2 text-white text-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <img
+                    src={shareOwner.avatar || '/default-avatar.png'}
+                    alt={shareOwner.name}
+                    className="h-7 w-7 rounded-full object-cover"
+                  />
+                  <div className="flex-1 leading-tight">
+                    <p className="font-semibold">{shareOwner.name}</p>
+                    <p className="text-white/70">
+                      shared {contentReel.user?.name ? `${contentReel.user.name}'s` : 'a'} reel
+                    </p>
+                  </div>
+                </div>
+                {shareMessage ? (
+                  <p className="text-white/80 whitespace-pre-wrap leading-tight">{shareMessage}</p>
+                ) : null}
               </div>
-              {reel._count && (
-                <>
-                  <div className="flex items-center gap-1">
-                    <span>❤️</span>
-                    <span>{reel._count.likes}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>💬</span>
-                    <span>{reel._count.comments}</span>
-                  </div>
-                </>
-              )}
+            ) : null}
+
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-linear-to-t from-black/70 to-transparent">
+              <div className="flex flex-wrap items-center gap-3 text-white text-sm">
+                <div className="flex items-center gap-1">
+                  <Eye className="w-4 h-4" />
+                  <span>{reel.views.toLocaleString()}</span>
+                </div>
+                {reel._count && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span>❤️</span>
+                      <span>{reel._count.likes}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>💬</span>
+                      <span>{reel._count.comments}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>↻</span>
+                      <span>{shareCount}</span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

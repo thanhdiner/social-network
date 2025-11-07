@@ -1,9 +1,131 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
+import { ReelsService } from '../reels/reels.service';
+import { ShareReelDto } from '../reels/dto/share-reel.dto';
+
+const POST_USER_SELECT = {
+  id: true,
+  name: true,
+  username: true,
+  avatar: true,
+} as const;
+
+const REEL_PREVIEW_INCLUDE = {
+  user: {
+    select: POST_USER_SELECT,
+  },
+  sharedFrom: {
+    include: {
+      user: {
+        select: POST_USER_SELECT,
+      },
+      _count: {
+        select: {
+          likes: true,
+          comments: true,
+          shares: true,
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      likes: true,
+      comments: true,
+      shares: true,
+    },
+  },
+} as const;
+
+type PostWithRelations = Prisma.PostGetPayload<{
+  include: {
+    user: { select: typeof POST_USER_SELECT };
+    sharedPost: {
+      include: {
+        user: { select: typeof POST_USER_SELECT };
+        sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+      };
+    };
+    sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+    _count: {
+      select: {
+        comments: true;
+        shares: true;
+      };
+    };
+  };
+}>;
+
+type PostWithDetails = Prisma.PostGetPayload<{
+  include: {
+    user: { select: typeof POST_USER_SELECT };
+    sharedPost: {
+      include: {
+        user: { select: typeof POST_USER_SELECT };
+        sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+      };
+    };
+    sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+    comments: {
+      include: {
+        user: { select: typeof POST_USER_SELECT };
+      };
+      orderBy: { createdAt: 'desc' };
+    };
+    likes: {
+      include: {
+        user: { select: typeof POST_USER_SELECT };
+      };
+    };
+    _count: {
+      select: {
+        comments: true;
+        shares: true;
+      };
+    };
+  };
+}>;
+
+type SavedPostWithRelations = Prisma.SavedPostGetPayload<{
+  include: {
+    post: {
+      include: {
+        user: { select: typeof POST_USER_SELECT };
+        sharedPost: {
+          include: {
+            user: { select: typeof POST_USER_SELECT };
+            sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+          };
+        };
+        sharedReel: { include: typeof REEL_PREVIEW_INCLUDE };
+        _count: {
+          select: {
+            comments: true;
+            shares: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
+type PostShareSummary = {
+  id: string;
+  userId: string;
+  sharedPostId: string | null;
+  sharedReelId: string | null;
+};
+
+type OriginalPostShareSummary = {
+  id: string;
+  userId: string;
+  sharedReelId: string | null;
+};
 
 @Injectable()
 export class PostsService {
@@ -11,6 +133,7 @@ export class PostsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private chatGateway: ChatGateway,
+    private reelsService: ReelsService,
   ) {}
 
   async create(userId: string, createPostDto: CreatePostDto) {
@@ -52,16 +175,16 @@ export class PostsService {
     const skip = (page - 1) * limit;
 
     // Build where clause: posts from user or people they follow
-    let whereClause = {};
+    let whereClause: Prisma.PostWhereInput = {};
     if (userId) {
       // Get list of users that current user is following
       const following = await this.prisma.follow.findMany({
         where: { followerId: userId },
         select: { followingId: true },
       });
-      
-      const followingIds = following.map(f => f.followingId);
-      
+
+      const followingIds = following.map((f) => f.followingId);
+
       // Include posts from user and people they follow
       whereClause = {
         userId: {
@@ -70,49 +193,44 @@ export class PostsService {
       };
     }
 
-    const [posts, total] = await Promise.all([
-      this.prisma.post.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
+    const posts = (await this.prisma.post.findMany({
+      where: whereClause,
+      skip,
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: POST_USER_SELECT,
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatar: true,
+        sharedPost: {
+          include: {
+            user: {
+              select: POST_USER_SELECT,
             },
-          },
-          sharedPost: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  username: true,
-                  avatar: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              comments: true,
-              shares: true,
+            sharedReel: {
+              include: REEL_PREVIEW_INCLUDE,
             },
           },
         },
-      }),
-      this.prisma.post.count({ where: whereClause }),
-    ]);
+        sharedReel: {
+          include: REEL_PREVIEW_INCLUDE,
+        },
+        _count: {
+          select: {
+            comments: true,
+            shares: true,
+          },
+        },
+      },
+    })) as PostWithRelations[];
+
+    const total = await this.prisma.post.count({ where: whereClause });
 
     // Count likes with imageIndex = null for each post
     const postsWithLikes = await Promise.all(
-      posts.map(async (post) => {
+      posts.map(async (post: PostWithRelations) => {
         const postLikesCount = await this.prisma.like.count({
           where: {
             postId: post.id,
@@ -123,7 +241,8 @@ export class PostsService {
         return {
           ...post,
           _count: {
-            ...post._count,
+            comments: post._count.comments,
+            shares: post._count.shares,
             likes: postLikesCount,
           },
         };
@@ -141,49 +260,44 @@ export class PostsService {
   async findByUserId(userId: string, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
 
-    const [posts, total] = await Promise.all([
-      this.prisma.post.findMany({
-        where: { userId },
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
+    const posts = (await this.prisma.post.findMany({
+      where: { userId },
+      skip,
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: POST_USER_SELECT,
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              avatar: true,
+        sharedPost: {
+          include: {
+            user: {
+              select: POST_USER_SELECT,
             },
-          },
-          sharedPost: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  username: true,
-                  avatar: true,
-                },
-              },
-            },
-          },
-          _count: {
-            select: {
-              comments: true,
-              shares: true,
+            sharedReel: {
+              include: REEL_PREVIEW_INCLUDE,
             },
           },
         },
-      }),
-      this.prisma.post.count({ where: { userId } }),
-    ]);
+        sharedReel: {
+          include: REEL_PREVIEW_INCLUDE,
+        },
+        _count: {
+          select: {
+            comments: true,
+            shares: true,
+          },
+        },
+      },
+    })) as PostWithRelations[];
+
+    const total = await this.prisma.post.count({ where: { userId } });
 
     // Count likes with imageIndex = null for each post
     const postsWithLikes = await Promise.all(
-      posts.map(async (post) => {
+      posts.map(async (post: PostWithRelations) => {
         const postLikesCount = await this.prisma.like.count({
           where: {
             postId: post.id,
@@ -194,7 +308,8 @@ export class PostsService {
         return {
           ...post,
           _count: {
-            ...post._count,
+            comments: post._count.comments,
+            shares: post._count.shares,
             likes: postLikesCount,
           },
         };
@@ -210,38 +325,29 @@ export class PostsService {
   }
 
   async findOne(id: string) {
-    const post = await this.prisma.post.findUnique({
+    const post = (await this.prisma.post.findUnique({
       where: { id },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
+          select: POST_USER_SELECT,
         },
         sharedPost: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatar: true,
-              },
+              select: POST_USER_SELECT,
+            },
+            sharedReel: {
+              include: REEL_PREVIEW_INCLUDE,
             },
           },
+        },
+        sharedReel: {
+          include: REEL_PREVIEW_INCLUDE,
         },
         comments: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatar: true,
-              },
+              select: POST_USER_SELECT,
             },
           },
           orderBy: {
@@ -251,12 +357,7 @@ export class PostsService {
         likes: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatar: true,
-              },
+              select: POST_USER_SELECT,
             },
           },
         },
@@ -267,7 +368,7 @@ export class PostsService {
           },
         },
       },
-    });
+    })) as PostWithDetails | null;
 
     if (!post) {
       return null;
@@ -284,7 +385,8 @@ export class PostsService {
     return {
       ...post,
       _count: {
-        ...post._count,
+        comments: post._count.comments,
+        shares: post._count.shares,
         likes: postLikesCount,
       },
     };
@@ -296,18 +398,12 @@ export class PostsService {
     imageIndex?: number,
   ): Promise<{ liked: boolean; type: string | null }> {
     // Build where clause based on whether imageIndex is provided
-    const whereClause: any = {
+    const whereClause: Prisma.LikeWhereInput = {
       postId,
       userId,
+      imageIndex:
+        imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
     };
-
-    // Only add imageIndex to where clause if it's a valid number
-    if (imageIndex !== undefined && imageIndex !== null) {
-      whereClause.imageIndex = imageIndex;
-    } else {
-      // For post likes (not image likes), imageIndex should be null
-      whereClause.imageIndex = null;
-    }
 
     const like = await this.prisma.like.findFirst({
       where: whereClause,
@@ -334,7 +430,7 @@ export class PostsService {
             userId,
             imageIndex: i,
           },
-        } as any,
+        },
       });
 
       // Count total likes for this image
@@ -356,13 +452,11 @@ export class PostsService {
   }
 
   async getLikeList(postId: string, imageIndex?: number) {
-    const whereClause: any = { postId };
-    
-    if (imageIndex !== undefined && imageIndex !== null) {
-      whereClause.imageIndex = imageIndex;
-    } else {
-      whereClause.imageIndex = null;
-    }
+    const whereClause: Prisma.LikeWhereInput = {
+      postId,
+      imageIndex:
+        imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
+    };
 
     const likes = await this.prisma.like.findMany({
       where: whereClause,
@@ -397,13 +491,12 @@ export class PostsService {
     imageIndex?: number,
   ) {
     // Build where clause for findFirst (supports null in composite key)
-    const whereClause: any = { postId, userId };
-    
-    if (imageIndex !== undefined && imageIndex !== null) {
-      whereClause.imageIndex = imageIndex;
-    } else {
-      whereClause.imageIndex = null;
-    }
+    const whereClause: Prisma.LikeWhereInput = {
+      postId,
+      userId,
+      imageIndex:
+        imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
+    };
 
     const existingLike = await this.prisma.like.findFirst({
       where: whereClause,
@@ -441,7 +534,8 @@ export class PostsService {
           postId,
           userId,
           type,
-          imageIndex: imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
+          imageIndex:
+            imageIndex !== undefined && imageIndex !== null ? imageIndex : null,
         },
       });
 
@@ -481,7 +575,11 @@ export class PostsService {
         this.chatGateway.notifyUser(post.user.id, notification);
       }
 
-      return { liked: true, type: created.type as string, message: 'Post liked' };
+      return {
+        liked: true,
+        type: created.type,
+        message: 'Post liked',
+      };
     }
   }
 
@@ -650,47 +748,59 @@ export class PostsService {
   }
 
   async sharePost(postId: string, userId: string, content?: string) {
-    // Kiểm tra xem post có tồn tại không
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
-        },
-        sharedPost: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatar: true,
-              },
-            },
-          },
-        },
+      select: {
+        id: true,
+        userId: true,
+        sharedPostId: true,
+        sharedReelId: true,
       },
     });
 
     if (!post) {
       throw new Error('Post not found');
     }
+    const postSummary = post as PostShareSummary;
+    const originalPostId = postSummary.sharedPostId || postId;
 
-    // Lấy ID của bài gốc (nếu đang share bài đã share thì lấy bài gốc)
-    const originalPostId = post.sharedPostId || postId;
-    const originalPost = post.sharedPostId ? post.sharedPost : post;
+    const originalPost = await this.prisma.post.findUnique({
+      where: { id: originalPostId },
+      select: {
+        id: true,
+        userId: true,
+        sharedReelId: true,
+      },
+    });
 
     if (!originalPost) {
       throw new Error('Original post not found');
     }
 
-    // Tạo shared post mới (luôn trỏ về bài gốc)
-    const sharedPost = await this.prisma.post.create({
+    const originalPostSummary = originalPost as OriginalPostShareSummary;
+
+    if (
+      typeof originalPostSummary.sharedReelId === 'string' &&
+      originalPostSummary.sharedReelId
+    ) {
+      const reelId = originalPostSummary.sharedReelId;
+
+      const sharePayload: ShareReelDto = {};
+      const trimmedContent = content?.trim();
+      if (trimmedContent) {
+        sharePayload.content = trimmedContent;
+      }
+
+      const { post: reelSharePost } = await this.reelsService.share(
+        reelId,
+        userId,
+        sharePayload,
+      );
+
+      return reelSharePost;
+    }
+
+    const createdSharedPost = await this.prisma.post.create({
       data: {
         content: content || '',
         userId,
@@ -698,24 +808,20 @@ export class PostsService {
       },
       include: {
         user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
+          select: POST_USER_SELECT,
         },
         sharedPost: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                username: true,
-                avatar: true,
-              },
+              select: POST_USER_SELECT,
+            },
+            sharedReel: {
+              include: REEL_PREVIEW_INCLUDE,
             },
           },
+        },
+        sharedReel: {
+          include: REEL_PREVIEW_INCLUDE,
         },
         _count: {
           select: {
@@ -726,23 +832,23 @@ export class PostsService {
       },
     });
 
-    // Count likes with imageIndex = null
     const postLikesCount = await this.prisma.like.count({
       where: {
-        postId: sharedPost.id,
+        postId: createdSharedPost.id,
         imageIndex: null,
       },
     });
 
-    const sharedPostWithLikes = {
-      ...sharedPost,
+    const sharedPostRecord = createdSharedPost as PostWithRelations;
+    const createdSharedPostWithLikes = {
+      ...sharedPostRecord,
       _count: {
-        ...sharedPost._count,
+        comments: sharedPostRecord._count.comments,
+        shares: sharedPostRecord._count.shares,
         likes: postLikesCount,
       },
     };
 
-    // Tạo bản ghi share (luôn lưu là share bài gốc)
     await this.prisma.share.create({
       data: {
         postId: originalPostId,
@@ -750,8 +856,7 @@ export class PostsService {
       },
     });
 
-    // Tạo thông báo cho chủ bài gốc (nếu không phải chính mình share)
-    if (originalPost.userId !== userId) {
+    if (originalPostSummary.userId !== userId) {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -764,23 +869,21 @@ export class PostsService {
         const notification = await this.notificationsService.create({
           type: 'share',
           content: `shared your post`,
-          userId: originalPost.userId,
+          userId: originalPostSummary.userId,
           actorId: userId,
           actorName: user.name,
           actorAvatar: user.avatar || undefined,
           relatedId: originalPostId,
         });
 
-        // Emit realtime notification
-        this.chatGateway.notifyUser(originalPost.userId, notification);
+        this.chatGateway.notifyUser(originalPostSummary.userId, notification);
       }
     }
 
-    return sharedPostWithLikes;
+    return createdSharedPostWithLikes;
   }
 
   async toggleSavePost(postId: string, userId: string) {
-    // Check if post exists
     const post = await this.prisma.post.findUnique({
       where: { id: postId },
     });
@@ -789,7 +892,6 @@ export class PostsService {
       throw new Error('Post not found');
     }
 
-    // Check if already saved
     const existingSave = await this.prisma.savedPost.findUnique({
       where: {
         postId_userId: {
@@ -800,73 +902,68 @@ export class PostsService {
     });
 
     if (existingSave) {
-      // Unsave
       await this.prisma.savedPost.delete({
         where: { id: existingSave.id },
       });
+
       return { saved: false, message: 'Post unsaved' };
-    } else {
-      // Save
-      await this.prisma.savedPost.create({
-        data: {
-          postId,
-          userId,
-        },
-      });
-      return { saved: true, message: 'Post saved' };
     }
+
+    await this.prisma.savedPost.create({
+      data: {
+        postId,
+        userId,
+      },
+    });
+
+    return { saved: true, message: 'Post saved' };
   }
 
   async getSavedPosts(userId: string, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
 
-    const [savedPosts, total] = await Promise.all([
-      this.prisma.savedPost.findMany({
-        where: { userId },
-        skip,
-        take: limit,
-        orderBy: {
-          createdAt: 'desc',
-        },
-        include: {
-          post: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  username: true,
-                  avatar: true,
+    const savedPosts = (await this.prisma.savedPost.findMany({
+      where: { userId },
+      skip,
+      take: limit,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        post: {
+          include: {
+            user: {
+              select: POST_USER_SELECT,
+            },
+            sharedPost: {
+              include: {
+                user: {
+                  select: POST_USER_SELECT,
+                },
+                sharedReel: {
+                  include: REEL_PREVIEW_INCLUDE,
                 },
               },
-              sharedPost: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      username: true,
-                      avatar: true,
-                    },
-                  },
-                },
-              },
-              _count: {
-                select: {
-                  comments: true,
-                  shares: true,
-                },
+            },
+            sharedReel: {
+              include: REEL_PREVIEW_INCLUDE,
+            },
+            _count: {
+              select: {
+                comments: true,
+                shares: true,
               },
             },
           },
         },
-      }),
-      this.prisma.savedPost.count({ where: { userId } }),
-    ]);
+      },
+    })) as SavedPostWithRelations[];
+
+    const total = await this.prisma.savedPost.count({ where: { userId } });
 
     // Extract posts from savedPosts and check if user liked/saved them, count post likes
     const posts = await Promise.all(
-      savedPosts.map(async (savedPost) => {
+      savedPosts.map(async (savedPost: SavedPostWithRelations) => {
         const [reactionInfo, postLikesCount] = await Promise.all([
           this.checkIfUserLiked(savedPost.post.id, userId),
           this.prisma.like.count({
@@ -883,7 +980,8 @@ export class PostsService {
           reactionType: reactionInfo.type,
           isSaved: true, // Always true for saved posts
           _count: {
-            ...savedPost.post._count,
+            comments: savedPost.post._count.comments,
+            shares: savedPost.post._count.shares,
             likes: postLikesCount,
           },
         };

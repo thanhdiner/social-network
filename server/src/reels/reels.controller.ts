@@ -14,6 +14,7 @@ import { ReelsService } from './reels.service';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { UpdateReelDto } from './dto/update-reel.dto';
 import { CreateReelCommentDto } from './dto/create-reel-comment.dto';
+import { ShareReelDto } from './dto/share-reel.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('reels')
@@ -102,8 +103,8 @@ export class ReelsController {
   }
 
   @Post(':id/share')
-  share(@Request() req, @Param('id') id: string) {
-    return this.reelsService.share(id, req.user.userId);
+  share(@Request() req, @Param('id') id: string, @Body() shareReelDto: ShareReelDto) {
+    return this.reelsService.share(id, req.user.userId, shareReelDto);
   }
 
   @Post(':id/view')

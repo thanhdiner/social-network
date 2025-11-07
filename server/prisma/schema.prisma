@@ -19,7 +19,7 @@ model User {
   avatar      String?
   coverImage  String?
   bio         String?
-  gender      String?   // Nam, Nữ, Khác
+  gender      String? // Nam, Nữ, Khác
   dateOfBirth DateTime?
   address     String?
   phone       String?
@@ -31,69 +31,72 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  posts          Post[]
-  comments       Comment[]
-  likes          Like[]
-  commentLikes   CommentLike[]
-  followers      Follow[]  @relation("UserFollowers")
-  following      Follow[]  @relation("UserFollowing")
-  blockers       Block[]   @relation("UserBlocks")
-  blockedBy      Block[]   @relation("UserBlockedBy")
-  sentMessages   Message[] @relation("SentMessages")
-  notifications  Notification[]
-  lifeEvents     LifeEvent[]
-  sharedPosts    Share[]
-  savedPosts     SavedPost[]
-  stories        Story[]
-  pinnedMessages Message[] @relation("PinnedMessages")
+  posts                Post[]
+  comments             Comment[]
+  likes                Like[]
+  commentLikes         CommentLike[]
+  followers            Follow[]                    @relation("UserFollowers")
+  following            Follow[]                    @relation("UserFollowing")
+  blockers             Block[]                     @relation("UserBlocks")
+  blockedBy            Block[]                     @relation("UserBlockedBy")
+  sentMessages         Message[]                   @relation("SentMessages")
+  notifications        Notification[]
+  lifeEvents           LifeEvent[]
+  sharedPosts          Share[]
+  savedPosts           SavedPost[]
+  stories              Story[]
+  pinnedMessages       Message[]                   @relation("PinnedMessages")
   customizationAsUserA ConversationCustomization[] @relation("UserAConversationCustomization")
   customizationAsUserB ConversationCustomization[] @relation("UserBConversationCustomization")
   customizationUpdated ConversationCustomization[] @relation("CustomizationUpdatedBy")
-  reels          Reel[]
-  reelLikes      ReelLike[]
-  reelComments   ReelComment[]
-  reelShares     ReelShare[]
+  reels                Reel[]
+  reelLikes            ReelLike[]
+  reelComments         ReelComment[]
+  reelShares           ReelShare[]
 }
 
 model Post {
-  id        String   @id @default(uuid())
-  content   String
-  imageUrl  String?
-  videoUrl  String?
-  userId    String
+  id           String   @id @default(uuid())
+  content      String
+  imageUrl     String?
+  videoUrl     String?
+  userId       String
   sharedPostId String? // ID của post được share (nếu đây là shared post)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sharedReelId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments     Comment[]
-  likes        Like[]
-  shares       Share[]
-  savedPosts   SavedPost[]
-  sharedPost   Post?     @relation("SharedPosts", fields: [sharedPostId], references: [id], onDelete: Cascade)
-  sharedBy     Post[]    @relation("SharedPosts")
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments   Comment[]
+  likes      Like[]
+  shares     Share[]
+  savedPosts SavedPost[]
+  sharedPost Post?       @relation("SharedPosts", fields: [sharedPostId], references: [id], onDelete: Cascade)
+  sharedBy   Post[]      @relation("SharedPosts")
+  sharedReel Reel?       @relation("PostSharedReel", fields: [sharedReelId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([createdAt])
   @@index([sharedPostId])
+  @@index([sharedReelId])
 }
 
 model Comment {
   id         String   @id @default(uuid())
   content    String
-  imageUrl   String?  // URL của ảnh trong comment
+  imageUrl   String? // URL của ảnh trong comment
   postId     String
   userId     String
-  imageIndex Int?     // Index của ảnh trong post (null = comment chung cho post)
-  parentId   String?  // ID của comment cha (null = comment gốc, có giá trị = reply)
+  imageIndex Int? // Index của ảnh trong post (null = comment chung cho post)
+  parentId   String? // ID của comment cha (null = comment gốc, có giá trị = reply)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  post     Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent   Comment?          @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[]         @relation("CommentReplies")
-  likes    CommentLike[]
+  post    Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[]     @relation("CommentReplies")
+  likes   CommentLike[]
 
   @@index([postId])
   @@index([userId])
@@ -121,7 +124,7 @@ model Like {
   postId     String
   userId     String
   type       String   @default("like") // 'like', 'love', 'haha', 'wow', 'sad', 'angry'
-  imageIndex Int?     // null = like post, number = like specific image
+  imageIndex Int? // null = like post, number = like specific image
   createdAt  DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -148,29 +151,29 @@ model Follow {
 }
 
 model Message {
-  id          String    @id @default(uuid())
-  content     String
-  imageUrl    String?
-  videoUrl    String?
-  audioUrl    String?
-  fileUrl     String?
-  fileName    String?
-  fileSize    Int?
-  fileType    String?
-  senderId    String
-  receiverId  String
-  replyToId   String?   // ID of message being replied to
-  read        Boolean   @default(false)
-  deliveredAt DateTime? // When message was delivered to recipient
-  readAt      DateTime? // When message was read by recipient
-  deletedBy   String[]  @default([]) // Array of user IDs who deleted this message
-  unsent      Boolean   @default(false) // Message has been unsent by sender
-  callType    String?   // 'voice' | 'video' - Type of call
-  callDuration Int?     // Duration in seconds
-  callStatus  String?   // 'completed' | 'missed' | 'rejected' | 'no-answer'
-  createdAt   DateTime  @default(now())
-  pinnedById  String?
-  pinnedAt    DateTime?
+  id           String    @id @default(uuid())
+  content      String
+  imageUrl     String?
+  videoUrl     String?
+  audioUrl     String?
+  fileUrl      String?
+  fileName     String?
+  fileSize     Int?
+  fileType     String?
+  senderId     String
+  receiverId   String
+  replyToId    String? // ID of message being replied to
+  read         Boolean   @default(false)
+  deliveredAt  DateTime? // When message was delivered to recipient
+  readAt       DateTime? // When message was read by recipient
+  deletedBy    String[]  @default([]) // Array of user IDs who deleted this message
+  unsent       Boolean   @default(false) // Message has been unsent by sender
+  callType     String? // 'voice' | 'video' - Type of call
+  callDuration Int? // Duration in seconds
+  callStatus   String? // 'completed' | 'missed' | 'rejected' | 'no-answer'
+  createdAt    DateTime  @default(now())
+  pinnedById   String?
+  pinnedAt     DateTime?
 
   sender    User              @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   reactions MessageReaction[]
@@ -189,7 +192,7 @@ model MessageReaction {
   id        String   @id @default(uuid())
   messageId String
   userId    String
-  emoji     String   // '❤️', '😂', '😮', '😢', '😡', '👍'
+  emoji     String // '❤️', '😂', '😮', '😢', '😡', '👍'
   createdAt DateTime @default(now())
 
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -200,10 +203,10 @@ model MessageReaction {
 }
 
 model Block {
-  id         String   @id @default(uuid())
-  blockerId  String
-  blockedId  String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
 
   blocker User @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
@@ -215,14 +218,14 @@ model Block {
 
 model Notification {
   id            String   @id @default(uuid())
-  type          String   // 'like', 'comment', 'follow', 'unfollow', 'message'
+  type          String // 'like', 'comment', 'follow', 'unfollow', 'message'
   content       String
-  userId        String   // Người nhận thông báo
-  actorId       String?  // Người thực hiện hành động
-  actorName     String?  // Tên người thực hiện
-  actorUsername String?  // Username người thực hiện
-  actorAvatar   String?  // Avatar người thực hiện
-  relatedId     String?  // ID liên quan (postId, commentId, etc)
+  userId        String // Người nhận thông báo
+  actorId       String? // Người thực hiện hành động
+  actorName     String? // Tên người thực hiện
+  actorUsername String? // Username người thực hiện
+  actorAvatar   String? // Avatar người thực hiện
+  relatedId     String? // ID liên quan (postId, commentId, etc)
   read          Boolean  @default(false)
   createdAt     DateTime @default(now())
 
@@ -234,17 +237,17 @@ model Notification {
 }
 
 model LifeEvent {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
-  type        String   // 'work', 'education', 'relationship', 'home', 'location', 'achievement', 'health', 'travel'
+  type        String // 'work', 'education', 'relationship', 'home', 'location', 'achievement', 'health', 'travel'
   title       String
   description String?
   date        DateTime
   endDate     DateTime?
   imageUrl    String?
-  privacy     String   @default("public") // 'public', 'friends', 'private'
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  privacy     String    @default("public") // 'public', 'friends', 'private'
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -288,7 +291,7 @@ model Story {
   createdAt DateTime @default(now())
   expiresAt DateTime // Stories expire after 24 hours
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   views StoryView[]
 
   @@index([userId])
@@ -310,10 +313,10 @@ model StoryView {
 }
 
 model MutedConversation {
-  id           String   @id @default(uuid())
-  userId       String   // Người tắt thông báo
-  mutedUserId  String   // Người bị tắt thông báo
-  createdAt    DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String // Người tắt thông báo
+  mutedUserId String // Người bị tắt thông báo
+  createdAt   DateTime @default(now())
 
   @@unique([userId, mutedUserId])
   @@index([userId])
@@ -333,9 +336,9 @@ model ConversationCustomization {
   changeSummary    String?
   updatedAt        DateTime @updatedAt
 
-  userA     User   @relation("UserAConversationCustomization", fields: [userAId], references: [id], onDelete: Cascade)
-  userB     User   @relation("UserBConversationCustomization", fields: [userBId], references: [id], onDelete: Cascade)
-  updatedBy User?  @relation("CustomizationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  userA     User  @relation("UserAConversationCustomization", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User  @relation("UserBConversationCustomization", fields: [userBId], references: [id], onDelete: Cascade)
+  updatedBy User? @relation("CustomizationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@unique([userAId, userBId])
   @@index([userAId])
@@ -343,22 +346,28 @@ model ConversationCustomization {
 }
 
 model Reel {
-  id          String   @id @default(uuid())
-  videoUrl    String
+  id           String   @id @default(uuid())
+  videoUrl     String
   thumbnailUrl String?
-  description String?
-  userId      String
-  views       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  description  String?
+  shareContent String?
+  userId       String
+  sharedFromId String?
+  views        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  likes    ReelLike[]
-  comments ReelComment[]
-  shares   ReelShare[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes         ReelLike[]
+  comments      ReelComment[]
+  shares        ReelShare[]
+  sharedFrom    Reel?         @relation("ReelShared", fields: [sharedFromId], references: [id], onDelete: Cascade)
+  sharedBy      Reel[]        @relation("ReelShared")
+  sharedAsPosts Post[]        @relation("PostSharedReel")
 
   @@index([userId])
   @@index([createdAt])
+  @@index([sharedFromId])
 }
 
 model ReelLike {
@@ -380,15 +389,15 @@ model ReelComment {
   content   String
   reelId    String
   userId    String
-  parentId  String?  // For replies
+  parentId  String? // For replies
   imageUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  reel    Reel           @relation(fields: [reelId], references: [id], onDelete: Cascade)
-  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  ReelComment?   @relation("ReelCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies ReelComment[]  @relation("ReelCommentReplies")
+  reel    Reel          @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  ReelComment?  @relation("ReelCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies ReelComment[] @relation("ReelCommentReplies")
 
   @@index([reelId])
   @@index([userId])
@@ -399,6 +408,7 @@ model ReelShare {
   id        String   @id @default(uuid())
   reelId    String
   userId    String
+  content   String?
   createdAt DateTime @default(now())
 
   reel Reel @relation(fields: [reelId], references: [id], onDelete: Cascade)

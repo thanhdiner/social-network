@@ -5,7 +5,16 @@ import type {
   UpdateReelData,
   ReelComment,
   CreateReelCommentData,
+  Post,
 } from '../types';
+
+export interface ShareReelResponse {
+  share: Reel;
+  shares: number;
+  reelId: string;
+  post: Post;
+  message: string;
+}
 
 // Lấy danh sách reels
 export const getReels = async (page = 1, limit = 10): Promise<Reel[]> => {
@@ -94,8 +103,12 @@ export const deleteReelComment = async (commentId: string): Promise<void> => {
 };
 
 // Share reel
-export const shareReel = async (id: string): Promise<void> => {
-  await api.post(`/reels/${id}/share`);
+export const shareReel = async (
+  id: string,
+  data?: { content?: string },
+): Promise<ShareReelResponse> => {
+  const response = await api.post(`/reels/${id}/share`, data ?? {});
+  return response.data as ShareReelResponse;
 };
 
 // Increment view count for a reel (called when user watched enough)

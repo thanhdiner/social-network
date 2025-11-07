@@ -13,6 +13,7 @@ import { Avatar } from './Avatar'
 import { CommentForm } from './CommentForm'
 import { SharePostModal } from './SharePostModal'
 import { LikeListModal } from './LikeListModal'
+import { SharedReelPreview } from './SharedReelPreview'
 
 interface FeedPostsProps {
   refresh?: number
@@ -71,6 +72,23 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
   useEffect(() => {
     loadPosts()
   }, [loadPosts, refresh])
+
+  useEffect(() => {
+    const handleSharedReelPost = (event: Event) => {
+      const newPost = (event as CustomEvent<Post>).detail
+      setPosts((prev) => {
+        if (prev.some((item) => item.id === newPost.id)) {
+          return prev
+        }
+        return [newPost, ...prev]
+      })
+    }
+
+    window.addEventListener('post:shared-reel-created', handleSharedReelPost as EventListener)
+    return () => {
+      window.removeEventListener('post:shared-reel-created', handleSharedReelPost as EventListener)
+    }
+  }, [])
 
   const handleLike = async (postId: string, type: ReactionType = 'like') => {
     try {
@@ -184,46 +202,6 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
       window.history.replaceState(null, '', originalUrlRef.current)
     }
     originalUrlRef.current = null
-  }
-
-  const handleDeleteImage = async (postId: string, imageIndex: number) => {
-    try {
-      // Get current post
-      const post = posts.find(p => p.id === postId)
-      if (!post || !post.imageUrl) return
-
-      // Get all images
-      const images = post.imageUrl.split(',').filter(url => url.trim())
-      
-      // Remove the image at the specified index
-      const newImages = images.filter((_, i) => i !== imageIndex)
-      
-      // Update post with new images
-      const newImageUrl = newImages.length > 0 ? newImages.join(',') : undefined
-      
-      await postService.updatePost(postId, {
-        content: post.content,
-        imageUrl: newImageUrl,
-      })
-      
-      // Update local state
-      setPosts(prev => prev.map(p => {
-        if (p.id === postId) {
-          return {
-            ...p,
-            imageUrl: newImageUrl
-          }
-        }
-        return p
-      }))
-      
-      // Update viewer images
-      setViewerImages(newImages)
-      toast.success('Đã xóa ảnh')
-    } catch (error) {
-      console.error('Failed to delete image:', error)
-      toast.error('Xóa ảnh thất bại. Vui lòng thử lại.')
-    }
   }
 
   if (isLoading) {
@@ -395,6 +373,9 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
               )}
             </div>
           )}
+
+          {/* Shared Reel */}
+          {post.sharedReel && <SharedReelPreview reel={post.sharedReel} />}
 
           {/* Post Images */}
           {post.imageUrl && (() => {

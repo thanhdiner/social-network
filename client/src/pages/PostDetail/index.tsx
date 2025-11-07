@@ -11,6 +11,7 @@ import { useTitle } from '@/hooks/useTitle'
 import { ReactionPicker, type ReactionType } from '@/components/shared/ReactionPicker'
 import { CommentList } from '@/components/shared/CommentList'
 import { CommentForm } from '@/components/shared/CommentForm'
+import { SharedReelPreview } from '@/components/shared/SharedReelPreview'
 
 export const PostDetail = () => {
   const { postId, photoIndex } = useParams<{ postId: string; photoIndex?: string }>()
@@ -166,41 +167,6 @@ export const PostDetail = () => {
     setViewerImages(images)
     setViewerIndex(index)
     setViewerOpen(true)
-  }
-
-  const handleDeleteImage = async (imageIndex: number) => {
-    if (!post || !post.imageUrl) return
-
-    try {
-      // Get all images
-      const images = post.imageUrl.split(',').filter(url => url.trim())
-      
-      // Remove the image at the specified index
-      const newImages = images.filter((_, i) => i !== imageIndex)
-      
-      // Update post with new images
-      const newImageUrl = newImages.length > 0 ? newImages.join(',') : undefined
-      
-      await postService.updatePost(post.id, {
-        content: post.content,
-        imageUrl: newImageUrl,
-      })
-      
-      // Update local state
-      setPost(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          imageUrl: newImageUrl
-        }
-      })
-      
-      // Update viewer images
-      setViewerImages(newImages)
-    } catch (error) {
-      console.error('Failed to delete image:', error)
-      alert('Failed to delete image. Please try again.')
-    }
   }
 
   if (isLoading) {
@@ -361,6 +327,9 @@ export const PostDetail = () => {
             )}
           </div>
         )}
+
+  {/* Shared Reel */}
+  {post.sharedReel && <SharedReelPreview reel={post.sharedReel} />}
 
         {/* Post Images */}
         {post.imageUrl && (() => {

@@ -4,12 +4,68 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateReelDto } from './dto/create-reel.dto';
 import { UpdateReelDto } from './dto/update-reel.dto';
 import { CreateReelCommentDto } from './dto/create-reel-comment.dto';
+import { ShareReelDto } from './dto/share-reel.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
+
+const USER_SELECT = {
+  id: true,
+  name: true,
+  username: true,
+  avatar: true,
+} as const;
+
+const COUNT_SELECT = {
+  likes: true,
+  comments: true,
+  shares: true,
+} as const;
+
+const SHARED_FROM_INCLUDE = {
+  user: {
+    select: USER_SELECT,
+  },
+  _count: {
+    select: COUNT_SELECT,
+  },
+} as const;
+
+const REEL_INCLUDE = {
+  user: {
+    select: USER_SELECT,
+  },
+  sharedFrom: {
+    include: SHARED_FROM_INCLUDE,
+  },
+  _count: {
+    select: COUNT_SELECT,
+  },
+} as const;
+
+const POST_COUNT_SELECT = {
+  comments: true,
+  shares: true,
+} as const;
+
+type SharedFromPayload = Prisma.ReelGetPayload<{
+  include: typeof SHARED_FROM_INCLUDE;
+}>;
+type ReelWithRelations = Prisma.ReelGetPayload<{
+  include: typeof REEL_INCLUDE;
+}>;
+
+type SharedReelPostPayload = Prisma.PostGetPayload<{
+  include: {
+    user: { select: typeof USER_SELECT };
+    sharedReel: { include: typeof REEL_INCLUDE };
+    _count: { select: typeof POST_COUNT_SELECT };
+  };
+}>;
 
 @Injectable()
 export class ReelsService {
@@ -19,6 +75,85 @@ export class ReelsService {
     private chatGateway: ChatGateway,
   ) {}
 
+  private readonly userSelect = USER_SELECT;
+
+  private readonly countSelect = COUNT_SELECT;
+
+  private readonly reelInclude = REEL_INCLUDE;
+
+  private getReelWithRelations(id: string) {
+    return this.prisma.reel.findUnique({
+      where: { id },
+      include: this.reelInclude,
+    });
+  }
+
+  private extractSharedFromId(reel: ReelWithRelations | null) {
+    const candidate = (reel as { sharedFromId?: unknown } | null)?.sharedFromId;
+    return typeof candidate === 'string' && candidate.length > 0
+      ? candidate
+      : null;
+  }
+
+  private async resolveOriginalReel(reel: ReelWithRelations) {
+    let current: ReelWithRelations | null = reel;
+
+    while (true) {
+      const parentId = this.extractSharedFromId(current);
+      if (!parentId) break;
+
+      const parent = await this.getReelWithRelations(parentId);
+      if (!parent) break;
+      current = parent;
+    }
+
+    return current ?? reel;
+  }
+
+  private async formatReelForViewer(reel: ReelWithRelations, viewerId: string) {
+    const sharedFrom = (reel.sharedFrom ?? null) as SharedFromPayload | null;
+
+    const [likeRecord, shareCountForReel, sharedFromShareCount] =
+      await Promise.all([
+        this.prisma.reelLike.findUnique({
+          where: {
+            reelId_userId: {
+              reelId: reel.id,
+              userId: viewerId,
+            },
+          },
+        }),
+        this.prisma.reelShare.count({
+          where: { reelId: reel.id },
+        }),
+        sharedFrom
+          ? this.prisma.reelShare.count({
+              where: { reelId: sharedFrom.id },
+            })
+          : Promise.resolve(undefined),
+      ]);
+
+    const formattedSharedFrom = sharedFrom
+      ? {
+          ...sharedFrom,
+          _count: {
+            ...(sharedFrom._count ?? { likes: 0, comments: 0, shares: 0 }),
+            shares: sharedFromShareCount ?? sharedFrom._count?.shares ?? 0,
+          },
+        }
+      : undefined;
+
+    return {
+      ...reel,
+      sharedFrom: formattedSharedFrom,
+      _count: {
+        ...(reel._count ?? { likes: 0, comments: 0, shares: 0 }),
+        shares: shareCountForReel,
+      },
+      isLiked: !!likeRecord,
+    };
+  }
+
   // Tạo reel mới
   async create(userId: string, createReelDto: CreateReelDto) {
     return this.prisma.reel.create({
@@ -26,23 +161,7 @@ export class ReelsService {
         ...createReelDto,
         userId,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
-        },
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-            shares: true,
-          },
-        },
-      },
+      include: this.reelInclude,
     });
   }
 
@@ -56,49 +175,23 @@ export class ReelsService {
       orderBy: {
         createdAt: 'desc',
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
-        },
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-            shares: true,
-          },
-        },
-      },
+      include: this.reelInclude,
     });
 
-    // Check if user liked each reel
-    const reelsWithLikeStatus = await Promise.all(
-      reels.map(async (reel) => {
-        const isLiked = await this.prisma.reelLike.findUnique({
-          where: {
-            reelId_userId: {
-              reelId: reel.id,
-              userId,
-            },
-          },
-        });
-
-        return {
-          ...reel,
-          isLiked: !!isLiked,
-        };
-      }),
+    const reelsWithMeta = await Promise.all(
+      reels.map((reel) => this.formatReelForViewer(reel, userId)),
     );
 
-    return reelsWithLikeStatus;
+    return reelsWithMeta;
   }
 
   // Lấy reels của một user
-  async findByUser(targetUserId: string, currentUserId: string, page = 1, limit = 10) {
+  async findByUser(
+    targetUserId: string,
+    currentUserId: string,
+    page = 1,
+    limit = 10,
+  ) {
     const skip = (page - 1) * limit;
 
     const reels = await this.prisma.reel.findMany({
@@ -110,83 +203,27 @@ export class ReelsService {
       orderBy: {
         createdAt: 'desc',
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
-        },
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-            shares: true,
-          },
-        },
-      },
+      include: this.reelInclude,
     });
 
-    const reelsWithLikeStatus = await Promise.all(
-      reels.map(async (reel) => {
-        const isLiked = await this.prisma.reelLike.findUnique({
-          where: {
-            reelId_userId: {
-              reelId: reel.id,
-              userId: currentUserId,
-            },
-          },
-        });
-
-        return {
-          ...reel,
-          isLiked: !!isLiked,
-        };
-      }),
+    const reelsWithMeta = await Promise.all(
+      reels.map((reel) => this.formatReelForViewer(reel, currentUserId)),
     );
 
-    return reelsWithLikeStatus;
+    return reelsWithMeta;
   }
 
   // Lấy một reel theo ID
   async findOne(id: string, userId: string) {
     const reel = await this.prisma.reel.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            username: true,
-            avatar: true,
-          },
-        },
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-            shares: true,
-          },
-        },
-      },
+      include: this.reelInclude,
     });
 
     if (!reel) {
       throw new NotFoundException('Reel not found');
     }
 
-    const isLiked = await this.prisma.reelLike.findUnique({
-      where: {
-        reelId_userId: {
-          reelId: id,
-          userId,
-        },
-      },
-    });
-
-    // Increment views
     await this.prisma.reel.update({
       where: { id },
       data: {
@@ -196,15 +233,17 @@ export class ReelsService {
       },
     });
 
+    const formatted = await this.formatReelForViewer(reel, userId);
+
     return {
-      ...reel,
-      isLiked: !!isLiked,
+      ...formatted,
       views: reel.views + 1,
     };
   }
 
   // Increment view count (called when user watched video enough)
   async view(id: string, userId: string) {
+    void userId;
     const reel = await this.prisma.reel.findUnique({ where: { id } });
     if (!reel) throw new NotFoundException('Reel not found');
 
@@ -379,7 +418,11 @@ export class ReelsService {
   }
 
   // Create comment
-  async createComment(reelId: string, userId: string, createCommentDto: CreateReelCommentDto) {
+  async createComment(
+    reelId: string,
+    userId: string,
+    createCommentDto: CreateReelCommentDto,
+  ) {
     if (!createCommentDto.content?.trim() && !createCommentDto.imageUrl) {
       throw new BadRequestException('Comment content or image is required');
     }
@@ -451,7 +494,11 @@ export class ReelsService {
           include: { user: { select: { id: true } } },
         });
 
-        if (parent && parent.user.id !== userId && parent.user.id !== reel.userId) {
+        if (
+          parent &&
+          parent.user.id !== userId &&
+          parent.user.id !== reel.userId
+        ) {
           const notification = await this.notificationsService.create({
             type: 'comment',
             content: `replied to your comment`,
@@ -523,22 +570,135 @@ export class ReelsService {
   }
 
   // Share reel
-  async share(reelId: string, userId: string) {
-    const reel = await this.prisma.reel.findUnique({
-      where: { id: reelId },
-    });
+  async share(reelId: string, userId: string, shareReelDto: ShareReelDto) {
+    const target = await this.getReelWithRelations(reelId);
 
-    if (!reel) {
+    if (!target) {
       throw new NotFoundException('Reel not found');
     }
 
+    const original = await this.resolveOriginalReel(target);
+    const shareContent = shareReelDto.content?.trim() || null;
+
+    const sharedReelRaw = await this.prisma.reel.create({
+      data: {
+        userId,
+        videoUrl: original.videoUrl,
+        thumbnailUrl: original.thumbnailUrl,
+        description: original.description,
+        shareContent,
+        sharedFromId: original.id,
+      },
+      include: this.reelInclude,
+    });
+
     await this.prisma.reelShare.create({
       data: {
-        reelId,
+        reelId: original.id,
         userId,
+        content: shareContent,
       },
     });
 
-    return { message: 'Reel shared successfully' };
+    const [sharedReelFormatted, shares] = await Promise.all([
+      this.formatReelForViewer(sharedReelRaw, userId),
+      this.prisma.reelShare.count({
+        where: { reelId: original.id },
+      }),
+    ]);
+
+    const createdPostRecord = await this.prisma.post.create({
+      data: {
+        userId,
+        content: shareContent ?? '',
+        sharedReelId: original.id,
+      },
+    });
+
+    const createdPost = await this.prisma.post.findUnique({
+      where: { id: createdPostRecord.id },
+      include: {
+        user: {
+          select: USER_SELECT,
+        },
+        sharedReel: {
+          include: this.reelInclude,
+        },
+        _count: {
+          select: POST_COUNT_SELECT,
+        },
+      },
+    });
+
+    if (!createdPost) {
+      throw new Error('Failed to load shared reel post');
+    }
+
+    const sharedReel = {
+      ...sharedReelFormatted,
+      sharedFrom: sharedReelFormatted.sharedFrom
+        ? {
+            ...sharedReelFormatted.sharedFrom,
+            _count: {
+              ...(sharedReelFormatted.sharedFrom._count ?? {
+                likes: 0,
+                comments: 0,
+                shares: 0,
+              }),
+              shares,
+            },
+          }
+        : undefined,
+    };
+
+    const sharedPostBase: SharedReelPostPayload = createdPost;
+
+    const sharedPost = {
+      ...sharedPostBase,
+      _count: {
+        comments: sharedPostBase._count.comments,
+        shares: sharedPostBase._count.shares,
+        likes: 0,
+      },
+      sharedReel: sharedPostBase.sharedReel ?? undefined,
+    };
+
+    if (original.userId !== userId && original.user) {
+      try {
+        const notification = await this.notificationsService.create({
+          type: 'share',
+          content: shareContent
+            ? `shared your reel: "${shareContent}"`
+            : 'shared your reel',
+          userId: original.userId,
+          actorId: userId,
+          actorName: sharedReel.user?.name ?? 'Someone',
+          actorAvatar: sharedReel.user?.avatar || undefined,
+          relatedId: original.id,
+        });
+
+        this.chatGateway.notifyUser(original.userId, notification);
+      } catch (err) {
+        console.error('Failed to create/emit reel share notification', err);
+      }
+    }
+
+    const payload = {
+      reelId: original.id,
+      shares,
+      share: sharedReel,
+      post: sharedPost,
+    };
+
+    try {
+      this.chatGateway.broadcast('reel_share_created', payload);
+    } catch (err) {
+      console.error('Failed to broadcast reel share', err);
+    }
+
+    return {
+      ...payload,
+      message: 'Reel shared successfully',
+    };
   }
 }

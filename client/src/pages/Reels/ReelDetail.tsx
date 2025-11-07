@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Reel, ReelComment } from '../../types';
-import { getReel } from '../../services/reelService';
+import type { Reel, ReelComment, ReelSummary, Post } from '../../types';
+import { getReel, type ShareReelResponse } from '../../services/reelService';
 import ReelPlayer from '../../components/Reels/ReelPlayer';
 import ReelComments from '../../components/Reels/ReelComments';
+import { ShareReelModal } from '../../components/Reels/ShareReelModal';
 import { X } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
 import socketService from '../../services/socketService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 
 export default function ReelDetailPage() {
   const { reelId } = useParams<{ reelId: string }>();
@@ -14,16 +16,12 @@ export default function ReelDetailPage() {
   const [reel, setReel] = useState<Reel | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sharingReel, setSharingReel] = useState<ReelSummary | null>(null);
+  const { user: currentUser } = useCurrentUser();
   
   useTitle(reel ? `Reel của ${reel.user?.name}` : 'Reel');
 
-  useEffect(() => {
-    if (reelId) {
-      loadReel();
-    }
-  }, [reelId]);
-
-  const loadReel = async () => {
+  const loadReel = useCallback(async () => {
     if (!reelId) return;
     
     setLoading(true);
@@ -36,7 +34,56 @@ export default function ReelDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate, reelId]);
+
+  useEffect(() => {
+    if (reelId) {
+      loadReel();
+    }
+  }, [loadReel, reelId]);
+
+  const handleShareCreated = useCallback((response: ShareReelResponse) => {
+    const { shares, reelId, post } = response;
+    setReel((prev) => {
+      if (!prev) return prev;
+      if (prev.id === reelId) {
+        const baseCount = prev._count ?? { likes: 0, comments: 0, shares: 0 };
+        return {
+          ...prev,
+          _count: {
+            ...baseCount,
+            shares,
+          },
+        };
+      }
+      if (prev.sharedFrom && prev.sharedFrom.id === reelId) {
+        return {
+          ...prev,
+          sharedFrom: {
+            ...prev.sharedFrom,
+            _count: {
+              ...(prev.sharedFrom._count ?? { likes: 0, comments: 0, shares: 0 }),
+              shares,
+            },
+          },
+        };
+      }
+      return prev;
+    });
+    window.dispatchEvent(
+      new CustomEvent<Post>('post:shared-reel-created', { detail: post }),
+    );
+  }, []);
+
+  const handleShareRequest = useCallback(() => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    if (reel) {
+      setSharingReel(reel.sharedFrom ?? reel);
+    }
+  }, [currentUser, navigate, reel]);
 
   useEffect(() => {
     const socket = socketService.getSocket();
@@ -82,11 +129,19 @@ export default function ReelDetailPage() {
     socket.on('reel_comment_created', handleCommentCreated);
     socket.on('reel_comment_deleted', handleCommentDeleted);
 
+    const handleShareCreatedSocket = (payload: ShareReelResponse) => {
+      if (!payload?.share) return;
+      handleShareCreated(payload);
+    };
+
+    socket.on('reel_share_created', handleShareCreatedSocket);
+
     return () => {
       socket.off('reel_comment_created', handleCommentCreated);
       socket.off('reel_comment_deleted', handleCommentDeleted);
+      socket.off('reel_share_created', handleShareCreatedSocket);
     };
-  }, []);
+  }, [handleShareCreated]);
 
   if (loading) {
     return (
@@ -118,6 +173,7 @@ export default function ReelDetailPage() {
           onCommentClick={() => setShowComments((prev) => !prev)}
           onDelete={() => navigate('/reels')}
           showComments={showComments}
+          onShareClick={handleShareRequest}
         />
       </div>
 
@@ -127,6 +183,19 @@ export default function ReelDetailPage() {
           reelId={reel.id}
           onClose={() => setShowComments(false)}
           isDrawer
+        />
+      )}
+
+      {sharingReel && currentUser && (
+        <ShareReelModal
+          reel={sharingReel}
+          open={!!sharingReel}
+          onClose={() => setSharingReel(null)}
+          onShared={(response) => {
+            handleShareCreated(response);
+          }}
+          currentUserName={currentUser.name}
+          currentUserAvatar={currentUser.avatar}
         />
       )}
     </div>

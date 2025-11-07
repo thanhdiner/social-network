@@ -5,6 +5,7 @@ import socketService from '@/services/socketService'
 import notificationService from '@/services/notificationService'
 import type { Notification } from '@/services/notificationService'
 import { formatDistanceToNow } from 'date-fns'
+import { getReel } from '@/services/reelService'
 
 export const NotificationsDropdown = () => {
   const navigate = useNavigate()
@@ -185,19 +186,43 @@ export const NotificationsDropdown = () => {
     }
   }
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
     setIsOpen(false)
     
     // Navigate based on notification type
     if (notification.type === 'follow' && notification.actorUsername) {
       // For follow notifications, navigate to the follower's profile
       navigate(`/profile/${notification.actorUsername}`)
-    } else if ((notification.type === 'like' || notification.type === 'comment' || notification.type === 'share') && notification.relatedId) {
-      // Navigate based on content type (default to reels if content mentions reel)
-      const path = notification.content?.toLowerCase().includes('reel')
-        ? `/reels/${notification.relatedId}`
-        : `/post/${notification.relatedId}`;
-      navigate(path);
+      return
+    }
+
+    if (
+      (notification.type === 'like' ||
+        notification.type === 'comment' ||
+        notification.type === 'share') &&
+      notification.relatedId
+    ) {
+      const normalizedContent = notification.content?.toLowerCase() ?? ''
+
+      // Fast paths based on explicit wording
+      if (normalizedContent.includes('reel')) {
+        navigate(`/reels/${notification.relatedId}`)
+        return
+      }
+
+      if (normalizedContent.includes('post')) {
+        navigate(`/post/${notification.relatedId}`)
+        return
+      }
+
+      // Fallback: try loading as reel first (covers localized content where "reel" keyword changes)
+      try {
+        await getReel(notification.relatedId)
+        navigate(`/reels/${notification.relatedId}`)
+      } catch (error) {
+        // If fetching the reel fails, assume it's a post
+        navigate(`/post/${notification.relatedId}`)
+      }
     }
   }
 
