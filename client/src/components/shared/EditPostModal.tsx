@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Image as ImageIcon, Video } from 'lucide-react'
+import { X, Image as ImageIcon, Video, Sparkles, Wand2 } from 'lucide-react'
+import geminiService from '@/services/geminiService'
 import { useAuth } from '@/contexts/AuthContext'
 import postService from '@/services/postService'
 import uploadService from '@/services/uploadService'
@@ -25,6 +26,7 @@ export const EditPostModal = ({ postId, initialContent, initialImages, initialVi
   const [existingImages, setExistingImages] = useState<string[]>([])
   const [existingVideo, setExistingVideo] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -219,6 +221,57 @@ export const EditPostModal = ({ postId, initialContent, initialImages, initialVi
             placeholder={`What's on your mind, ${user?.name?.split(' ')[0]}?`}
             className="w-full h-32 resize-none border-0 focus:ring-0 outline-none text-gray-800 placeholder-gray-400 text-lg"
           />
+
+          {/* AI Buttons for edit */}
+          {content.trim() && (
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!content.trim()) return
+                  setIsAiProcessing(true)
+                  try {
+                    const completed = await geminiService.completePost(content)
+                    setContent(completed)
+                  } catch (err) {
+                    console.error('Failed to complete with AI:', err)
+                    const e = err as { response?: { data?: { message?: string } }; message?: string }
+                    const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                    alert(`Failed to complete with AI: ${msg}`)
+                  } finally {
+                    setIsAiProcessing(false)
+                  }
+                }}
+                disabled={isAiProcessing || isSubmitting}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isAiProcessing ? 'Processing...' : 'Complete with AI'}
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (!content.trim()) return
+                  setIsAiProcessing(true)
+                  try {
+                    const improved = await geminiService.improvePost(content)
+                    setContent(improved)
+                  } catch (err) {
+                    console.error('Failed to improve with AI:', err)
+                    const e = err as { response?: { data?: { message?: string } }; message?: string }
+                    const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                    alert(`Failed to improve with AI: ${msg}`)
+                  } finally {
+                    setIsAiProcessing(false)
+                  }
+                }}
+                disabled={isAiProcessing || isSubmitting}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition cursor-pointer"
+              >
+                <Wand2 className="w-4 h-4" />
+                {isAiProcessing ? 'Processing...' : 'Improve with AI'}
+              </button>
+            </div>
+          )}
 
           {/* Images Preview with Scroll */}
           {(existingImages.length > 0 || previewUrls.length > 0) && (
