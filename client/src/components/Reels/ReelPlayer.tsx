@@ -609,7 +609,7 @@ export default function ReelPlayer({
                     className="pointer-events-auto flex items-center gap-3 cursor-pointer group"
                     onClick={() => {
                       if (contentReel.user?.username) {
-                        navigate(`/profile/${contentReel.user.username}`);
+                        navigate(`/profile/${contentReel.user.username}?tab=reels`);
                       }
                     }}
                   >

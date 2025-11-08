@@ -1,12 +1,14 @@
+export type ProfileTab = 'timeline' | 'about' | 'connections' | 'photos' | 'reels' | 'saved'
+
 interface Props {
-  activeTab: string
-  setActiveTab: (tab: 'timeline' | 'about' | 'connections' | 'photos' | 'saved') => void
+  activeTab: ProfileTab
+  setActiveTab: (tab: ProfileTab) => void
   isOwnProfile?: boolean
 }
 
 export const ProfileTabs = ({ activeTab, setActiveTab, isOwnProfile = false }: Props) => {
-  const baseTabs = ['timeline', 'about', 'connections', 'photos']
-  const tabs = isOwnProfile ? [...baseTabs, 'saved'] : baseTabs
+  const baseTabs: ProfileTab[] = ['timeline', 'about', 'connections', 'photos', 'reels']
+  const tabs: ProfileTab[] = isOwnProfile ? [...baseTabs, 'saved'] : baseTabs
 
   return (
     <div className="flex justify-center mt-7 border-b bg-white shadow-sm rounded-2xl max-w-4xl w-full overflow-hidden">
@@ -18,7 +20,7 @@ export const ProfileTabs = ({ activeTab, setActiveTab, isOwnProfile = false }: P
         return (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab as 'timeline' | 'about' | 'connections' | 'photos' | 'saved')}
+            onClick={() => setActiveTab(tab)}
             className={`flex-1 py-3 capitalize text-sm font-medium transition-all duration-200 cursor-pointer
               ${
                 active

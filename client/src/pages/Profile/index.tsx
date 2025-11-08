@@ -3,54 +3,62 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserProfile } from '@/hooks/useUserProfile'
 import { ProfileHeader } from './components/ProfileHeader'
-import { ProfileTabs } from './components/ProfileTabs'
+import { ProfileTabs, type ProfileTab } from './components/ProfileTabs'
 import { ProfileTimeline } from './components/ProfileTimeline'
 import { ProfileAbout } from './components/ProfileAbout'
 import { ProfileConnections } from './components/ProfileConnections'
 import { ProfilePhotos } from './components/ProfilePhotos'
 import { SavedPosts } from './components/SavedPosts'
+import { ProfileReels } from './components/ProfileReels.tsx'
+
+const ALL_TABS: ProfileTab[] = ['timeline', 'about', 'connections', 'photos', 'reels', 'saved']
+const isValidTab = (value: string | null): value is ProfileTab => {
+  return Boolean(value && ALL_TABS.includes(value as ProfileTab))
+}
 
 export default function MyProfilePage() {
   const { username } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user: currentUser } = useAuth()
-  
-  // Get tab from URL params or default to 'timeline'
-  const tabFromUrl = searchParams.get('tab') as 'timeline' | 'about' | 'connections' | 'photos' | 'saved' | null
-  const [activeTab, setActiveTab] = useState<'timeline' | 'about' | 'connections' | 'photos' | 'saved'>(
-    tabFromUrl && ['timeline', 'about', 'connections', 'photos', 'saved'].includes(tabFromUrl) 
-      ? tabFromUrl 
-      : 'timeline'
-  )
 
-  // Check if this is the user's own profile
   const isOwnProfile = username === currentUser?.username
-  // Actual username to fetch data (prefer username from URL, fallback to currentUser.username)
   const profileUsername = username || currentUser?.username
+  const tabFromUrl = searchParams.get('tab')
+
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
+    if (!isValidTab(tabFromUrl)) return 'timeline'
+    if (tabFromUrl === 'saved' && !isOwnProfile) return 'timeline'
+    return tabFromUrl
+  })
 
   // Fetch profile user data
   const { user: profileUser } = useUserProfile(profileUsername)
 
   // Update URL when tab changes
   useEffect(() => {
-    const profileUsername = username || currentUser?.username
     if (profileUsername) {
       const newUrl = activeTab === 'timeline' 
         ? `/profile/${profileUsername}`
         : `/profile/${profileUsername}?tab=${activeTab}`
       navigate(newUrl, { replace: true })
     }
-  }, [activeTab, username, currentUser?.username, navigate])
+  }, [activeTab, profileUsername, navigate])
 
   // Sync activeTab with URL params
   useEffect(() => {
-    if (tabFromUrl && ['timeline', 'about', 'connections', 'photos', 'saved'].includes(tabFromUrl)) {
-      setActiveTab(tabFromUrl)
-    } else {
+    if (!isValidTab(tabFromUrl)) {
       setActiveTab('timeline')
+      return
     }
-  }, [tabFromUrl])
+
+    if (tabFromUrl === 'saved' && !isOwnProfile) {
+      setActiveTab('timeline')
+      return
+    }
+
+    setActiveTab(tabFromUrl)
+  }, [tabFromUrl, isOwnProfile])
 
   if (!profileUser) {
     return (
@@ -74,6 +82,7 @@ export default function MyProfilePage() {
         {activeTab === 'about' && <ProfileAbout username={profileUsername} />}
         {activeTab === 'connections' && <ProfileConnections username={profileUsername} />}
         {activeTab === 'photos' && <ProfilePhotos userId={profileUser.id} />}
+        {activeTab === 'reels' && <ProfileReels userId={profileUser.id} />}
         {activeTab === 'saved' && isOwnProfile && <SavedPosts />}
       </div>
     </div>

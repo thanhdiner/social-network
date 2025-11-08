@@ -161,28 +161,6 @@ export default function UserReels({ userId }: UserReelsProps) {
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Play className="w-12 h-12 text-white" />
             </div>
-
-            {shareOwner ? (
-              <div className="absolute top-2 left-2 right-2 rounded-xl bg-black/60 p-2 text-white text-xs space-y-1">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={shareOwner.avatar || '/default-avatar.png'}
-                    alt={shareOwner.name}
-                    className="h-7 w-7 rounded-full object-cover"
-                  />
-                  <div className="flex-1 leading-tight">
-                    <p className="font-semibold">{shareOwner.name}</p>
-                    <p className="text-white/70">
-                      shared {contentReel.user?.name ? `${contentReel.user.name}'s` : 'a'} reel
-                    </p>
-                  </div>
-                </div>
-                {shareMessage ? (
-                  <p className="text-white/80 whitespace-pre-wrap leading-tight">{shareMessage}</p>
-                ) : null}
-              </div>
-            ) : null}
-
             <div className="absolute bottom-0 left-0 right-0 p-3 bg-linear-to-t from-black/70 to-transparent">
               <div className="flex flex-wrap items-center gap-3 text-white text-sm">
                 <div className="flex items-center gap-1">
