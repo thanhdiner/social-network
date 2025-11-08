@@ -37,6 +37,7 @@ import clsx from 'clsx';
 import { useChat } from '../../contexts/ChatContext';
 import { chatService } from '../../services/chatService';
 import socketService from '../../services/socketService';
+import geminiService from '../../services/geminiService';
 import type { Message, User, Conversation, ConversationCustomization as ConversationCustomizationDTO } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import uploadService from '../../services/uploadService';
@@ -322,6 +323,7 @@ export default function Chat() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isAiProcessingChat, setIsAiProcessingChat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -2088,6 +2090,47 @@ export default function Chat() {
       } else {
         toast.error(`Gửi tin nhắn thất bại: ${errorMessage}`);
       }
+    }
+  };
+
+  // AI helpers for chat composer
+  const handleCompleteMessageWithAI = async () => {
+    if (!newMessage.trim()) {
+      alert('Please write something first!');
+      return;
+    }
+    setIsAiProcessingChat(true);
+    try {
+      const completed = await geminiService.completePost(newMessage);
+      setNewMessage(completed);
+      inputRef.current?.focus();
+    } catch (err: unknown) {
+      console.error('Failed to complete message with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const message = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to complete with AI: ${message}`);
+    } finally {
+      setIsAiProcessingChat(false);
+    }
+  };
+
+  const handleImproveMessageWithAI = async () => {
+    if (!newMessage.trim()) {
+      alert('Please write something first!');
+      return;
+    }
+    setIsAiProcessingChat(true);
+    try {
+      const improved = await geminiService.improvePost(newMessage);
+      setNewMessage(improved);
+      inputRef.current?.focus();
+    } catch (err: unknown) {
+      console.error('Failed to improve message with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const message = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to improve with AI: ${message}`);
+    } finally {
+      setIsAiProcessingChat(false);
     }
   };
 
@@ -3916,6 +3959,27 @@ export default function Chat() {
                       >
                         <Smile className="w-6 h-6" />
                       </button>
+                      {/* AI buttons for composing messages */}
+                      {newMessage.trim() && (
+                        <div className="flex gap-2 ml-2">
+                          <button
+                            type="button"
+                            onClick={handleCompleteMessageWithAI}
+                            disabled={isAiProcessingChat || uploading}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                          >
+                            {isAiProcessingChat ? 'Processing...' : 'Complete with AI'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleImproveMessageWithAI}
+                            disabled={isAiProcessingChat || uploading}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                          >
+                            {isAiProcessingChat ? 'Processing...' : 'Improve with AI'}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && selectedFiles.length === 0) ? (
