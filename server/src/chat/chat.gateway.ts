@@ -147,7 +147,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // Broadcast an event to all connected sockets (optionally skipping users)
-  broadcast(event: string, payload: any, options?: { excludeUserIds?: string[] }) {
+  broadcast(
+    event: string,
+    payload: any,
+    options?: { excludeUserIds?: string[] },
+  ) {
     const exclude = new Set(options?.excludeUserIds ?? []);
     if (exclude.size === 0) {
       this.server.emit(event, payload);
@@ -167,20 +171,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     message: { senderId: string; [key: string]: any },
   ) {
     let delivered = false;
-    
+
     // Send to receiver if online
     const socketId = this.userSockets.get(receiverId);
     if (socketId) {
       this.server.to(socketId).emit('new_message', message);
       delivered = true; // Receiver is online and will get the message
     }
-    
+
     // Always send to sender for multi-device support and real-time UI update
     const senderSocketId = this.userSockets.get(message.senderId);
     if (senderSocketId) {
       this.server.to(senderSocketId).emit('new_message', message);
     }
-    
+
     return delivered;
   }
 
@@ -195,12 +199,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
     const socketId = this.userSockets.get(senderId);
     console.log(`[ChatGateway] Socket ID for ${senderId}: ${socketId}`);
-    
+
     const payload = {
       messageIds,
       deliveredAt: deliveredAt.toISOString(),
     };
-    
+
     if (socketId) {
       this.server.to(socketId).emit('messages_delivered', payload);
       console.log(

@@ -4,7 +4,7 @@ import { getReels, getReel, type ShareReelResponse } from '../../services/reelSe
 import ReelPlayer from '../../components/Reels/ReelPlayer';
 import ReelComments from '../../components/Reels/ReelComments';
 import { ShareReelModal } from '../../components/Reels/ShareReelModal';
-import { ChevronUp, ChevronDown, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
 import { useNavigate, useParams } from 'react-router-dom';
 import socketService from '../../services/socketService';
@@ -26,13 +26,14 @@ export default function ReelsPage() {
   const lastWheelAt = useRef<number>(0);
   const { user: currentUser } = useCurrentUser();
   const [sharingReel, setSharingReel] = useState<ReelSummary | null>(null);
+  const [mode, setMode] = useState<'default' | 'trending' | 'random'>('default');
 
   const fetchReelsPage = useCallback(
-    async (pageToLoad: number) => {
+    async (pageToLoad: number, modeArg: 'default' | 'trending' | 'random' = mode) => {
       setHasAttemptedInitialLoad(true);
       setLoading(true);
       try {
-        const data = await getReels(pageToLoad, 10);
+        const data = await getReels(pageToLoad, 10, modeArg);
         if (data.length === 0) {
           setHasMore(false);
           return;
@@ -46,17 +47,17 @@ export default function ReelsPage() {
         setLoading(false);
       }
     },
-    [],
+    [mode],
   );
 
   useEffect(() => {
-    void fetchReelsPage(1);
-  }, [fetchReelsPage]);
+    void fetchReelsPage(1, mode);
+  }, [fetchReelsPage, mode]);
 
   const loadMoreReels = useCallback(async () => {
     if (loading || !hasMore) return;
-    await fetchReelsPage(page);
-  }, [fetchReelsPage, hasMore, loading, page]);
+    await fetchReelsPage(page, mode);
+  }, [fetchReelsPage, hasMore, loading, page, mode]);
 
   // when reels change, if there's a param reelId, try to focus it
   useEffect(() => {
@@ -191,6 +192,18 @@ export default function ReelsPage() {
     [currentUser, navigate],
   );
 
+  const changeMode = useCallback(
+    (newMode: 'default' | 'trending' | 'random') => {
+      if (newMode === mode) return;
+      setMode(newMode);
+      setReels([]);
+      setPage(1);
+      setHasMore(true);
+      void fetchReelsPage(1, newMode);
+    },
+    [mode, fetchReelsPage],
+  );
+
   const handleShareCreated = useCallback((response: ShareReelResponse) => {
     const { share, shares, reelId, post } = response;
     setReels((prev) => {
@@ -291,29 +304,58 @@ export default function ReelsPage() {
 
   if (reels.length === 0 && !loading && !paramReelId && hasAttemptedInitialLoad) {
     return (
-      <div className="relative h-screen bg-black">
+      <div 
+        className="relative h-screen bg-black overflow-hidden"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(31, 41, 55, 0.4), rgba(0, 0, 0, 1))',
+        }}
+      >
         {/* Create Reel Button - still show when no reels */}
         <button
           onClick={() => navigate('/reels/create')}
-          className="fixed top-20 right-4 z-30 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-lg transition-colors cursor-pointer"
+          className={`fixed top-20 z-30 text-white rounded-full p-4 shadow-2xl transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-orange-500/50 ${
+            showComments ? 'sm:right-[420px] right-4' : 'right-4'
+          }`}
+          style={{
+            background: 'linear-gradient(135deg, #f97316, #ea580c)',
+          }}
           title="Tạo Reel mới"
         >
           <Plus className="w-6 h-6" />
         </button>
 
-        <div className="h-full flex items-center justify-center">
-          <p className="text-white text-xl">Không có reels nào</p>
+        <div className="h-full flex flex-col items-center justify-center gap-4">
+          <div 
+            className="w-24 h-24 rounded-full flex items-center justify-center border-2 border-orange-500/30"
+            style={{
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.2))',
+            }}
+          >
+            <Plus className="w-12 h-12 text-orange-400" />
+          </div>
+          <p className="text-white text-xl font-medium">Không có reels nào</p>
+          <p className="text-gray-400 text-sm">Hãy tạo reel đầu tiên của bạn!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative h-screen bg-black overflow-hidden">
+    <div 
+      className="relative h-screen bg-black overflow-hidden"
+      style={{
+        background: 'radial-gradient(ellipse at center, rgba(31, 41, 55, 0.4), rgba(0, 0, 0, 1))',
+      }}
+    >
       {/* Create Reel Button */}
       <button
         onClick={() => navigate('/reels/create')}
-        className="fixed top-20 right-4 z-30 bg-orange-500 hover:bg-orange-600 text-white rounded-full p-4 shadow-lg transition-colors cursor-pointer"
+        className={`fixed top-20 z-30 text-white rounded-full p-4 shadow-2xl cursor-pointer hover:scale-110 hover:shadow-orange-500/50 transition-all duration-300 ${
+          showComments ? 'sm:right-[420px] right-4' : 'right-4'
+        }`}
+        style={{
+          background: 'linear-gradient(135deg, #f97316, #ea580c)',
+        }}
         title="Tạo Reel mới"
       >
         <Plus className="w-6 h-6" />
@@ -335,7 +377,7 @@ export default function ReelsPage() {
             <div
               key={reel.id}
               className={`${!skipTransition ? 'transition-transform duration-300' : ''} absolute top-0 left-0 bottom-0 right-0 ${
-                showComments ? 'sm:right-[436px]' : ''
+                showComments ? 'sm:right-[380px]' : ''
               }`}
               style={{ zIndex: index === currentIndex ? 10 : 1, transform }}
             >
@@ -349,40 +391,73 @@ export default function ReelsPage() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 onShareClick={handleShareRequest}
+                onPrevReel={handlePrevious}
+                onNextReel={handleNext}
               />
             </div>
           );
         })}
       </div>
 
-      {/* Navigation Buttons (moved further right so action icons sit left of them) */}
+      {/* Feed mode selector */}
       <div
-        className={`fixed top-1/2 -translate-y-1/2 flex flex-col gap-4 z-30 right-2 transition-[right] duration-300 ${
-          showComments ? 'sm:right-[436px]' : ''
+        className={`fixed top-20 z-40 flex gap-2 bg-black/30 backdrop-blur-md p-1.5 rounded-full border border-white/10 transition-all duration-300 ${
+          showComments ? 'sm:right-[520px] right-4' : 'right-20'
         }`}
       >
-        {currentIndex > 0 && (
-          <button
-            onClick={handlePrevious}
-            className="bg-black/40 hover:bg-black/50 backdrop-blur-sm rounded-full p-3 transition-colors cursor-pointer border border-white/10"
-          >
-            <ChevronUp className="w-6 h-6 text-white" />
-          </button>
-        )}
-        {currentIndex < reels.length - 1 && (
-          <button
-            onClick={handleNext}
-            className="bg-black/40 hover:bg-black/50 backdrop-blur-sm rounded-full p-3 transition-colors cursor-pointer border border-white/10"
-          >
-            <ChevronDown className="w-6 h-6 text-white" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => changeMode('default')}
+          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+            mode === 'default' 
+              ? 'text-white shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+          style={mode === 'default' ? {
+            background: 'linear-gradient(135deg, #f97316, #ea580c)',
+          } : undefined}
+        >
+          For you
+        </button>
+        <button
+          type="button"
+          onClick={() => changeMode('trending')}
+          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+            mode === 'trending' 
+              ? 'text-white shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+          style={mode === 'trending' ? {
+            background: 'linear-gradient(135deg, #f97316, #ea580c)',
+          } : undefined}
+        >
+          Trending
+        </button>
+        <button
+          type="button"
+          onClick={() => changeMode('random')}
+          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+            mode === 'random' 
+              ? 'text-white shadow-lg' 
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+          style={mode === 'random' ? {
+            background: 'linear-gradient(135deg, #f97316, #ea580c)',
+          } : undefined}
+        >
+          Random
+        </button>
       </div>
+
+      {/* Navigation buttons removed per request */}
 
       {/* Loading Indicator */}
       {loading && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-          <p className="text-white text-sm">Đang tải...</p>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-6 py-3 border border-orange-500/30 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-white text-sm font-medium">Đang tải...</p>
+          </div>
         </div>
       )}
 

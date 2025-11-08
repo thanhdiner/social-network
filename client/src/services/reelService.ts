@@ -17,8 +17,13 @@ export interface ShareReelResponse {
 }
 
 // Lấy danh sách reels
-export const getReels = async (page = 1, limit = 10): Promise<Reel[]> => {
-  const response = await api.get(`/reels?page=${page}&limit=${limit}`);
+export const getReels = async (
+  page = 1,
+  limit = 10,
+  mode?: 'default' | 'trending' | 'random',
+): Promise<Reel[]> => {
+  const modeQuery = mode ? `&mode=${encodeURIComponent(mode)}` : '';
+  const response = await api.get(`/reels?page=${page}&limit=${limit}${modeQuery}`);
   return response.data;
 };
 

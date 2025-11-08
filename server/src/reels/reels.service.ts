@@ -111,7 +111,7 @@ export class ReelsService {
   }
 
   private async formatReelForViewer(reel: ReelWithRelations, viewerId: string) {
-    const sharedFrom = (reel.sharedFrom ?? null) as SharedFromPayload | null;
+    const sharedFrom = reel.sharedFrom ?? null;
 
     const [likeRecord, shareCountForReel, sharedFromShareCount] =
       await Promise.all([
@@ -165,18 +165,59 @@ export class ReelsService {
     });
   }
 
-  // Lấy danh sách reels (feed)
-  async findAll(userId: string, page = 1, limit = 10) {
+  // Lấy danh sách reels (feed). Supports modes: 'default' (recent), 'trending', 'random'
+  async findAll(
+    userId: string,
+    page = 1,
+    limit = 10,
+    mode: string = 'default',
+  ) {
     const skip = (page - 1) * limit;
 
-    const reels = await this.prisma.reel.findMany({
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: this.reelInclude,
-    });
+    let reels: ReelWithRelations[] = [];
+
+    if (mode === 'trending') {
+      // Trending: order by views within the last 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      reels = await this.prisma.reel.findMany({
+        where: {
+          createdAt: {
+            gte: sevenDaysAgo,
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: [{ views: 'desc' }, { createdAt: 'desc' }],
+        include: this.reelInclude,
+      });
+    } else if (mode === 'random') {
+      // Random: pick a random contiguous block using random skip to avoid DB-specific RANDOM() usage
+      const total = await this.prisma.reel.count();
+      if (total <= limit) {
+        reels = await this.prisma.reel.findMany({
+          take: limit,
+          include: this.reelInclude,
+        });
+      } else {
+        const maxSkip = Math.max(total - limit, 0);
+        const randomSkip = Math.floor(Math.random() * (maxSkip + 1));
+        reels = await this.prisma.reel.findMany({
+          skip: randomSkip,
+          take: limit,
+          include: this.reelInclude,
+        });
+      }
+    } else {
+      // Default: recent
+      reels = await this.prisma.reel.findMany({
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        include: this.reelInclude,
+      });
+    }
 
     const reelsWithMeta = await Promise.all(
       reels.map((reel) => this.formatReelForViewer(reel, userId)),

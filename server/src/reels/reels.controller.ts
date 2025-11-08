@@ -28,10 +28,21 @@ export class ReelsController {
   }
 
   @Get()
-  findAll(@Request() req, @Query('page') page?: string, @Query('limit') limit?: string) {
+  findAll(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('mode') mode?: string,
+  ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.reelsService.findAll(req.user.userId, pageNum, limitNum);
+    const modeStr = mode ?? 'default';
+    return this.reelsService.findAll(
+      req.user.userId,
+      pageNum,
+      limitNum,
+      modeStr,
+    );
   }
 
   @Get('user/:userId')
@@ -43,7 +54,12 @@ export class ReelsController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.reelsService.findByUser(userId, req.user.userId, pageNum, limitNum);
+    return this.reelsService.findByUser(
+      userId,
+      req.user.userId,
+      pageNum,
+      limitNum,
+    );
   }
 
   @Get(':id')
@@ -52,7 +68,11 @@ export class ReelsController {
   }
 
   @Patch(':id')
-  update(@Request() req, @Param('id') id: string, @Body() updateReelDto: UpdateReelDto) {
+  update(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateReelDto: UpdateReelDto,
+  ) {
     return this.reelsService.update(id, req.user.userId, updateReelDto);
   }
 
@@ -94,7 +114,11 @@ export class ReelsController {
     @Param('id') id: string,
     @Body() createCommentDto: CreateReelCommentDto,
   ) {
-    return this.reelsService.createComment(id, req.user.userId, createCommentDto);
+    return this.reelsService.createComment(
+      id,
+      req.user.userId,
+      createCommentDto,
+    );
   }
 
   @Delete('comments/:commentId')
@@ -103,7 +127,11 @@ export class ReelsController {
   }
 
   @Post(':id/share')
-  share(@Request() req, @Param('id') id: string, @Body() shareReelDto: ShareReelDto) {
+  share(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() shareReelDto: ShareReelDto,
+  ) {
     return this.reelsService.share(id, req.user.userId, shareReelDto);
   }
 

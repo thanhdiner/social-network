@@ -113,16 +113,21 @@ export class ChatController {
     this.logger.log(
       `POST /chat/messages from=${req.user.userId} to=${data.receiverId}`,
     );
-    return this.chatService.sendMessage(req.user.userId, data.receiverId, data.content, {
-      imageUrl: data.imageUrl,
-      videoUrl: data.videoUrl,
-      audioUrl: data.audioUrl,
-      fileUrl: data.fileUrl,
-      fileName: data.fileName,
-      fileSize: data.fileSize,
-      fileType: data.fileType,
-      replyToId: data.replyToId,
-    });
+    return this.chatService.sendMessage(
+      req.user.userId,
+      data.receiverId,
+      data.content,
+      {
+        imageUrl: data.imageUrl,
+        videoUrl: data.videoUrl,
+        audioUrl: data.audioUrl,
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        fileType: data.fileType,
+        replyToId: data.replyToId,
+      },
+    );
   }
 
   @Put('messages/:userId/read')

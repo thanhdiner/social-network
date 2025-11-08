@@ -71,14 +71,19 @@ export class CommentsService {
     return comment;
   }
 
-  async findByPostId(postId: string, page = 1, limit = 20, imageIndex?: number) {
+  async findByPostId(
+    postId: string,
+    page = 1,
+    limit = 20,
+    imageIndex?: number,
+  ) {
     const skip = (page - 1) * limit;
 
-    const where: any = { 
+    const where: any = {
       postId,
       parentId: null, // Chỉ lấy comment gốc, không lấy replies
     };
-    
+
     // Nếu imageIndex được cung cấp, lọc theo imageIndex đó
     // Nếu không, chỉ lấy comments không có imageIndex (comments chung)
     if (imageIndex !== undefined) {
@@ -215,11 +220,7 @@ export class CommentsService {
   }
 
   // Like/Unlike comment
-  async toggleLike(
-    commentId: string,
-    userId: string,
-    type: string = 'like',
-  ) {
+  async toggleLike(commentId: string, userId: string, type: string = 'like') {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
     });
@@ -291,4 +292,3 @@ export class CommentsService {
     };
   }
 }
-

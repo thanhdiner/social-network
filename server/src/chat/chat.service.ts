@@ -187,8 +187,8 @@ export class ChatService {
       ...(summary
         ? { changeSummary: summary }
         : (record as any).changeSummary
-        ? { changeSummary: (record as any).changeSummary }
-        : {}),
+          ? { changeSummary: (record as any).changeSummary }
+          : {}),
     };
   }
 
@@ -532,7 +532,7 @@ export class ChatService {
       data: updateData,
     });
 
-  let summary: string | null = null;
+    let summary: string | null = null;
     try {
       const actor = await this.prisma.user.findUnique({
         where: { id: currentUserId },
@@ -560,7 +560,9 @@ export class ChatService {
     if (summary) {
       try {
         // Use any-cast because Prisma client types may not be regenerated yet in the running environment.
-        finalRecord = await (this.prisma as any).conversationCustomization.update({
+        finalRecord = await (
+          this.prisma as any
+        ).conversationCustomization.update({
           where: {
             userAId_userBId: {
               userAId,
@@ -578,7 +580,11 @@ export class ChatService {
 
     this.broadcastCustomizationUpdate(finalRecord, summary);
 
-    return this.formatCustomizationForUser(finalRecord, isCurrentUserA, summary);
+    return this.formatCustomizationForUser(
+      finalRecord,
+      isCurrentUserA,
+      summary,
+    );
   }
 
   async resetConversationCustomization(
@@ -644,7 +650,9 @@ export class ChatService {
     let finalRecordReset = updated;
     if (summary) {
       try {
-        finalRecordReset = await (this.prisma as any).conversationCustomization.update({
+        finalRecordReset = await (
+          this.prisma as any
+        ).conversationCustomization.update({
           where: {
             userAId_userBId: {
               userAId,
@@ -662,7 +670,11 @@ export class ChatService {
 
     this.broadcastCustomizationUpdate(finalRecordReset, summary);
 
-    return this.formatCustomizationForUser(finalRecordReset, isCurrentUserA, summary);
+    return this.formatCustomizationForUser(
+      finalRecordReset,
+      isCurrentUserA,
+      summary,
+    );
   }
 
   async sendMessage(

@@ -695,10 +695,10 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
     }
 
     return (
-      <div className="mt-3 space-y-3 border-l border-gray-200 pl-4">
+      <div className="mt-3 space-y-3 border-l border-orange-500/30 pl-4">
         {entry?.isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Loader2 className="h-4 w-4 animate-spin text-orange-400" />
             Loading replies...
           </div>
         ) : replies.length === 0 ? (
@@ -714,15 +714,15 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                 />
               </Link>
               <div className="flex-1">
-                <div className="inline-block max-w-full rounded-2xl bg-gray-100 px-3 py-2">
+                <div className="inline-block max-w-full rounded-2xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 px-3 py-2">
                   <Link
                     to={reply.user?.username ? `/profile/${reply.user.username}` : '#'}
-                    className="text-sm font-semibold text-gray-800 hover:text-orange-500 cursor-pointer"
+                    className="text-sm font-semibold text-white hover:text-orange-400 cursor-pointer transition-colors"
                   >
                     {reply.user?.name}
                   </Link>
                 {reply.content?.trim() ? (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
+                  <p className="text-sm text-gray-300 whitespace-pre-wrap wrap-break-word">
                     {renderContentWithMention(reply.content)}
                   </p>
                 ) : null}
@@ -730,16 +730,16 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                   <img
                     src={reply.imageUrl}
                     alt="Reply attachment"
-                    className="mt-2 max-h-52 w-auto rounded-xl border border-gray-200 object-cover"
+                    className="mt-2 max-h-52 w-auto rounded-xl border border-orange-500/30 object-cover shadow-lg"
                   />
                 ) : null}
               </div>
                 <div className="mt-1 flex flex-wrap items-center gap-3 px-2 text-xs text-gray-500">
-                  <span>{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
+                  <span className="text-gray-400">{formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true, locale: enUS })}</span>
                   <button
                     type="button"
                     onClick={() => handleStartReply(comment.id, reply.user?.name)}
-                    className="font-semibold text-gray-600 hover:text-orange-500 cursor-pointer"
+                    className="font-semibold text-gray-400 hover:text-orange-400 cursor-pointer transition-colors"
                   >
                     Reply
                   </button>
@@ -747,7 +747,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                     <button
                       type="button"
                       onClick={() => handleDeleteComment(reply.id, comment.id)}
-                      className="flex items-center gap-1 text-gray-500 hover:text-red-500 cursor-pointer"
+                      className="flex items-center gap-1 text-gray-400 hover:text-red-400 cursor-pointer transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                       Delete
@@ -762,7 +762,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
           <button
             type="button"
             onClick={() => loadReplies(comment.id, entry.page + 1)}
-            className="flex items-center gap-2 text-sm text-orange-500 hover:text-orange-600 cursor-pointer"
+            className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 cursor-pointer font-semibold transition-colors"
             disabled={entry.isLoadingMore}
           >
             {entry.isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -778,16 +778,22 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
       <div
         className={
           drawer
-            ? 'pointer-events-auto fixed right-0 top-0 bottom-0 flex w-full flex-col overflow-y-auto bg-white shadow-xl sm:top-[65px] sm:w-[420px]'
-            : 'pointer-events-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl'
+            ? 'pointer-events-auto fixed right-0 top-0 bottom-0 flex w-full flex-col overflow-y-auto shadow-2xl sm:top-[65px] sm:w-[380px] border-l border-gray-800'
+            : 'pointer-events-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border border-gray-800'
         }
+        style={{
+          background: 'linear-gradient(to bottom, #111827, #000000)',
+        }}
       >
-        <div className="flex items-center justify-between border-b p-4">
-          <h2 className="text-lg font-semibold text-gray-900">Comments</h2>
+        <div className="flex items-center justify-between border-b border-gray-800/50 p-4 bg-black/40 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-orange-500" />
+            <h2 className="text-lg font-semibold text-white">Comments</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 cursor-pointer"
+            className="text-gray-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-full p-1.5 cursor-pointer transition-colors"
             aria-label="Close comments"
           >
             <X className="h-5 w-5" />
@@ -799,16 +805,19 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
             <div className="space-y-4">
               {[...Array(3)].map((_, index) => (
                 <div key={index} className="flex gap-3">
-                  <div className="h-10 w-10 animate-pulse rounded-full bg-gray-200" />
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-gray-700" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-3 w-1/4 animate-pulse rounded bg-gray-200" />
-                    <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+                    <div className="h-3 w-1/4 animate-pulse rounded bg-gray-700" />
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-gray-700" />
                   </div>
                 </div>
               ))}
             </div>
           ) : comments.length === 0 ? (
-            <p className="py-10 text-center text-sm text-gray-500">No comments yet. Be the first to say something!</p>
+            <div className="py-16 text-center">
+              <MessageCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">No comments yet. Be the first to say something!</p>
+            </div>
           ) : (
             <div className="space-y-5">
               {comments.map((comment) => {
@@ -825,15 +834,15 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
               />
             </Link>
             <div className="flex-1">
-              <div className="inline-block max-w-full rounded-2xl bg-gray-100 px-3 py-2">
+              <div className="inline-block max-w-full rounded-2xl bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 px-3 py-2">
                 <Link
                   to={comment.user?.username ? `/profile/${comment.user.username}` : '#'}
-                  className="text-sm font-semibold text-gray-900 hover:text-orange-500 cursor-pointer"
+                  className="text-sm font-semibold text-white hover:text-orange-400 cursor-pointer transition-colors"
                 >
                   {comment.user?.name}
                 </Link>
                         {comment.content?.trim() ? (
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap wrap-break-word">
+                          <p className="text-sm text-gray-300 whitespace-pre-wrap wrap-break-word">
                             {renderContentWithMention(comment.content)}
                           </p>
                         ) : null}
@@ -841,16 +850,16 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                           <img
                             src={comment.imageUrl}
                             alt="Comment attachment"
-                            className="mt-2 max-h-64 w-auto rounded-xl border border-gray-200 object-cover"
+                            className="mt-2 max-h-64 w-auto rounded-xl border border-orange-500/30 object-cover shadow-lg"
                           />
                         ) : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-3 px-2 text-xs text-gray-500">
-                        <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
+                        <span className="text-gray-400">{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: enUS })}</span>
                         <button
                           type="button"
                           onClick={() => handleStartReply(comment.id, comment.user?.name)}
-                          className="font-semibold text-gray-600 hover:text-orange-500 cursor-pointer"
+                          className="font-semibold text-gray-400 hover:text-orange-400 cursor-pointer transition-colors"
                         >
                           Reply
                         </button>
@@ -858,7 +867,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                           <button
                             type="button"
                             onClick={() => handleDeleteComment(comment.id)}
-                            className="flex items-center gap-1 text-gray-500 hover:text-red-500 cursor-pointer"
+                            className="flex items-center gap-1 text-gray-400 hover:text-red-400 cursor-pointer transition-colors"
                           >
                             <Trash2 className="h-3 w-3" />
                             Delete
@@ -868,7 +877,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                           <button
                             type="button"
                             onClick={() => handleToggleReplies(comment.id)}
-                            className="flex items-center gap-1 text-gray-600 hover:text-orange-500 cursor-pointer"
+                            className="flex items-center gap-1 text-gray-400 hover:text-orange-400 cursor-pointer transition-colors font-semibold"
                           >
                             <MessageCircle className="h-3 w-3" />
                             {isExpanded ? 'Hide replies' : `View replies (${repliesCount})`}
@@ -877,18 +886,18 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                       </div>
 
                       {replyTarget?.parentId === comment.id && (
-                        <form onSubmit={handleSubmitReply} className="mt-3 space-y-3">
+                        <form onSubmit={handleSubmitReply} className="mt-3 space-y-3 bg-gray-900/30 backdrop-blur-sm border border-gray-700/30 rounded-lg p-3">
                           {replyImageUrl && (
                             <div className="relative inline-block">
                               <img
                                 src={replyImageUrl}
                                 alt="Reply attachment"
-                                className="max-h-40 w-auto rounded-xl border border-gray-200 object-cover"
+                                className="max-h-40 w-auto rounded-xl border border-orange-500/30 object-cover shadow-lg"
                               />
                               <button
                                 type="button"
                                 onClick={handleRemoveReplyImage}
-                                className="absolute -right-2 -top-2 rounded-full bg-black/70 p-1 text-white hover:bg-black/80 cursor-pointer"
+                                className="absolute -right-2 -top-2 rounded-full bg-orange-500 p-1.5 text-white hover:bg-orange-600 cursor-pointer shadow-lg transition-colors"
                                 aria-label="Remove attached image"
                               >
                                 <X className="h-4 w-4" />
@@ -900,7 +909,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                             value={replyContent}
                             onChange={(event) => setReplyContent(event.target.value)}
                             placeholder={replyTarget.mention ? `Reply to ${replyTarget.mention}...` : 'Write a reply...'}
-                            className="min-h-20 resize-none"
+                            className="min-h-20 resize-none bg-gray-900/50 border-gray-700/50 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/30"
                             disabled={isUploadingReplyImage}
                             onFocus={(e) => {
                               // Ensure caret is placed after the prefilled mention when focused
@@ -941,7 +950,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                               variant="ghost"
                               onClick={() => replyImageInputRef.current?.click()}
                               disabled={!currentUser || isSubmittingReply || isUploadingReplyImage}
-                              className="flex items-center gap-2 cursor-pointer"
+                              className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-orange-400 hover:bg-orange-500/10"
                             >
                               {isUploadingReplyImage ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -955,7 +964,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                                 type="button"
                                 variant="ghost"
                                 onClick={handleCancelReply}
-                                className="cursor-pointer"
+                                className="cursor-pointer text-gray-400 hover:text-white hover:bg-gray-800"
                               >
                                 Cancel
                               </Button>
@@ -967,7 +976,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                                   isUploadingReplyImage ||
                                   (!replyContent.trim() && !replyImageUrl)
                                 }
-                                className="cursor-pointer"
+                                className="cursor-pointer bg-orange-500 hover:bg-orange-600 text-white transition-colors"
                               >
                                 {(isSubmittingReply || isUploadingReplyImage) && (
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -989,7 +998,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                 <button
                   type="button"
                   onClick={handleLoadMoreComments}
-                  className="flex items-center gap-2 w-full justify-center rounded-full border border-orange-500 px-4 py-2 text-sm font-medium text-orange-500 hover:bg-orange-50 cursor-pointer"
+                  className="flex items-center gap-2 w-full justify-center rounded-full border border-orange-500/50 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-orange-400 hover:bg-orange-500/20 hover:border-orange-500 cursor-pointer transition-all duration-200"
                   disabled={isLoadingMore}
                 >
                   {isLoadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -1000,7 +1009,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
           )}
         </div>
 
-        <form onSubmit={handleSubmitComment} className="border-t bg-white p-4">
+        <form onSubmit={handleSubmitComment} className="border-t border-gray-700/30 bg-black/40 backdrop-blur-md p-4">
           <div className="flex items-start gap-3">
             <Avatar
               src={currentUser?.avatar || undefined}
@@ -1013,12 +1022,12 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                   <img
                     src={commentImageUrl}
                     alt="Comment attachment"
-                    className="max-h-48 w-auto rounded-xl border border-gray-200 object-cover"
+                    className="max-h-48 w-auto rounded-xl border border-orange-500/30 object-cover shadow-lg"
                   />
                   <button
                     type="button"
                     onClick={handleRemoveCommentImage}
-                    className="absolute -right-2 -top-2 rounded-full bg-black/70 p-1 text-white hover:bg-black/80 cursor-pointer"
+                    className="absolute -right-2 -top-2 rounded-full bg-orange-500 p-1.5 text-white hover:bg-orange-600 cursor-pointer shadow-lg transition-colors"
                     aria-label="Remove attached image"
                   >
                     <X className="h-4 w-4" />
@@ -1030,7 +1039,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                 onChange={(event) => setNewComment(event.target.value)}
                 placeholder={currentUser ? 'Share your thoughts...' : 'You need to sign in to comment.'}
                 disabled={!currentUser || isUploadingCommentImage}
-                className="min-h-24 resize-none"
+                className="min-h-24 resize-none bg-gray-900/50 border-gray-700/50 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/30"
               />
               <input
                 ref={commentImageInputRef}
@@ -1045,7 +1054,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                   variant="ghost"
                   onClick={() => commentImageInputRef.current?.click()}
                   disabled={!currentUser || isSubmittingComment || isUploadingCommentImage}
-                  className="flex items-center gap-2 cursor-pointer"
+                  className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-orange-400 hover:bg-orange-500/10"
                 >
                   {isUploadingCommentImage ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1061,7 +1070,7 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                     (isSubmittingComment || isUploadingCommentImage) ||
                     (!newComment.trim() && !commentImageUrl)
                   }
-                  className="cursor-pointer"
+                  className="cursor-pointer bg-orange-500 hover:bg-orange-600 text-white transition-colors"
                 >
                   {(isSubmittingComment || isUploadingCommentImage) && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
