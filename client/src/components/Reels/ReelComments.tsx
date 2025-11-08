@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { enUS } from 'date-fns/locale';
-import { X, Send, MessageCircle, Loader2, Trash2, Image as ImageIcon } from 'lucide-react';
+import { X, Send, MessageCircle, Loader2, Trash2, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import socketService from '../../services/socketService';
 import type { Notification } from '../../services/notificationService';
@@ -17,6 +17,7 @@ import { Avatar } from '../shared/Avatar';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import uploadService from '../../services/uploadService';
+import geminiService from '../../services/geminiService';
 
 interface ReelCommentsProps {
   reelId: string;
@@ -64,6 +65,8 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
   const [replyImageUrl, setReplyImageUrl] = useState<string | null>(null);
   const [isUploadingCommentImage, setIsUploadingCommentImage] = useState(false);
   const [isUploadingReplyImage, setIsUploadingReplyImage] = useState(false);
+  const [isAiProcessingComment, setIsAiProcessingComment] = useState(false);
+  const [isAiProcessingReply, setIsAiProcessingReply] = useState(false);
 
   const loadComments = useCallback(
     async (pageToLoad = 1) => {
@@ -336,6 +339,70 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
       if (!repliesState[parentId] || (repliesState[parentId]?.page ?? 0) < 1) {
         void loadReplies(parentId, 1);
       }
+    }
+  };
+
+  const handleCompleteCommentWithAI = async () => {
+    if (!newComment.trim()) return;
+    setIsAiProcessingComment(true);
+    try {
+      const completed = await geminiService.completePost(newComment);
+      setNewComment(completed);
+    } catch (err) {
+      console.error('Failed to complete comment with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to complete with AI: ${msg}`);
+    } finally {
+      setIsAiProcessingComment(false);
+    }
+  };
+
+  const handleImproveCommentWithAI = async () => {
+    if (!newComment.trim()) return;
+    setIsAiProcessingComment(true);
+    try {
+      const improved = await geminiService.improvePost(newComment);
+      setNewComment(improved);
+    } catch (err) {
+      console.error('Failed to improve comment with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to improve with AI: ${msg}`);
+    } finally {
+      setIsAiProcessingComment(false);
+    }
+  };
+
+  const handleCompleteReplyWithAI = async () => {
+    if (!replyContent.trim()) return;
+    setIsAiProcessingReply(true);
+    try {
+      const completed = await geminiService.completePost(replyContent);
+      setReplyContent(completed);
+    } catch (err) {
+      console.error('Failed to complete reply with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to complete with AI: ${msg}`);
+    } finally {
+      setIsAiProcessingReply(false);
+    }
+  };
+
+  const handleImproveReplyWithAI = async () => {
+    if (!replyContent.trim()) return;
+    setIsAiProcessingReply(true);
+    try {
+      const improved = await geminiService.improvePost(replyContent);
+      setReplyContent(improved);
+    } catch (err) {
+      console.error('Failed to improve reply with AI:', err);
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error';
+      alert(`Failed to improve with AI: ${msg}`);
+    } finally {
+      setIsAiProcessingReply(false);
     }
   };
 
@@ -957,9 +1024,32 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                               ) : (
                                 <ImageIcon className="h-4 w-4" />
                               )}
-                              Attach image
+                              Image
                             </Button>
                             <div className="flex items-center justify-end gap-2">
+                              {/* AI buttons for reply (icon-only) */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleCompleteReplyWithAI}
+                                disabled={isAiProcessingReply || isUploadingReplyImage}
+                                className="p-2 text-orange-400 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full"
+                                title={isAiProcessingReply ? 'Processing...' : 'Complete with AI'}
+                              >
+                                <Sparkles className={`h-4 w-4 ${isAiProcessingReply ? 'text-gray-400' : 'text-orange-400'}`} />
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={handleImproveReplyWithAI}
+                                disabled={isAiProcessingReply || isUploadingReplyImage}
+                                className="p-2 text-orange-400 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full"
+                                title={isAiProcessingReply ? 'Processing...' : 'Improve with AI'}
+                              >
+                                <Wand2 className={`h-4 w-4 ${isAiProcessingReply ? 'text-gray-400' : 'text-orange-400'}`} />
+                              </Button>
+
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -1049,20 +1139,45 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                 className="hidden"
               />
               <div className="flex items-center justify-between">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => commentImageInputRef.current?.click()}
-                  disabled={!currentUser || isSubmittingComment || isUploadingCommentImage}
-                  className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-orange-400 hover:bg-orange-500/10"
-                >
-                  {isUploadingCommentImage ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ImageIcon className="h-4 w-4" />
-                  )}
-                  Attach image
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => commentImageInputRef.current?.click()}
+                    disabled={!currentUser || isSubmittingComment || isUploadingCommentImage}
+                    className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-orange-400 hover:bg-orange-500/10"
+                  >
+                    {isUploadingCommentImage ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ImageIcon className="h-4 w-4" />
+                    )}
+                    Image
+                  </Button>
+
+                  {/* AI buttons for comment (icon-only) */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCompleteCommentWithAI}
+                    disabled={isAiProcessingComment || isUploadingCommentImage}
+                    className="p-2 text-orange-400 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full"
+                    title={isAiProcessingComment ? 'Processing...' : 'Complete with AI'}
+                  >
+                    <Sparkles className={`h-4 w-4 ${isAiProcessingComment ? 'text-gray-400' : 'text-orange-400'}`} />
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleImproveCommentWithAI}
+                    disabled={isAiProcessingComment || isUploadingCommentImage}
+                    className="p-2 text-orange-400 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-full"
+                    title={isAiProcessingComment ? 'Processing...' : 'Improve with AI'}
+                  >
+                    <Wand2 className={`h-4 w-4 ${isAiProcessingComment ? 'text-gray-400' : 'text-orange-400'}`} />
+                  </Button>
+                </div>
                 <Button
                   type="submit"
                   disabled={
@@ -1075,8 +1190,8 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                   {(isSubmittingComment || isUploadingCommentImage) && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  <Send className="mr-2 h-4 w-4" />
-                  Comment
+                  <Send className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only">Comment</span>
                 </Button>
               </div>
             </div>
