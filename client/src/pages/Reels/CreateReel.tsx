@@ -4,6 +4,7 @@ import { createReel } from '../../services/reelService';
 import uploadService from '../../services/uploadService';
 import { Button } from '../../components/ui/button';
 import { Textarea } from '../../components/ui/textarea';
+import geminiService from '../../services/geminiService';
 import { Upload, X, Video } from 'lucide-react';
 import { useTitle } from '../../hooks/useTitle';
 
@@ -12,6 +13,7 @@ export default function CreateReelPage() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [description, setDescription] = useState('');
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
@@ -149,6 +151,61 @@ export default function CreateReelPage() {
               <p className="text-sm text-gray-500 mt-1">
                 {description.length}/500 ký tự
               </p>
+              {/* AI buttons for description */}
+              {description.trim() && (
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!description.trim()) {
+                        alert('Please write something first!');
+                        return;
+                      }
+                      setIsAiProcessing(true);
+                      try {
+                        const completed = await geminiService.completePost(description);
+                        setDescription(completed);
+                      } catch (err: unknown) {
+                        console.error('Failed to complete with AI:', err);
+                        const e = err as { response?: { data?: { message?: string } }; message?: string };
+                        const message = e?.response?.data?.message || e?.message || 'Unknown error';
+                        alert(`Failed to complete with AI: ${message}`);
+                      } finally {
+                        setIsAiProcessing(false);
+                      }
+                    }}
+                    disabled={isAiProcessing || uploading}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                  >
+                    {isAiProcessing ? 'Processing...' : 'Complete with AI'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!description.trim()) {
+                        alert('Please write something first!');
+                        return;
+                      }
+                      setIsAiProcessing(true);
+                      try {
+                        const improved = await geminiService.improvePost(description);
+                        setDescription(improved);
+                      } catch (err: unknown) {
+                        console.error('Failed to improve with AI:', err);
+                        const e = err as { response?: { data?: { message?: string } }; message?: string };
+                        const message = e?.response?.data?.message || e?.message || 'Unknown error';
+                        alert(`Failed to improve with AI: ${message}`);
+                      } finally {
+                        setIsAiProcessing(false);
+                      }
+                    }}
+                    disabled={isAiProcessing || uploading}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                  >
+                    {isAiProcessing ? 'Processing...' : 'Improve with AI'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Submit Button */}
