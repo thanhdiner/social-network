@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Image as ImageIcon, X, Video } from 'lucide-react'
+import { Image as ImageIcon, X, Video, Sparkles, Wand2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import postService from '@/services/postService'
 import uploadService from '@/services/uploadService'
+import geminiService from '@/services/geminiService'
 import { Avatar } from './Avatar'
 
 interface CreatePostCardProps {
@@ -18,6 +19,7 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -71,6 +73,46 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
     }
     setSelectedVideo(null)
     setVideoPreviewUrl(null)
+  }
+
+  const handleCompleteWithAI = async () => {
+    if (!content.trim()) {
+      alert('Please write something first!')
+      return
+    }
+
+    setIsAiProcessing(true)
+    try {
+      const completedText = await geminiService.completePost(content)
+      setContent(completedText)
+    } catch (error: unknown) {
+      console.error('Failed to complete with AI:', error)
+      const err = error as { response?: { data?: { message?: string } }; message?: string }
+      const errorMsg = err?.response?.data?.message || err?.message || 'Unknown error'
+      alert(`Failed to complete with AI: ${errorMsg}`)
+    } finally {
+      setIsAiProcessing(false)
+    }
+  }
+
+  const handleImproveWithAI = async () => {
+    if (!content.trim()) {
+      alert('Please write something first!')
+      return
+    }
+
+    setIsAiProcessing(true)
+    try {
+      const improvedText = await geminiService.improvePost(content)
+      setContent(improvedText)
+    } catch (error: unknown) {
+      console.error('Failed to improve with AI:', error)
+      const err = error as { response?: { data?: { message?: string } }; message?: string }
+      const errorMsg = err?.response?.data?.message || err?.message || 'Unknown error'
+      alert(`Failed to improve with AI: ${errorMsg}`)
+    } finally {
+      setIsAiProcessing(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -172,12 +214,37 @@ export const CreatePostCard = ({ onPostCreated }: CreatePostCardProps) => {
               </div>
 
               {/* Content Textarea */}
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={`What's on your mind, ${user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?`}
-                className="w-full min-h-[150px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none text-lg"
-              />
+              <div className="space-y-2">
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={`What's on your mind, ${user?.name?.split(' ')[user?.name?.split(' ').length - 1]}?`}
+                  className="w-full min-h-[150px] text-gray-800 placeholder-gray-400 resize-none focus:outline-none text-lg"
+                  disabled={isAiProcessing}
+                />
+                
+                {/* AI Buttons */}
+                {content.trim() && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCompleteWithAI}
+                      disabled={isAiProcessing || isSubmitting}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      {isAiProcessing ? 'Processing...' : 'Complete with AI'}
+                    </button>
+                    <button
+                      onClick={handleImproveWithAI}
+                      disabled={isAiProcessing || isSubmitting}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition cursor-pointer"
+                    >
+                      <Wand2 className="w-4 h-4" />
+                      {isAiProcessing ? 'Processing...' : 'Improve with AI'}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Image Preview with Scroll */}
               {previewUrls.length > 0 && (
