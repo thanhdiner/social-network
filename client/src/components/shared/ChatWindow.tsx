@@ -27,6 +27,7 @@ import {
   Bell,
   BellOff,
   Palette,
+  Sparkles,
   UserCog
 } from 'lucide-react'
 import RecordRTC from 'recordrtc'
@@ -39,6 +40,7 @@ import videoCallService from '../../services/videoCallService'
 import { EmojiPicker } from './EmojiPicker'
 import { ImageViewer } from './ImageViewer'
 import uploadService from '../../services/uploadService'
+import geminiService from '../../services/geminiService'
 import type { Message, User } from '../../types'
 import { Avatar } from './Avatar'
 import { saveMessagesCache, clearMessagesCache, clearConversationsCache } from '../../utils/chatCache'
@@ -358,6 +360,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
   const [showScrollToLatest, setShowScrollToLatest] = useState(false)
   const atBottomRef = useRef(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const [isBlocked, setIsBlocked] = useState(false)
   const [hasBlocked, setHasBlocked] = useState(false) // User đã block mình
@@ -1174,6 +1177,47 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
     }
   }
 
+  // Composer AI helpers: populate composer with AI-completed or improved text
+  const handleCompleteComposerWithAI = async () => {
+    if (!newMessage.trim()) {
+      alert('Please write something first!')
+      return
+    }
+    setIsAiProcessing(true)
+    try {
+      const completed = await geminiService.completePost(newMessage)
+      setNewMessage(completed)
+      inputRef.current?.focus()
+    } catch (err) {
+      console.error('Failed to complete composer with AI:', err)
+      const e = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+      alert(`Failed to complete with AI: ${msg}`)
+    } finally {
+      setIsAiProcessing(false)
+    }
+  }
+
+  const handleImproveComposerWithAI = async () => {
+    if (!newMessage.trim()) {
+      alert('Please write something first!')
+      return
+    }
+    setIsAiProcessing(true)
+    try {
+      const improved = await geminiService.improvePost(newMessage)
+      setNewMessage(improved)
+      inputRef.current?.focus()
+    } catch (err) {
+      console.error('Failed to improve composer with AI:', err)
+      const e = err as { response?: { data?: { message?: string } }; message?: string }
+      const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+      alert(`Failed to improve with AI: ${msg}`)
+    } finally {
+      setIsAiProcessing(false)
+    }
+  }
+
   const handleSendLike = async () => {
     // quick reaction: send the currently selected emoji as a standalone message
     if (uploading) return
@@ -1349,7 +1393,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
 
   return (
     <div 
-      className="w-80 h-[420px] bg-white rounded-t-lg shadow-2xl border border-gray-200 flex flex-col overflow-visible"
+      className="w-80 h-[420px] bg-white rounded-t-lg shadow-2xl border border-gray-200 flex flex-col overflow-visible relative"
       style={themeStyleVars}
     >
       {/* Header */}
@@ -1647,7 +1691,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                         )}
                         {message.unsent ? (
                           <p className={`text-sm italic ${isOwn ? 'text-white/90' : 'text-gray-600'}`}>Message unsent</p>
-                        ) : (
+                          ) : (
                           <>
                             {/* Reply preview */}
                             {message.replyTo && (
@@ -1832,6 +1876,7 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                               )}
                           </>
                         )}
+                        {/* per-message AI actions removed; composer-level AI remains */}
                       </div>
 
                       {/* Reactions display */}
@@ -2416,8 +2461,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                     )}
                   </button>
 
-                  <div className={`flex-1 rounded-full px-4 py-2 flex items-center bg-gray-100 min-w-0`}>
-                    <textarea
+          <div className={`flex-1 rounded-full px-3 py-1 flex items-center bg-gray-100 min-w-0`}>
+            <textarea
                       ref={inputRef}
                       value={newMessage}
                       onChange={e => {
@@ -2444,8 +2489,8 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                       onCompositionEnd={() => { composingRef.current = false }}
                       placeholder="Aa"
                       rows={1}
-                      className="flex-1 bg-transparent resize-none outline-none text-sm max-h-20"
-                      style={{ minHeight: '20px' }}
+                      className="flex-1 bg-transparent resize-none outline-none text-sm max-h-20 py-0 leading-5"
+                      style={{ minHeight: '20px', lineHeight: '1.2' }}
                     />
                     <button
                       data-emoji-trigger
@@ -2466,7 +2511,31 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                     >
                       <Smile className="w-5 h-5" />
                     </button>
+                    {/* Composer AI buttons (centered above send) */}
+                    {newMessage.trim() && (
+                      <div className="absolute left-1/2 transform -translate-x-1/2 -top-8 z-30 flex items-center gap-2 shadow-sm bg-white/95 backdrop-blur-sm rounded-full px-1 py-0.5">
+                        <button
+                          type="button"
+                          onClick={handleCompleteComposerWithAI}
+                          disabled={isAiProcessing || uploading}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
+                        >
+                          <Sparkles className="w-3 h-3 text-orange-500" />
+                          {isAiProcessing ? 'Processing...' : 'Complete with AI'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleImproveComposerWithAI}
+                          disabled={isAiProcessing || uploading}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
+                        >
+                          <Sparkles className="w-3 h-3 text-orange-500" />
+                          {isAiProcessing ? 'Processing...' : 'Improve with AI'}
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  {/* placeholder removed - AI buttons rendered absolutely above send */}
                   {(!newMessage.trim() && selectedImages.length === 0 && !selectedVideo && !audioBlob && selectedFiles.length === 0) ? (
                     // Show like icon when input is empty
                     <button
