@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { Send, Image, X } from 'lucide-react'
+import { Send, Image, X, Sparkles, Wand2 } from 'lucide-react'
+import geminiService from '@/services/geminiService'
 import { useAuth } from '@/contexts/AuthContext'
 import { commentService } from '@/services/commentService'
 import uploadService from '@/services/uploadService'
@@ -16,6 +17,7 @@ export const CommentForm = ({ postId, onCommentAdded }: CommentFormProps) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,14 +124,64 @@ export const CommentForm = ({ postId, onCommentAdded }: CommentFormProps) => {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading || isSubmitting}
+            disabled={isUploading || isSubmitting || isAiProcessing}
             className="text-gray-600 hover:text-orange-600 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer transition"
+            title="Attach image"
           >
             <Image className="w-5 h-5" />
           </button>
+
+          {/* Small AI buttons for comments (icon-only to save space) */}
+          <button
+            type="button"
+            onClick={async () => {
+              if (!content.trim()) return
+              setIsAiProcessing(true)
+              try {
+                const completed = await geminiService.completePost(content)
+                setContent(completed)
+              } catch (err) {
+                console.error('Failed to complete comment with AI:', err)
+                const e = err as { response?: { data?: { message?: string } }; message?: string }
+                const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                alert(`Failed to complete with AI: ${msg}`)
+              } finally {
+                setIsAiProcessing(false)
+              }
+            }}
+            disabled={isAiProcessing || isSubmitting}
+            className="text-orange-600 hover:text-orange-700 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer transition p-1 rounded-full"
+            title="Complete with AI"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              if (!content.trim()) return
+              setIsAiProcessing(true)
+              try {
+                const improved = await geminiService.improvePost(content)
+                setContent(improved)
+              } catch (err) {
+                console.error('Failed to improve comment with AI:', err)
+                const e = err as { response?: { data?: { message?: string } }; message?: string }
+                const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                alert(`Failed to improve with AI: ${msg}`)
+              } finally {
+                setIsAiProcessing(false)
+              }
+            }}
+            disabled={isAiProcessing || isSubmitting}
+            className="text-orange-600 hover:text-orange-700 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer transition p-1 rounded-full"
+            title="Improve with AI"
+          >
+            <Wand2 className="w-4 h-4" />
+          </button>
           <button
             type="submit"
-            disabled={(!content.trim() && !imageUrl) || isSubmitting}
+            disabled={(!content.trim() && !imageUrl) || isSubmitting || isAiProcessing}
             className="text-orange-600 hover:text-orange-700 disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer transition"
           >
             <Send className="w-5 h-5" />

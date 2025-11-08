@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useRef, useCallback } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle, Image as ImageIcon } from 'lucide-react'
+import { MoreHorizontal, Trash2, Pencil, X, Check, MessageCircle, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { commentService } from '@/services/commentService'
 import type { Comment, ReactionType } from '@/types'
@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Avatar } from './Avatar'
 import { ReactionPicker } from './ReactionPicker'
 import uploadService from '@/services/uploadService'
+import geminiService from '@/services/geminiService'
 
 interface CommentListProps {
   postId: string
@@ -33,10 +34,48 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   const [replyImage, setReplyImage] = useState<File | null>(null)
   const [replyImagePreview, setReplyImagePreview] = useState<string | null>(null)
   const [isUploadingReplyImage, setIsUploadingReplyImage] = useState(false)
+  const [isAiProcessing, setIsAiProcessing] = useState(false)
   const [commentLikes, setCommentLikes] = useState<Record<string, { liked: boolean; type: ReactionType | null; count: number }>>({})
   const menuRef = useRef<HTMLDivElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
   const replyImageInputRef = useRef<HTMLInputElement>(null)
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
+
+  const loadComments = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await commentService.getCommentsByPostId(postId, 1, limit)
+      setComments(response.comments)
+      setPage(1)
+      setTotal(response.total)
+      setHasMore(response.comments.length < response.total)
+
+      // Load like information for comments and replies
+      const allCommentIds = response.comments.flatMap(c => [c.id, ...(c.replies?.map(r => r.id) || [])])
+  const likesData: Record<string, { liked: boolean; type: ReactionType | null; count: number }> = {}
+
+      await Promise.all(
+        allCommentIds.map(async (commentId) => {
+          try {
+            const likeInfo = await commentService.getCommentLikes(commentId)
+            likesData[commentId] = {
+              liked: !!likeInfo.userLike,
+              type: likeInfo.userLike,
+              count: likeInfo.likes.reduce((sum, l) => sum + l.count, 0)
+            }
+          } catch (error) {
+            console.error(`Failed to load likes for comment ${commentId}:`, error)
+          }
+        })
+      )
+
+      setCommentLikes(likesData)
+    } catch (error) {
+      console.error('Failed to load comments:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [postId, limit])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -63,44 +102,6 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
       }, 100)
     }
   }, [replyingTo])
-
-  const loadComments = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const response = await commentService.getCommentsByPostId(postId, 1, limit)
-      setComments(response.comments)
-      setTotal(response.total)
-      setPage(1)
-      setHasMore(response.comments.length < response.total)
-      
-      // Load like information for all comments and replies
-      const allCommentIds = response.comments.flatMap(c => [c.id, ...(c.replies?.map(r => r.id) || [])])
-      const likesData: Record<string, { liked: boolean; type: ReactionType | null; count: number }> = {}
-      
-      await Promise.all(
-        allCommentIds.map(async (commentId) => {
-          try {
-            const likeInfo = await commentService.getCommentLikes(commentId)
-            likesData[commentId] = {
-              liked: !!likeInfo.userLike,
-              type: likeInfo.userLike,
-              count: likeInfo.likes.reduce((sum, l) => sum + l.count, 0)
-            }
-          } catch (error) {
-            console.error(`Failed to load likes for comment ${commentId}:`, error)
-          }
-        })
-      )
-      
-      setCommentLikes(likesData)
-    } catch (error) {
-      console.error('Failed to load comments:', error)
-      setComments([])
-      setTotal(0)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [postId, limit])
 
   const loadMoreComments = async () => {
     setIsLoadingMore(true)
@@ -143,26 +144,26 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   }, [postId, refresh, loadComments])
 
   const handleDelete = async (commentId: string, isReply = false) => {
-    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a bÃ¬nh luáº­n nÃ y?')) return
+    if (!confirm('Are you sure you want to delete this comment?')) return
 
     try {
       await commentService.deleteComment(commentId)
       
       if (isReply) {
-        // XÃ³a reply khá»i comment cha
+          // Remove reply from parent comment
         setComments(prev => prev.map(c => ({
           ...c,
           replies: c.replies?.filter(r => r.id !== commentId)
         })))
       } else {
-        // XÃ³a comment
+          // Remove comment
         setComments(prev => prev.filter(c => c.id !== commentId))
       }
       
       setMenuOpen(null)
     } catch (error) {
       console.error('Failed to delete comment:', error)
-      alert('KhÃ´ng thá»ƒ xÃ³a bÃ¬nh luáº­n. Vui lÃ²ng thá»­ láº¡i.')
+  alert('Unable to delete comment. Please try again.')
     }
   }
 
@@ -239,7 +240,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
         imageUrl = await uploadService.uploadImage(replyImage)
       }
 
-      // Náº¿u reply to reply, thÃªm @tag vÃ o Ä‘áº§u content
+      // If replying to a reply, prepend an @tag to the content
       const content = replyingToUser 
         ? `@${replyingToUser.name} ${replyContent.trim()}`
         : replyContent.trim()
@@ -375,13 +376,13 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
               >
                 <MessageCircle className="w-3 h-3" />
-                Pháº£n há»“i
+                Reply
               </button>
 
               {/* Like count */}
               {commentLikes[comment.id]?.count > 0 && (
                 <span className="text-gray-600">
-                  {commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'lÆ°á»£t thÃ­ch' : 'lÆ°á»£t thÃ­ch'}
+                  {commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'like' : 'likes'}
                 </span>
               )}
             </div>
@@ -390,7 +391,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
             {replyingTo === comment.id && (
               <div className="mt-2 ml-3">
                 <div className="flex items-center gap-2 mb-2 px-3">
-                  <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
+                  <span className="text-xs text-gray-500">Replying</span>
                   <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                   <button
                     onClick={() => {
@@ -429,11 +430,11 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                     )}
                     <div className="flex gap-2">
                       <input
-                        ref={replyingTo === comment.id ? replyInputRef : null}
+                        ref={replyInputRef}
                         type="text"
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
+                        placeholder={`Reply to ${replyingToUser?.name}...`}
                         className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -451,16 +452,63 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                       <button
                         onClick={() => replyImageInputRef.current?.click()}
                         className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                        title="ThÃªm áº£nh"
+                        title="Add image"
                       >
                         <ImageIcon className="w-5 h-5" />
+                      </button>
+                      {/* AI buttons for reply (icon-only) */}
+                      <button
+                        onClick={async () => {
+                          if (!replyContent.trim()) return
+                          setIsAiProcessing(true)
+                          try {
+                            const completed = await geminiService.completePost(replyContent)
+                            setReplyContent(completed)
+                          } catch (err) {
+                            console.error('Failed to complete reply with AI:', err)
+                            const e = err as { response?: { data?: { message?: string } }; message?: string }
+                            const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                            alert(`Failed to complete with AI: ${msg}`)
+                          } finally {
+                            setIsAiProcessing(false)
+                          }
+                        }}
+                        disabled={isAiProcessing || isUploadingReplyImage}
+                        aria-disabled={isAiProcessing || isUploadingReplyImage}
+                        className="p-2 text-orange-600 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition cursor-pointer"
+                        title={isAiProcessing ? 'Processing...' : 'Complete with AI'}
+                      >
+                        <Sparkles className={`w-4 h-4 ${isAiProcessing ? 'text-gray-400' : 'text-orange-600'}`} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!replyContent.trim()) return
+                          setIsAiProcessing(true)
+                          try {
+                            const improved = await geminiService.improvePost(replyContent)
+                            setReplyContent(improved)
+                          } catch (err) {
+                            console.error('Failed to improve reply with AI:', err)
+                            const e = err as { response?: { data?: { message?: string } }; message?: string }
+                            const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                            alert(`Failed to improve with AI: ${msg}`)
+                          } finally {
+                            setIsAiProcessing(false)
+                          }
+                        }}
+                        disabled={isAiProcessing || isUploadingReplyImage}
+                        aria-disabled={isAiProcessing || isUploadingReplyImage}
+                        className="p-2 text-orange-600 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition cursor-pointer"
+                        title={isAiProcessing ? 'Processing...' : 'Improve with AI'}
+                      >
+                        <Wand2 className={`w-4 h-4 ${isAiProcessing ? 'text-gray-400' : 'text-orange-600'}`} />
                       </button>
                       <button
                         onClick={() => handleReplySubmit(comment.id)}
                         disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                         className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       >
-                        {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
+                        {isUploadingReplyImage ? 'Sending...' : 'Send'}
                       </button>
                     </div>
                   </div>
@@ -471,7 +519,23 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
             {/* Nested replies */}
             {comment.replies && comment.replies.length > 0 && (
               <div className="mt-2 ml-8 space-y-2">
-                {comment.replies.map((reply) => (
+                {(() => {
+                  const total = comment.replies?.length || 0
+                  const isExpanded = !!expandedReplies[comment.id]
+                  const visible = isExpanded ? comment.replies : comment.replies?.slice(Math.max(0, total - 2)) || []
+
+                  return (
+                    <>
+                      {total > visible.length && (
+                        <button
+                          onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: true }))}
+                          className="text-sm text-gray-500 hover:underline ml-8"
+                        >
+                          View previous replies ({total - visible.length})
+                        </button>
+                      )}
+
+                      {visible.map((reply) => (
                   <div key={reply.id} className="flex gap-2 group">
                     <Avatar 
                       src={reply.user?.avatar || undefined}
@@ -487,30 +551,53 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           {reply.content.startsWith('@') ? (
                             <>
                               {(() => {
-                                const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s);
-                                if (match) {
-                                  const [, taggedName, remainingContent] = match;
-                                  const taggedUser = comment.user?.name === taggedName ? comment.user : 
-                                    comment.replies?.find(r => r.user?.name === taggedName)?.user;
-                                  return (
-                                    <>
-                                      {taggedUser ? (
-                                        <Link 
-                                          to={`/profile/${taggedUser.username}`}
-                                          className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
-                                        >
-                                          @{taggedName}
-                                        </Link>
-                                      ) : (
-                                        <span className="font-semibold text-orange-500 mr-1">
-                                          @{taggedName}
-                                        </span>
-                                      )}
-                                      {remainingContent}
-                                    </>
-                                  );
+                                // Parse mention without regex: prefer matching known user names (supports multi-word names)
+                                if (!reply.content.startsWith('@')) return reply.content
+
+                                const candidates = [comment.user?.name, ...(comment.replies?.map(r => r.user?.name) || [])]
+                                  .filter(Boolean) as string[]
+
+                                candidates.sort((a, b) => b.length - a.length)
+
+                                let taggedName: string | null = null
+                                let remainingContent = ''
+                                let taggedUser: typeof comment.user | undefined = undefined
+
+                                for (const name of candidates) {
+                                  if (reply.content.startsWith(`@${name}`)) {
+                                    taggedName = name
+                                    taggedUser = name === comment.user?.name ? comment.user : comment.replies?.find(r => r.user?.name === name)?.user
+                                    remainingContent = reply.content.slice((`@${name}`).length).trimStart()
+                                    break
+                                  }
                                 }
-                                return reply.content;
+
+                                if (!taggedName) {
+                                  const firstSpace = reply.content.indexOf(' ')
+                                  if (firstSpace === -1) {
+                                    taggedName = reply.content.slice(1)
+                                    remainingContent = ''
+                                  } else {
+                                    taggedName = reply.content.slice(1, firstSpace)
+                                    remainingContent = reply.content.slice(firstSpace + 1)
+                                  }
+                                }
+
+                                return (
+                                  <>
+                                    {taggedUser ? (
+                                      <Link 
+                                        to={`/profile/${taggedUser.username}`}
+                                        className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
+                                      >
+                                        @{taggedName}
+                                      </Link>
+                                    ) : (
+                                      <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
+                                    )}
+                                    <span className="text-sm text-gray-800">{remainingContent}</span>
+                                  </>
+                                )
                               })()}
                             </>
                           ) : (
@@ -550,7 +637,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          Pháº£n há»“i
+                          Reply
                         </button>
 
                         {/* Delete button for reply - only show if current user is the author */}
@@ -567,19 +654,23 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         {/* Like count for reply */}
                         {commentLikes[reply.id]?.count > 0 && (
                           <span className="text-gray-600">
-                            {commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'lÆ°á»£t thÃ­ch' : 'lÆ°á»£t thÃ­ch'}
+                            {commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'like' : 'likes'}
                           </span>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
+
+                    </>
+                  )
+                })()}
                 
                 {/* Reply form for replying to a reply */}
                 {replyingTo?.startsWith('reply-') && (
                   <div className="mt-2">
                     <div className="flex items-center gap-2 mb-2 px-3">
-                      <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
+                      <span className="text-xs text-gray-500">Replying</span>
                       <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                       <button
                         onClick={() => {
@@ -622,7 +713,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             type="text"
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
-                            placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
+                            placeholder={`Reply to ${replyingToUser?.name}...`}
                             className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                             onKeyPress={(e) => {
                               if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -640,17 +731,64 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           <button
                             onClick={() => replyImageInputRef.current?.click()}
                             className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                            title="ThÃªm áº£nh"
+                            title="Add image"
                           >
                             <ImageIcon className="w-5 h-5" />
                           </button>
+                          {/* AI buttons for reply-to-reply (icon-only) */}
                           <button
-                            onClick={() => handleReplySubmit(comment.id)}
-                            disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
-                            className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            onClick={async () => {
+                              if (!replyContent.trim()) return
+                              setIsAiProcessing(true)
+                              try {
+                                const completed = await geminiService.completePost(replyContent)
+                                setReplyContent(completed)
+                              } catch (err) {
+                                console.error('Failed to complete reply with AI:', err)
+                                const e = err as { response?: { data?: { message?: string } }; message?: string }
+                                const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                                alert(`Failed to complete with AI: ${msg}`)
+                              } finally {
+                                setIsAiProcessing(false)
+                              }
+                            }}
+                            disabled={isAiProcessing || isUploadingReplyImage}
+                            aria-disabled={isAiProcessing || isUploadingReplyImage}
+                            className="p-2 text-orange-600 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition cursor-pointer"
+                            title={isAiProcessing ? 'Processing...' : 'Complete with AI'}
                           >
-                            {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
+                            <Sparkles className={`w-4 h-4 ${isAiProcessing ? 'text-gray-400' : 'text-orange-600'}`} />
                           </button>
+                          <button
+                            onClick={async () => {
+                              if (!replyContent.trim()) return
+                              setIsAiProcessing(true)
+                              try {
+                                const improved = await geminiService.improvePost(replyContent)
+                                setReplyContent(improved)
+                              } catch (err) {
+                                console.error('Failed to improve reply with AI:', err)
+                                const e = err as { response?: { data?: { message?: string } }; message?: string }
+                                const msg = e?.response?.data?.message || e?.message || 'Unknown error'
+                                alert(`Failed to improve with AI: ${msg}`)
+                              } finally {
+                                setIsAiProcessing(false)
+                              }
+                            }}
+                            disabled={isAiProcessing || isUploadingReplyImage}
+                            aria-disabled={isAiProcessing || isUploadingReplyImage}
+                            className="p-2 text-orange-600 hover:bg-orange-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition cursor-pointer"
+                            title={isAiProcessing ? 'Processing...' : 'Improve with AI'}
+                          >
+                            <Wand2 className={`w-4 h-4 ${isAiProcessing ? 'text-gray-400' : 'text-orange-600'}`} />
+                          </button>
+                          <button
+                          onClick={() => handleReplySubmit(comment.id)}
+                          disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
+                          className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          {isUploadingReplyImage ? 'Sending...' : 'Send'}
+                        </button>
                         </div>
                       </div>
                     </div>

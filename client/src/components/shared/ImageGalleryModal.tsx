@@ -24,10 +24,9 @@ interface ImageGalleryModalProps {
   postId: string
   post: Post
   onClose: () => void
-  onShare?: (post: Post) => void
 }
 
-export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onClose, onShare }: ImageGalleryModalProps) => {
+export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onClose }: ImageGalleryModalProps) => {
   const { user: currentUser } = useAuth()
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [comments, setComments] = useState<Comment[]>([])
@@ -52,6 +51,8 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
   const replyInputRef = useRef<HTMLInputElement>(null)
   const replyImageInputRef = useRef<HTMLInputElement>(null)
 
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
+
   // Track like state for each image separately
   const [imageLikes, setImageLikes] = useState<Record<number, ImageLikeState>>({})
 
@@ -65,28 +66,15 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
     count: 0
   }
 
-  const handlePrevious = useCallback(() => {
-    setCurrentIndex(prev => (prev > 0 ? prev - 1 : images.length - 1))
-  }, [images.length])
-
-  const handleNext = useCallback(() => {
-    setCurrentIndex(prev => (prev < images.length - 1 ? prev + 1 : 0))
-  }, [images.length])
-
-  // Update URL when image changes - always update to show shareable link
-  useEffect(() => {
-    const newUrl = `/post/${postId}/photo/${currentIndex + 1}`
-    window.history.replaceState(null, '', newUrl)
-  }, [currentIndex, postId])
-
-  // Load likes for all images once on mount
+  // Load likes for all images in the post (so we can display per-image like counts/state)
   useEffect(() => {
     const loadImageLikes = async () => {
       try {
-        const likes = await postService.getImageLikes(postId, images.length)
-        setImageLikes(likes)
-      } catch (error) {
-        console.error('Error loading image likes:', error)
+        const data = await postService.getImageLikes(postId, images.length)
+        // API returns a map keyed by image index
+        setImageLikes(data)
+      } catch (err) {
+        console.error('Failed to load image likes:', err)
       }
     }
 
@@ -140,34 +128,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
     }
   }, [replyingTo])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // KhÃ´ng xá»­ lÃ½ keyboard navigation khi Ä‘ang focus vÃ o input/textarea
-      const target = e.target as HTMLElement
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        // Chá»‰ xá»­ lÃ½ ESC khi Ä‘ang á»Ÿ input
-        if (e.key === 'Escape') {
-          target.blur() // Blur input trÆ°á»›c
-          onClose()
-        }
-        return
-      }
-
-      // Xá»­ lÃ½ keyboard navigation khi KHÃ”NG focus vÃ o input
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        handlePrevious()
-      }
-      if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        handleNext()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, handlePrevious, handleNext])
+  // keyboard navigation useEffect will be registered after handlers are defined
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -238,7 +199,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
   }
 
   const handleDeleteComment = async (commentId: string, isReply = false) => {
-    if (!confirm('Báº¡n cÃ³ cháº¯c muá»‘n xÃ³a bÃ¬nh luáº­n nÃ y?')) return
+    if (!confirm('Are you sure you want to delete this comment?')) return
 
     try {
       await commentService.deleteComment(commentId)
@@ -257,7 +218,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
       }
     } catch (error) {
       console.error('Error deleting comment:', error)
-      alert('KhÃ´ng thá»ƒ xÃ³a bÃ¬nh luáº­n. Vui lÃ²ng thá»­ láº¡i.')
+  alert('Unable to delete comment. Please try again.')
     }
   }
 
@@ -376,6 +337,43 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
   const handleShareClick = () => {
     setSharingPost(true)
   }
+
+  const handlePrevious = useCallback(() => {
+    setCurrentIndex(i => (i - 1 + images.length) % images.length)
+  }, [images.length])
+
+  const handleNext = useCallback(() => {
+    setCurrentIndex(i => (i + 1) % images.length)
+  }, [images.length])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle keyboard navigation when focus is on input/textarea
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Only handle Escape when focus inside input
+        if (e.key === 'Escape') {
+          target.blur()
+          onClose()
+        }
+        return
+      }
+
+      // Handle keyboard navigation when NOT focusing input
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handlePrevious()
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleNext()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose, handlePrevious, handleNext])
 
   const handleLikeClick = async (type: ReactionType = 'like') => {
     try {
@@ -514,11 +512,11 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                   )}
                 </div>
                 <button onClick={() => setShowLikeList(true)} className="hover:underline cursor-pointer">
-                  {currentImageLike.count} {currentImageLike.count === 1 ? 'ngÆ°á»i' : 'ngÆ°á»i'}
+                  {currentImageLike.count} {currentImageLike.count === 1 ? 'person' : 'people'}
                 </button>
                 {comments.length > 0 && (
                   <span className="ml-auto">
-                    {comments.length} {comments.length === 1 ? 'bÃ¬nh luáº­n' : 'bÃ¬nh luáº­n'}
+                    {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
                   </span>
                 )}
               </div>
@@ -617,7 +615,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          Pháº£n há»“i
+                          Reply
                         </button>
 
                         {/* Delete button - only show if current user is the author */}
@@ -632,7 +630,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                         )}
 
                         {commentLikes[comment.id]?.count > 0 && (
-                          <span className="text-gray-600">{commentLikes[comment.id]?.count} lÆ°á»£t thÃ­ch</span>
+                          <span className="text-gray-600">{commentLikes[comment.id]?.count} {commentLikes[comment.id]?.count === 1 ? 'like' : 'likes'}</span>
                         )}
                       </div>
 
@@ -640,7 +638,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                       {replyingTo === comment.id && (
                         <div className="mt-2 ml-3">
                           <div className="flex items-center gap-2 mb-2 px-3">
-                            <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
+                            <span className="text-xs text-gray-500">Replying</span>
                             <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                             <button
                               onClick={() => {
@@ -674,7 +672,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   type="text"
                                   value={replyContent}
                                   onChange={e => setReplyContent(e.target.value)}
-                                  placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
+                                  placeholder={`Reply to ${replyingToUser?.name}...`}
                                   className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                                   onKeyPress={e => {
                                     if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -692,7 +690,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                 <button
                                   onClick={() => replyImageInputRef.current?.click()}
                                   className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                                  title="ThÃªm áº£nh"
+                                  title="Add image"
                                 >
                                   <Image className="w-5 h-5" />
                                 </button>
@@ -701,7 +699,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                                   className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
-                                  {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
+                  {isUploadingReplyImage ? 'Sending...' : 'Send'}
                                 </button>
                               </div>
                             </div>
@@ -712,7 +710,23 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                       {/* Nested replies */}
                       {comment.replies && comment.replies.length > 0 && (
                         <div className="mt-2 ml-8 space-y-2">
-                          {comment.replies.map(reply => (
+                          {(() => {
+                            const total = comment.replies?.length || 0
+                            const isExpanded = !!expandedReplies[comment.id]
+                            const visible = isExpanded ? comment.replies : comment.replies?.slice(Math.max(0, total - 2)) || []
+
+                            return (
+                              <>
+                                {total > visible.length && (
+                                  <button
+                                    onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: true }))}
+                                    className="text-sm text-gray-500 hover:underline ml-8"
+                                  >
+                                    View previous replies ({total - visible.length})
+                                  </button>
+                                )}
+
+                                {visible.map(reply => (
                             <div key={reply.id} className="flex gap-2 group">
                               <Link to={`/profile/${reply.user?.username}`} className="cursor-pointer">
                                 <Avatar src={reply.user?.avatar} name={reply.user?.name || 'User'} size="sm" />
@@ -726,38 +740,60 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     {reply.user?.name || 'Unknown User'}
                                   </Link>
                                   <p className="text-sm text-gray-800 wrap-break-word">
-                                    {reply.content.startsWith('@') ? (
-                                      <>
-                                        {(() => {
-                                          const match = reply.content.match(/^@([^\s]+(?:\s+[^\s]+)*)\s+(.*)$/s)
-                                          if (match) {
-                                            const [, taggedName, remainingContent] = match
-                                            const taggedUser =
-                                              comment.user?.name === taggedName
-                                                ? comment.user
-                                                : comment.replies?.find(r => r.user?.name === taggedName)?.user
-                                            return (
-                                              <>
-                                                {taggedUser ? (
-                                                  <Link
-                                                    to={`/profile/${taggedUser.username}`}
-                                                    className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
-                                                  >
-                                                    @{taggedName}
-                                                  </Link>
-                                                ) : (
-                                                  <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
-                                                )}
-                                                {remainingContent}
-                                              </>
-                                            )
+                                    {reply.content.startsWith('@')
+                                      ? (() => {
+                                          // Parse mention without regex: prefer matching known user names (supports multi-word names)
+                                          const content = reply.content || ''
+                                          if (!content.startsWith('@')) return content
+
+                                          const candidates = [comment.user?.name, ...(comment.replies?.map(r => r.user?.name) || [])]
+                                            .filter(Boolean) as string[]
+
+                                          candidates.sort((a, b) => b.length - a.length)
+
+                                          let taggedName: string | null = null
+                                          let remainingContent = ''
+                                          let taggedUser: typeof comment.user | undefined = undefined
+
+                                          for (const name of candidates) {
+                                            if (content.startsWith(`@${name}`)) {
+                                              taggedName = name
+                                              taggedUser = name === comment.user?.name ? comment.user : comment.replies?.find(r => r.user?.name === name)?.user
+                                              remainingContent = content.slice((`@${name}`).length).trimStart()
+                                              break
+                                            }
                                           }
-                                          return reply.content
-                                        })()}
-                                      </>
-                                    ) : (
-                                      reply.content
-                                    )}
+
+                                          if (!taggedName) {
+                                            const firstSpace = content.indexOf(' ')
+                                            if (firstSpace === -1) {
+                                              taggedName = content.slice(1)
+                                              remainingContent = ''
+                                            } else {
+                                              taggedName = content.slice(1, firstSpace)
+                                              remainingContent = content.slice(firstSpace + 1)
+                                            }
+                                          }
+
+                                          return (
+                                            <>
+                                              {taggedUser ? (
+                                                <Link
+                                                  to={`/profile/${taggedUser.username}`}
+                                                  className="font-semibold text-orange-500 hover:underline cursor-pointer mr-1"
+                                                >
+                                                  @{taggedName}
+                                                </Link>
+                                              ) : (
+                                                <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
+                                              )}
+                                              <span className="text-sm text-gray-800">{remainingContent}</span>
+                                            </>
+                                          )
+                                        })()
+                                      : (
+                                        reply.content
+                                      )}
                                   </p>
                                   {reply.imageUrl && (
                                     <img
@@ -791,7 +827,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                                   >
                                     <MessageCircle className="w-3 h-3" />
-                                    Pháº£n há»“i
+                                    Reply
                                   </button>
 
                                   {/* Delete button for reply - only show if current user is the author */}
@@ -806,18 +842,21 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                   )}
 
                                   {commentLikes[reply.id]?.count > 0 && (
-                                    <span className="text-gray-600">{commentLikes[reply.id]?.count} lÆ°á»£t thÃ­ch</span>
+                                    <span className="text-gray-600">{commentLikes[reply.id]?.count} {commentLikes[reply.id]?.count === 1 ? 'like' : 'likes'}</span>
                                   )}
                                 </div>
                               </div>
                             </div>
-                          ))}
+                            ))}
+                                </>
+                              )
+                            })()}
 
                           {/* Reply to reply form */}
                           {replyingTo?.startsWith('reply-') && (
                             <div className="mt-2">
                               <div className="flex items-center gap-2 mb-2 px-3">
-                                <span className="text-xs text-gray-500">Äang pháº£n há»“i</span>
+                                <span className="text-xs text-gray-500">Replying</span>
                                 <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
                                 <button
                                   onClick={() => {
@@ -851,7 +890,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                       type="text"
                                       value={replyContent}
                                       onChange={e => setReplyContent(e.target.value)}
-                                      placeholder={`Pháº£n há»“i ${replyingToUser?.name}...`}
+                                      placeholder={`Reply to ${replyingToUser?.name}...`}
                                       className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                                       onKeyPress={e => {
                                         if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
@@ -869,7 +908,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                     <button
                                       onClick={() => replyImageInputRef.current?.click()}
                                       className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                                      title="ThÃªm áº£nh"
+                                      title="Add image"
                                     >
                                       <Image className="w-5 h-5" />
                                     </button>
@@ -878,7 +917,7 @@ export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onCl
                                       disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
                                       className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
-                                      {isUploadingReplyImage ? 'Äang gá»­i...' : 'Gá»­i'}
+                                      {isUploadingReplyImage ? 'Sending...' : 'Send'}
                                     </button>
                                   </div>
                                 </div>

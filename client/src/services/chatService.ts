@@ -2,35 +2,35 @@
 import type { Message, Conversation, SendMessageData, User, ConversationCustomization } from '../types';
 
 export const chatService = {
-  // Láº¥y danh sÃ¡ch conversation
+  // Get list of conversations
   async getConversations(): Promise<Conversation[]> {
     const response = await api.get('/chat/conversations');
     return response.data;
   },
 
-  // Láº¥y tin nháº¯n cá»§a 1 conversation
+  // Get messages for a conversation
   async getMessages(userId: string): Promise<Message[]> {
     const response = await api.get(`/chat/messages/${userId}`);
     return response.data;
   },
 
-  // Gá»­i tin nháº¯n
+  // Send a message
   async sendMessage(data: SendMessageData): Promise<Message> {
     const response = await api.post('/chat/messages', data);
     return response.data;
   },
 
-  // Đánh dấu đã đọc
+  // Mark messages as read
   async markAsRead(userId: string): Promise<void> {
     await api.put(`/chat/messages/${userId}/read`);
   },
 
-  // Xóa tất cả tin nhắn với một user
+  // Delete all messages with a user
   async deleteConversation(userId: string): Promise<void> {
     await api.delete(`/chat/messages/${userId}`);
   },
 
-  // Tìm kiếm user để chat
+  // Search users to chat with
   async searchUsers(query: string): Promise<User[]> {
     const response = await api.get(`/search/users?q=${query}`);
     return response.data;

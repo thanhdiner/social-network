@@ -2518,18 +2518,20 @@ export const ChatWindow = ({ user, isMinimized, onClose, onMinimize }: ChatWindo
                           type="button"
                           onClick={handleCompleteComposerWithAI}
                           disabled={isAiProcessing || uploading}
-                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
+                          aria-disabled={isAiProcessing || uploading}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
                         >
-                          <Sparkles className="w-3 h-3 text-orange-500" />
+                          <Sparkles className={`w-3 h-3 ${isAiProcessing ? 'text-gray-400' : 'text-orange-500'}`} />
                           {isAiProcessing ? 'Processing...' : 'Complete with AI'}
                         </button>
                         <button
                           type="button"
                           onClick={handleImproveComposerWithAI}
                           disabled={isAiProcessing || uploading}
-                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
+                          aria-disabled={isAiProcessing || uploading}
+                          className="flex items-center gap-1 px-3 py-1 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 rounded-full transition-shadow shadow-sm cursor-pointer whitespace-nowrap"
                         >
-                          <Sparkles className="w-3 h-3 text-orange-500" />
+                          <Sparkles className={`w-3 h-3 ${isAiProcessing ? 'text-gray-400' : 'text-orange-500'}`} />
                           {isAiProcessing ? 'Processing...' : 'Improve with AI'}
                         </button>
                       </div>
