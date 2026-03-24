@@ -3236,3 +3236,203 @@
 @media (max-width: 480px) {
   .reels-masonry { columns: 1; }
 }
+
+/* ─── Admin Posts Refresh ─────────────────────────────────────────────────── */
+.posts-page .editorial-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.posts-page .editorial-sub {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.posts-page .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #f97316;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.25);
+}
+
+.editorial-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.posts-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.posts-export-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 10px 20px rgba(234, 88, 12, 0.18);
+  cursor: pointer;
+}
+
+.posts-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.posts-kpi-card {
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  padding: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.posts-kpi-card-primary {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.posts-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(249, 115, 22, 0.12);
+  color: #ea580c;
+}
+
+.posts-kpi-icon.soft {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.posts-kpi-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.posts-kpi-label {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.posts-kpi-value {
+  margin: 6px 0 0;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.posts-kpi-chip {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #ea580c;
+  padding: 4px 9px;
+}
+
+.posts-table-section .posts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.posts-table-head {
+  background: rgba(249, 115, 22, 0.04);
+}
+
+.posts-table th {
+  text-align: left;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.posts-table td {
+  padding: 16px;
+  vertical-align: middle;
+  color: #0f172a;
+}
+
+.hover-row:hover {
+  background: #fffaf5;
+}
+
+.interaction-icon { color: #94a3b8; transition: color 0.16s; }
+.group:hover .interaction-icon { color: #f97316; }
+
+.posts-table .users-empty-row {
+  padding: 28px;
+  text-align: center;
+  color: #94a3b8;
+  background: #fffaf5;
+  font-weight: 700;
+}
+
+.floating-add-btn {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 40px rgba(234, 88, 12, 0.25);
+  z-index: 40;
+  cursor: pointer;
+  transition: transform 0.16s;
+}
+
+.floating-add-btn:active { transform: scale(0.95); }
+
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+@media (max-width: 980px) {
+  .posts-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .editorial-actions { width: 100%; justify-content: flex-end; }
+}
+
+@media (max-width: 640px) {
+  .posts-kpi-grid { grid-template-columns: 1fr; }
+  .editorial-actions { width: 100%; justify-content: flex-end; gap: 8px; }
+}
