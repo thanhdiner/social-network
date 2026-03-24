@@ -3399,6 +3399,9 @@
 }
 
 .posts-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 16px;
   border-radius: 12px;
   background: linear-gradient(135deg, #f97316, #ea580c);
@@ -3413,6 +3416,197 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 18px;
+}
+
+.posts-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px 130px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.posts-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0 12px;
+  min-height: 44px;
+  background: #ffffff;
+  color: #94a3b8;
+}
+
+.posts-search-input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+  color: #0f172a;
+  background: transparent;
+}
+
+.posts-media-select,
+.posts-search-btn {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 12px;
+}
+
+.posts-search-btn {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.posts-modal {
+  max-width: 640px;
+}
+
+.posts-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.posts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.posts-field > span {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.posts-input {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.posts-input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.posts-detail-modal {
+  max-width: 880px;
+}
+
+.posts-detail-author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.posts-detail-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.posts-detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.posts-detail-stats > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 9999px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.posts-detail-content {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  color: #334155;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.posts-detail-media-wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.posts-detail-image,
+.posts-detail-video {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  background: #0f172a;
+  max-height: 280px;
+  object-fit: cover;
+}
+
+.posts-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.posts-detail-grid h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.posts-detail-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.posts-mini-item {
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 9px 10px;
+  margin-bottom: 8px;
+}
+
+.posts-mini-item strong {
+  display: block;
+  font-size: 13px;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.posts-mini-item p {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .posts-kpi-card {
@@ -3544,11 +3738,16 @@
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 @media (max-width: 980px) {
+  .posts-toolbar { grid-template-columns: 1fr; }
   .posts-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .editorial-actions { width: 100%; justify-content: flex-end; }
+  .posts-detail-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
   .posts-kpi-grid { grid-template-columns: 1fr; }
   .editorial-actions { width: 100%; justify-content: flex-end; gap: 8px; }
+  .posts-search-btn,
+  .posts-media-select,
+  .posts-search-wrap { width: 100%; }
 }
