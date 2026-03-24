@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -358,6 +362,68 @@ export class AdminService {
     return { ...user, recentPosts };
   }
 
+  async updateUser(
+    userId: string,
+    payload: {
+      name?: string;
+      username?: string;
+      email?: string;
+      bio?: string;
+      avatar?: string;
+    },
+  ) {
+    const prismaAny = this.prisma as any;
+
+    const username = payload.username?.trim();
+    const email = payload.email?.trim().toLowerCase();
+
+    if (!username) {
+      throw new BadRequestException('Username không được để trống');
+    }
+
+    if (!email) {
+      throw new BadRequestException('Email không được để trống');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new BadRequestException('Email không hợp lệ');
+    }
+
+    try {
+      return await prismaAny.user.update({
+        where: { id: userId },
+        data: {
+          name: payload.name?.trim() || '',
+          username,
+          email,
+          bio: payload.bio?.trim() || null,
+          avatar:
+            typeof payload.avatar === 'string' ? payload.avatar.trim() || null : undefined,
+        },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          bio: true,
+          avatar: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new BadRequestException('Tên đăng nhập hoặc email đã tồn tại');
+      }
+      if (err?.code === 'P2025') {
+        throw new NotFoundException('Không tìm thấy người dùng');
+      }
+      throw err;
+    }
+  }
+
   async updateUserRole(userId: string, role: string) {
     const prismaAny = this.prisma as any;
     return prismaAny.user.update({
@@ -391,12 +457,29 @@ export class AdminService {
 
   // ─── Post Management ─────────────────────────────────────────────────────────
 
-  async getPosts(page = 1, limit = 10, search?: string) {
+  async getPosts(page = 1, limit = 10, search?: string, media?: string) {
     const prismaAny = this.prisma as any;
     const skip = (page - 1) * limit;
-    const where = search
-      ? { content: { contains: search, mode: 'insensitive' } }
-      : {};
+    const where: any = {};
+
+    if (search?.trim()) {
+      where.OR = [
+        { content: { contains: search.trim(), mode: 'insensitive' } },
+        { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
+        {
+          user: { username: { contains: search.trim(), mode: 'insensitive' } },
+        },
+      ];
+    }
+
+    if (media === 'image') {
+      where.imageUrl = { not: null };
+    } else if (media === 'video') {
+      where.videoUrl = { not: null };
+    } else if (media === 'text') {
+      where.imageUrl = null;
+      where.videoUrl = null;
+    }
 
     const [posts, total] = await Promise.all([
       prismaAny.post.findMany({
@@ -421,6 +504,195 @@ export class AdminService {
       limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async getPostDetail(postId: string) {
+    const prismaAny = this.prisma as any;
+
+    const post = await prismaAny.post.findUnique({
+      where: { id: postId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            email: true,
+            avatar: true,
+            bio: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+          },
+        },
+        comments: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        likes: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            type: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        shares: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        _count: { select: { likes: true, comments: true, shares: true } },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+
+    return post;
+  }
+
+  async createPost(payload: {
+    userId: string;
+    content?: string;
+    imageUrl?: string;
+    videoUrl?: string;
+  }) {
+    const prismaAny = this.prisma as any;
+    const userId = payload.userId?.trim();
+    const content = payload.content?.trim() || '';
+    const imageUrl = payload.imageUrl?.trim() || null;
+    const videoUrl = payload.videoUrl?.trim() || null;
+
+    if (!userId) {
+      throw new BadRequestException('Thiếu thông tin tác giả bài viết');
+    }
+
+    if (!content && !imageUrl && !videoUrl) {
+      throw new BadRequestException('Bài viết phải có nội dung hoặc media');
+    }
+
+    const user = await prismaAny.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy tác giả bài viết');
+    }
+
+    return prismaAny.post.create({
+      data: {
+        userId,
+        content,
+        imageUrl,
+        videoUrl,
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, username: true, avatar: true },
+        },
+        _count: { select: { likes: true, comments: true, shares: true } },
+      },
+    });
+  }
+
+  async updatePost(
+    postId: string,
+    payload: {
+      content?: string;
+      imageUrl?: string | null;
+      videoUrl?: string | null;
+    },
+  ) {
+    const prismaAny = this.prisma as any;
+    const content = payload.content?.trim() ?? undefined;
+
+    if (
+      payload.content === undefined &&
+      payload.imageUrl === undefined &&
+      payload.videoUrl === undefined
+    ) {
+      throw new BadRequestException('Không có dữ liệu cần cập nhật');
+    }
+
+    const nextImageUrl =
+      payload.imageUrl === undefined
+        ? undefined
+        : payload.imageUrl
+          ? payload.imageUrl.trim() || null
+          : null;
+
+    const nextVideoUrl =
+      payload.videoUrl === undefined
+        ? undefined
+        : payload.videoUrl
+          ? payload.videoUrl.trim() || null
+          : null;
+
+    if (
+      (content !== undefined ? !content : false) &&
+      !nextImageUrl &&
+      !nextVideoUrl
+    ) {
+      throw new BadRequestException('Bài viết phải có nội dung hoặc media');
+    }
+
+    try {
+      return await prismaAny.post.update({
+        where: { id: postId },
+        data: {
+          content,
+          imageUrl: nextImageUrl,
+          videoUrl: nextVideoUrl,
+        },
+        include: {
+          user: {
+            select: { id: true, name: true, username: true, avatar: true },
+          },
+          _count: { select: { likes: true, comments: true, shares: true } },
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        throw new NotFoundException('Không tìm thấy bài viết');
+      }
+      throw err;
+    }
   }
 
   async deletePost(postId: string) {

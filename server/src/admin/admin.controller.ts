@@ -100,6 +100,27 @@ export class AdminController {
     return this.adminService.getUserDetail(userId);
   }
 
+  @Put('users/:userId')
+  updateUser(
+    @Param('userId') userId: string,
+    @Body()
+    body: {
+      name?: string;
+      username?: string;
+      email?: string;
+      bio?: string;
+      avatar?: string;
+    },
+  ) {
+    return this.adminService.updateUser(userId, {
+      name: body.name,
+      username: body.username,
+      email: body.email,
+      bio: body.bio,
+      avatar: body.avatar,
+    });
+  }
+
   @Put('users/:userId/role')
   updateUserRole(
     @Param('userId') userId: string,
@@ -125,8 +146,49 @@ export class AdminController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
     @Query('search') search?: string,
+    @Query('media') media?: string,
   ) {
-    return this.adminService.getPosts(page, limit, search);
+    return this.adminService.getPosts(page, limit, search, media);
+  }
+
+  @Get('posts/:postId')
+  getPostDetail(@Param('postId') postId: string) {
+    return this.adminService.getPostDetail(postId);
+  }
+
+  @Post('posts')
+  createPost(
+    @Body()
+    body: {
+      userId: string;
+      content?: string;
+      imageUrl?: string;
+      videoUrl?: string;
+    },
+  ) {
+    return this.adminService.createPost({
+      userId: body.userId,
+      content: body.content,
+      imageUrl: body.imageUrl,
+      videoUrl: body.videoUrl,
+    });
+  }
+
+  @Put('posts/:postId')
+  updatePost(
+    @Param('postId') postId: string,
+    @Body()
+    body: {
+      content?: string;
+      imageUrl?: string | null;
+      videoUrl?: string | null;
+    },
+  ) {
+    return this.adminService.updatePost(postId, {
+      content: body.content,
+      imageUrl: body.imageUrl,
+      videoUrl: body.videoUrl,
+    });
   }
 
   @Delete('posts/:postId')

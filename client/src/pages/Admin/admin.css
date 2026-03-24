@@ -3489,6 +3489,15 @@
   max-width: 640px;
 }
 
+/* Make posts modal headers more prominent (darker + bolder) */
+.posts-modal .modal-header h3,
+.posts-detail-modal .modal-header h3 {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+
 .posts-form {
   display: flex;
   flex-direction: column;

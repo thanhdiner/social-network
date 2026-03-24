@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Search, Shield, ShieldOff, Trash2, ChevronLeft, ChevronRight, UserX, UserCheck, Eye, UserPlus, TrendingUp, BadgeCheck, Ban, Heart, MessageCircle, Check, ChevronDown } from 'lucide-react'
-import adminService, { type AdminUser } from '@/services/adminService'
+import adminService, { type AdminUser, type AdminUserDetail } from '@/services/adminService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -15,7 +15,7 @@ const AdminUsers: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('')
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [selectedUser, setSelectedUser] = useState<AdminUserDetail | null>(null)
   const [showDetail, setShowDetail] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newName, setNewName] = useState('')
@@ -25,6 +25,14 @@ const AdminUsers: React.FC = () => {
   const [newRole, setNewRole] = useState<'user' | 'admin'>('user')
   const [creatingUser, setCreatingUser] = useState(false)
   const [roleSummary, setRoleSummary] = useState({ admins: 0, users: 0 })
+  const [isEditingDetail, setIsEditingDetail] = useState(false)
+  const [isSavingDetail, setIsSavingDetail] = useState(false)
+  const [detailForm, setDetailForm] = useState({
+    name: '',
+    username: '',
+    email: '',
+    bio: '',
+  })
   const roleDropdownRef = useRef<HTMLDivElement | null>(null)
 
   const roleOptions = [
@@ -158,6 +166,13 @@ const AdminUsers: React.FC = () => {
     try {
       const data = await adminService.getUserDetail(userId)
       setSelectedUser(data)
+      setDetailForm({
+        name: data.name || '',
+        username: data.username || '',
+        email: data.email || '',
+        bio: data.bio || '',
+      })
+      setIsEditingDetail(false)
       setShowDetail(true)
     } catch {
       toast.error('Không thể tải thông tin người dùng')
@@ -165,7 +180,101 @@ const AdminUsers: React.FC = () => {
   }
 
   const closeDetailModal = () => {
+    setIsEditingDetail(false)
     setShowDetail(false)
+  }
+
+  const handleStartEditDetail = () => {
+    if (!selectedUser) return
+    setDetailForm({
+      name: selectedUser.name || '',
+      username: selectedUser.username || '',
+      email: selectedUser.email || '',
+      bio: selectedUser.bio || '',
+    })
+    setIsEditingDetail(true)
+  }
+
+  const handleCancelEditDetail = () => {
+    if (!selectedUser) {
+      setIsEditingDetail(false)
+      return
+    }
+    setDetailForm({
+      name: selectedUser.name || '',
+      username: selectedUser.username || '',
+      email: selectedUser.email || '',
+      bio: selectedUser.bio || '',
+    })
+    setIsEditingDetail(false)
+  }
+
+  const handleDetailFormChange = (field: 'name' | 'username' | 'email' | 'bio', value: string) => {
+    setDetailForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSaveDetail = async () => {
+    if (!selectedUser) return
+
+    const payload = {
+      name: detailForm.name.trim(),
+      username: detailForm.username.trim(),
+      email: detailForm.email.trim(),
+      bio: detailForm.bio.trim(),
+    }
+
+    if (!payload.username || !payload.email) {
+      toast.error('Username và email không được để trống')
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(payload.email)) {
+      toast.error('Email không hợp lệ')
+      return
+    }
+
+    setIsSavingDetail(true)
+    try {
+      const updated = await adminService.updateUser(selectedUser.id, {
+        ...payload,
+        bio: payload.bio || undefined,
+      })
+
+      setSelectedUser(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          ...updated,
+        }
+      })
+
+      setUsers(prev => prev.map(user => (
+        user.id === selectedUser.id
+          ? {
+              ...user,
+              name: updated.name,
+              username: updated.username,
+              email: updated.email,
+              avatar: updated.avatar,
+            }
+          : user
+      )))
+
+      setDetailForm({
+        name: updated.name || '',
+        username: updated.username || '',
+        email: updated.email || '',
+        bio: updated.bio || '',
+      })
+      setIsEditingDetail(false)
+      toast.success('Đã cập nhật thông tin người dùng')
+      load()
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể cập nhật người dùng')
+    } finally {
+      setIsSavingDetail(false)
+    }
   }
 
   const handleModalToggleActive = async () => {
@@ -599,119 +708,203 @@ const AdminUsers: React.FC = () => {
 
       {/* User Detail Modal */}
       {showDetail && selectedUser && (
-        <div className="modal-overlay user-detail-modal" onClick={closeDetailModal}>
-          <div className="modal-content user-detail-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>Chi tiết người dùng</h3>
-                <p className="modal-subtitle">Thông tin hồ sơ, hoạt động và bài viết gần đây</p>
-              </div>
-              <button onClick={closeDetailModal} className="modal-close" aria-label="Đóng modal">✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="user-detail-header">
-                <div className="detail-profile-main">
-                  <div className="detail-avatar-wrap">
-                    <img
-                      src={selectedUser.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${selectedUser.name}`}
-                      alt={selectedUser.name}
-                      className="detail-avatar"
-                    />
-                  </div>
-                  <div>
-                    <div className="detail-head-main">
-                      <div className="detail-name">{selectedUser.name}</div>
-                      <span className={`badge detail-role-badge ${selectedUser.role === 'admin' ? 'badge-purple' : 'badge-gray'}`}>
-                        {selectedUser.role === 'admin' ? 'Admin' : 'User'}
-                      </span>
-                    </div>
-                    <div className="detail-username">@{selectedUser.username}</div>
-                    <div className="detail-email">{selectedUser.email}</div>
-                    <div className="detail-status-line">
-                      <span className={`status-dot ${selectedUser.isActive ? 'online' : 'offline'}`} />
-                      <span>{selectedUser.isActive ? 'Hoạt động' : 'Bị khóa'}</span>
-                    </div>
-                    <div className="detail-meta-row">
-                      Tham gia {formatDistanceToNow(new Date(selectedUser.createdAt), { addSuffix: true, locale: vi })}
-                    </div>
-                  </div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/10 p-4 backdrop-blur-sm" onClick={closeDetailModal}>
+          <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-orange-100 bg-[#fcfbf8] shadow-[0_20px_40px_rgba(44,42,81,0.06)]" onClick={e => e.stopPropagation()}>
+            <div className="p-8 pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-headline font-bold tracking-tight text-slate-800">Chi tiết người dùng</h3>
+                  <p className="mt-1 text-sm text-slate-500">Thông tin hồ sơ, hoạt động và bài viết gần đây</p>
                 </div>
                 <button
                   type="button"
-                  className="detail-edit-btn"
-                  onClick={() => toast.info('Tính năng chỉnh sửa trực tiếp sẽ được bổ sung sau')}
+                  onClick={closeDetailModal}
+                  className="cursor-pointer rounded-full p-2 text-slate-500 transition-colors hover:bg-orange-100"
+                  aria-label="Đóng modal"
                 >
-                  Chỉnh sửa
+                  ✕
                 </button>
               </div>
+            </div>
 
-              <div className="detail-stats-grid">
-                <div className="detail-stat">
-                  <div className="detail-stat-val">{selectedUser._count?.posts ?? 0}</div>
-                  <div className="detail-stat-lbl">Bài viết</div>
+            <div className="flex-1 space-y-8 overflow-y-auto px-8 pb-8">
+              <div className="rounded-3xl bg-orange-50/70 p-6">
+                <div className="flex items-start gap-6">
+                  <div className="relative shrink-0">
+                    <img
+                      src={selectedUser.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${selectedUser.name}`}
+                      alt={selectedUser.name}
+                      className="h-24 w-24 rounded-3xl object-cover ring-4 ring-white shadow-sm"
+                    />
+                    <span className={`absolute -bottom-1 -right-1 h-6 w-6 rounded-full border-4 border-orange-50 ${selectedUser.isActive ? 'bg-green-500' : 'bg-rose-500'}`} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    {!isEditingDetail ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-xl font-headline font-extrabold text-slate-800">@{selectedUser.username}</h4>
+                          <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${selectedUser.role === 'admin' ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-700'}`}>
+                            {selectedUser.role === 'admin' ? 'Admin' : 'User'}
+                          </span>
+                          <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${selectedUser.isActive ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-700'}`}>
+                            {selectedUser.isActive ? 'Hoạt động' : 'Bị khóa'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-slate-600">{selectedUser.name || 'Chưa cập nhật tên'}</p>
+                        <p className="mt-1 text-sm text-slate-500">{selectedUser.email}</p>
+                      </>
+                    ) : (
+                      <div className="grid gap-2">
+                        <input
+                          className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-orange-400 focus:outline-none"
+                          value={detailForm.name}
+                          onChange={(e) => handleDetailFormChange('name', e.target.value)}
+                          placeholder="Họ và tên"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-500">@</span>
+                          <input
+                            className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-orange-400 focus:outline-none"
+                            value={detailForm.username}
+                            onChange={(e) => handleDetailFormChange('username', e.target.value)}
+                            placeholder="username"
+                          />
+                        </div>
+                        <input
+                          className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-orange-400 focus:outline-none"
+                          value={detailForm.email}
+                          onChange={(e) => handleDetailFormChange('email', e.target.value)}
+                          placeholder="email@example.com"
+                          type="email"
+                        />
+                      </div>
+                    )}
+
+                    <p className="mt-3 text-xs font-semibold text-slate-500">
+                      Tham gia {formatDistanceToNow(new Date(selectedUser.createdAt), { addSuffix: true, locale: vi })}
+                    </p>
+                  </div>
                 </div>
-                <div className="detail-stat">
-                  <div className="detail-stat-val">{selectedUser._count?.followers ?? 0}</div>
-                  <div className="detail-stat-lbl">Followers</div>
-                </div>
-                <div className="detail-stat">
-                  <div className="detail-stat-val">{selectedUser._count?.following ?? 0}</div>
-                  <div className="detail-stat-lbl">Following</div>
-                </div>
-                <div className="detail-stat">
-                  <div className="detail-stat-val">{selectedUser._count?.comments ?? 0}</div>
-                  <div className="detail-stat-lbl">Bình luận</div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-xl border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-orange-700 transition-colors hover:bg-orange-100"
+                    onClick={handleModalToggleActive}
+                  >
+                    {selectedUser.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                  </button>
+                  <button
+                    type="button"
+                    className="cursor-pointer rounded-xl border border-orange-200 bg-white px-4 py-2 text-xs font-bold text-orange-700 transition-colors hover:bg-orange-100"
+                    onClick={handleModalToggleRole}
+                  >
+                    {selectedUser.role === 'admin' ? 'Hạ quyền admin' : 'Nâng quyền admin'}
+                  </button>
+                  {!isEditingDetail && (
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-orange-600"
+                      onClick={handleStartEditDetail}
+                    >
+                      Chỉnh sửa
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {selectedUser.bio && <p className="detail-bio">{selectedUser.bio}</p>}
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="rounded-2xl bg-orange-50 p-4 text-center">
+                  <p className="text-2xl font-headline font-bold text-orange-600">{selectedUser._count?.posts ?? 0}</p>
+                  <p className="text-xs font-semibold uppercase tracking-tight text-slate-500">Bài viết</p>
+                </div>
+                <div className="rounded-2xl bg-orange-50 p-4 text-center">
+                  <p className="text-2xl font-headline font-bold text-orange-600">{selectedUser._count?.followers ?? 0}</p>
+                  <p className="text-xs font-semibold uppercase tracking-tight text-slate-500">Followers</p>
+                </div>
+                <div className="rounded-2xl bg-orange-50 p-4 text-center">
+                  <p className="text-2xl font-headline font-bold text-orange-600">{selectedUser._count?.following ?? 0}</p>
+                  <p className="text-xs font-semibold uppercase tracking-tight text-slate-500">Following</p>
+                </div>
+                <div className="rounded-2xl bg-orange-50 p-4 text-center">
+                  <p className="text-2xl font-headline font-bold text-orange-600">{selectedUser._count?.comments ?? 0}</p>
+                  <p className="text-xs font-semibold uppercase tracking-tight text-slate-500">Bình luận</p>
+                </div>
+              </div>
 
-              <div className="recent-posts-section">
-                <div className="recent-posts-header">
-                  <h4>Bài viết gần đây</h4>
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold text-slate-500">Giới thiệu</h4>
+                {isEditingDetail ? (
+                  <textarea
+                    className="min-h-[100px] w-full rounded-2xl border border-orange-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
+                    value={detailForm.bio}
+                    onChange={(e) => handleDetailFormChange('bio', e.target.value)}
+                    placeholder="Giới thiệu ngắn về người dùng"
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-orange-100 bg-orange-50 p-5 text-sm italic leading-relaxed text-slate-600">
+                    {selectedUser.bio?.trim() || 'Người dùng này chưa cập nhật thông tin giới thiệu bản thân. Một chút thông tin sẽ giúp mọi người kết nối dễ hơn.'}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-end justify-between gap-3">
+                  <h4 className="text-sm font-bold text-slate-500">Bài viết gần đây</h4>
                   <button
                     type="button"
-                    className="recent-posts-link"
+                    className="cursor-pointer text-xs font-bold text-orange-600 hover:underline"
                     onClick={() => toast.info('Danh sách đầy đủ có thể xem ở trang hồ sơ người dùng')}
                   >
                     Xem tất cả
                   </button>
                 </div>
-                {selectedUser.recentPosts?.length > 0 ? (
-                  selectedUser.recentPosts.map((p: any) => (
-                    <div key={p.id} className="mini-post">
-                      <div className="mini-post-content">
-                        {p.content?.trim() ? p.content.slice(0, 120) : 'Bài viết không có nội dung văn bản'}
-                        {p.content?.length > 120 ? '...' : ''}
+
+                <div className="grid gap-3">
+                  {selectedUser.recentPosts?.length > 0 ? (
+                    selectedUser.recentPosts.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between rounded-2xl bg-orange-50 p-4 transition-colors hover:bg-orange-100/70">
+                        <div className="min-w-0 flex-1">
+                          <h5 className="truncate text-sm font-bold text-slate-700">
+                            {p.content?.trim() ? p.content.slice(0, 80) : 'Bài viết không có nội dung văn bản'}
+                            {p.content?.length > 80 ? '...' : ''}
+                          </h5>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDistanceToNow(new Date(p.createdAt), { addSuffix: true, locale: vi })}
+                          </p>
+                        </div>
+                        <div className="ml-4 flex shrink-0 items-center gap-3 text-xs font-semibold text-slate-500">
+                          <span className="inline-flex items-center gap-1"><Heart size={13} /> {p._count.likes}</span>
+                          <span className="inline-flex items-center gap-1"><MessageCircle size={13} /> {p._count.comments}</span>
+                        </div>
                       </div>
-                      <div className="mini-post-meta">
-                        <span className="mini-post-meta-item"><Heart size={12} /> {p._count.likes}</span>
-                        <span className="mini-post-meta-item"><MessageCircle size={12} /> {p._count.comments}</span>
-                        <span className="mini-post-time">
-                          {formatDistanceToNow(new Date(p.createdAt), { addSuffix: true, locale: vi })}
-                        </span>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-orange-200 bg-orange-50 px-4 py-5 text-center text-sm font-semibold text-orange-700">
+                      Người dùng này chưa có bài viết gần đây.
                     </div>
-                  ))
-                ) : (
-                  <div className="recent-post-empty">Người dùng này chưa có bài viết gần đây.</div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
-            <div className="modal-footer-actions">
+
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-orange-100 bg-orange-50/60 p-6">
               <button
                 type="button"
-                className="modal-footer-btn subtle"
-                onClick={handleModalToggleActive}
+                className="cursor-pointer rounded-xl px-6 py-2.5 text-sm font-bold text-orange-700 transition-all hover:bg-orange-100"
+                onClick={isEditingDetail ? handleCancelEditDetail : closeDetailModal}
+                disabled={isSavingDetail}
               >
-                {selectedUser.isActive ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                Hủy
               </button>
               <button
                 type="button"
-                className="modal-footer-btn primary"
-                onClick={handleModalToggleRole}
+                className="cursor-pointer rounded-xl bg-gradient-to-br from-orange-500 to-orange-400 px-8 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-200/40 transition-all hover:brightness-110"
+                onClick={isEditingDetail ? handleSaveDetail : handleStartEditDetail}
+                disabled={isSavingDetail}
               >
-                {selectedUser.role === 'admin' ? 'Thu hồi quyền admin' : 'Cấp quyền admin'}
+                {isEditingDetail ? (isSavingDetail ? 'Đang lưu...' : 'Lưu thay đổi') : 'Chỉnh sửa'}
               </button>
             </div>
           </div>

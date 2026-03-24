@@ -60,11 +60,31 @@ export interface AdminUser {
   }
 }
 
+export interface AdminUserDetail extends AdminUser {
+  coverImage: string | null
+  bio: string | null
+  _count: AdminUser['_count'] & {
+    comments: number
+    likes: number
+  }
+  recentPosts: Array<{
+    id: string
+    content: string
+    createdAt: string
+    _count: {
+      likes: number
+      comments: number
+    }
+  }>
+}
+
 export interface AdminPost {
   id: string
   content: string
   imageUrl?: string
+  videoUrl?: string
   createdAt: string
+  updatedAt?: string
   user: {
     id: string
     name: string
@@ -76,6 +96,47 @@ export interface AdminPost {
     comments: number
     shares: number
   }
+}
+
+export interface AdminPostDetail extends AdminPost {
+  user: AdminPost['user'] & {
+    email?: string
+    bio?: string | null
+    role?: string
+    isActive?: boolean
+  }
+  comments: Array<{
+    id: string
+    content: string
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      username: string
+      avatar: string | null
+    }
+  }>
+  likes: Array<{
+    id: string
+    type: string
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      username: string
+      avatar: string | null
+    }
+  }>
+  shares: Array<{
+    id: string
+    createdAt: string
+    user: {
+      id: string
+      name: string
+      username: string
+      avatar: string | null
+    }
+  }>
 }
 
 export interface AdminReel {
@@ -135,9 +196,11 @@ const adminService = {
     return adminApi.get(`/admin/users?${params}`).then(r => r.data)
   },
   getUserDetail: (userId: string) =>
-    adminApi.get(`/admin/users/${userId}`).then(r => r.data),
+    adminApi.get<AdminUserDetail>(`/admin/users/${userId}`).then(r => r.data),
   createUser: (payload: { name?: string; username: string; email: string; password: string; role?: 'user' | 'admin'; isActive?: boolean; avatar?: string }) =>
     adminApi.post('/admin/users', payload).then(r => r.data),
+  updateUser: (userId: string, payload: { name?: string; username?: string; email?: string; bio?: string; avatar?: string }) =>
+    adminApi.put(`/admin/users/${userId}`, payload).then(r => r.data),
   updateUserRole: (userId: string, role: string) =>
     adminApi.put(`/admin/users/${userId}/role`, { role }).then(r => r.data),
   toggleUserActive: (userId: string) =>
@@ -146,11 +209,18 @@ const adminService = {
     adminApi.delete(`/admin/users/${userId}`).then(r => r.data),
 
   // Posts
-  getPosts: (page = 1, limit = 10, search?: string) => {
+  getPosts: (page = 1, limit = 10, search?: string, media?: 'all' | 'image' | 'video' | 'text') => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
+    if (media && media !== 'all') params.append('media', media)
     return adminApi.get(`/admin/posts?${params}`).then(r => r.data)
   },
+  getPostDetail: (postId: string) =>
+    adminApi.get<AdminPostDetail>(`/admin/posts/${postId}`).then(r => r.data),
+  createPost: (payload: { userId: string; content?: string; imageUrl?: string; videoUrl?: string }) =>
+    adminApi.post<AdminPost>('/admin/posts', payload).then(r => r.data),
+  updatePost: (postId: string, payload: { content?: string; imageUrl?: string | null; videoUrl?: string | null }) =>
+    adminApi.put<AdminPost>(`/admin/posts/${postId}`, payload).then(r => r.data),
   deletePost: (postId: string) =>
     adminApi.delete(`/admin/posts/${postId}`).then(r => r.data),
 

@@ -20,6 +20,8 @@ import {
 } from 'lucide-react'
 import adminService, { type AdminPost, type AdminPostDetail, type AdminUser } from '@/services/adminService'
 import CustomSelect from '@/components/shared/CustomSelect'
+import { EditPostModal } from '@/components/shared/EditPostModal'
+import uploadService from '@/services/uploadService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -66,6 +68,19 @@ const AdminPosts: React.FC = () => {
     videoUrl: '',
   })
 
+  // Create modal file states (previews + files)
+  const [createSelectedImages, setCreateSelectedImages] = useState<File[]>([])
+  const [createSelectedVideo, setCreateSelectedVideo] = useState<File | null>(null)
+  const [createPreviewUrls, setCreatePreviewUrls] = useState<string[]>([])
+  const [createVideoPreviewUrl, setCreateVideoPreviewUrl] = useState<string | null>(null)
+
+  // Edit modal (external) state
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editPostId, setEditPostId] = useState<string | null>(null)
+  const [editInitialContent, setEditInitialContent] = useState('')
+  const [editInitialImages, setEditInitialImages] = useState('')
+  const [editInitialVideo, setEditInitialVideo] = useState<string | undefined>(undefined)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -107,6 +122,18 @@ const AdminPosts: React.FC = () => {
       loadAuthors()
     }
   }, [showCreateModal, authors.length, loadingAuthors, loadAuthors])
+
+  // Cleanup previews when create modal closes
+  useEffect(() => {
+    if (!showCreateModal) {
+      createPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+      setCreatePreviewUrls([])
+      if (createVideoPreviewUrl) URL.revokeObjectURL(createVideoPreviewUrl)
+      setCreateVideoPreviewUrl(null)
+      setCreateSelectedImages([])
+      setCreateSelectedVideo(null)
+    }
+  }, [showCreateModal])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -181,6 +208,21 @@ const AdminPosts: React.FC = () => {
     }
   }
 
+  const openEditModal = async (postId: string) => {
+    setEditPostId(postId)
+    setShowEditModal(true)
+    try {
+      const data = await adminService.getPostDetail(postId)
+      setEditInitialContent(data.content || '')
+      setEditInitialImages(data.imageUrl || '')
+      setEditInitialVideo(data.videoUrl || undefined)
+    } catch {
+      toast.error('Không thể tải bài viết để chỉnh sửa')
+      setShowEditModal(false)
+      setEditPostId(null)
+    }
+  }
+
   const closeDetail = () => {
     setShowDetail(false)
     setSelectedPost(null)
@@ -243,8 +285,8 @@ const AdminPosts: React.FC = () => {
     e.preventDefault()
     const userId = createForm.userId.trim()
     const content = createForm.content.trim()
-    const imageUrl = createForm.imageUrl.trim()
-    const videoUrl = createForm.videoUrl.trim()
+    const imageUrlText = createForm.imageUrl.trim()
+    const videoUrlText = createForm.videoUrl.trim()
 
     if (!userId) {
       toast.error('Vui lòng chọn tác giả')
@@ -258,11 +300,35 @@ const AdminPosts: React.FC = () => {
 
     setCreatingPost(true)
     try {
+      // If files are selected, upload them first
+      let finalImageUrl: string | undefined = undefined
+      let finalVideoUrl: string | undefined = undefined
+
+      if (createSelectedImages.length > 0) {
+        const uploaded: string[] = []
+        for (const img of createSelectedImages) {
+          const url = await uploadService.uploadImage(img)
+          uploaded.push(url)
+        }
+        finalImageUrl = uploaded.join(',')
+      } else if (imageUrlText) {
+        finalImageUrl = imageUrlText
+      }
+
+      if (createSelectedVideo) {
+        finalVideoUrl = await uploadService.uploadVideo(createSelectedVideo)
+      } else if (videoUrlText) {
+        finalVideoUrl = videoUrlText
+      }
+
+      // If images exist, prefer images over video (mirror app logic)
+      if (finalImageUrl) finalVideoUrl = undefined
+
       await adminService.createPost({
         userId,
         content,
-        imageUrl: imageUrl || undefined,
-        videoUrl: videoUrl || undefined,
+        imageUrl: finalImageUrl,
+        videoUrl: finalVideoUrl,
       })
 
       toast.success('Tạo bài viết thành công')
@@ -273,6 +339,14 @@ const AdminPosts: React.FC = () => {
         imageUrl: '',
         videoUrl: '',
       }))
+
+      // cleanup previews
+      createPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+      setCreatePreviewUrls([])
+      if (createVideoPreviewUrl) URL.revokeObjectURL(createVideoPreviewUrl)
+      setCreateVideoPreviewUrl(null)
+      setCreateSelectedImages([])
+      setCreateSelectedVideo(null)
 
       if (page !== 1) {
         setPage(1)
@@ -477,7 +551,7 @@ const AdminPosts: React.FC = () => {
                         type="button"
                         className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                         title="Chỉnh sửa bài viết"
-                        onClick={() => openDetail(post.id, true)}
+                        onClick={() => openEditModal(post.id)}
                       >
                         <Pencil size={16} />
                       </button>
@@ -550,7 +624,118 @@ const AdminPosts: React.FC = () => {
               </label>
 
               <label className="posts-field">
-                <span>Image URL</span>
+                <span>Ảnh</span>
+
+                {(createPreviewUrls.length > 0) && (
+                  <div className="max-h-[300px] overflow-y-auto border rounded-lg p-2">
+                    <div className={`grid gap-2 ${createPreviewUrls.length === 1 ? 'grid-cols-1' : createPreviewUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                      {createPreviewUrls.map((url, index) => (
+                        <div key={`new-${index}`} className="relative rounded-lg overflow-hidden border aspect-square">
+                          <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover bg-gray-100" />
+                          <button
+                            onClick={() => {
+                              const newFiles = createSelectedImages.filter((_, i) => i !== index)
+                              setCreateSelectedImages(newFiles)
+                              URL.revokeObjectURL(createPreviewUrls[index])
+                              const newUrls = createPreviewUrls.filter((_, i) => i !== index)
+                              setCreatePreviewUrls(newUrls)
+                            }}
+                            className="absolute top-2 right-2 bg-white hover:bg-gray-100 p-1.5 rounded-full shadow-lg transition cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Thêm ảnh / video</span>
+                    <div className="flex gap-2">
+                      {createSelectedImages.length < 10 && !createSelectedVideo && (
+                        <label className="cursor-pointer hover:bg-gray-100 p-2 rounded-full transition">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || [])
+                              if (files.length > 0 && !createSelectedVideo) {
+                                const totalImages = createSelectedImages.length + files.length
+                                if (totalImages > 10) {
+                                  alert('Bạn chỉ có thể tải tối đa 10 ảnh')
+                                  return
+                                }
+                                const newFiles = [...createSelectedImages, ...files].slice(0, 10)
+                                setCreateSelectedImages(newFiles)
+                                const newUrls = newFiles.map(file => URL.createObjectURL(file))
+                                createPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+                                setCreatePreviewUrls(newUrls)
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <Image size={18} />
+                        </label>
+                      )}
+
+                      {createSelectedImages.length === 0 && !createSelectedVideo && (
+                        <label className="cursor-pointer hover:bg-gray-100 p-2 rounded-full transition">
+                          <input
+                            type="file"
+                            accept="video/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file && createSelectedImages.length === 0) {
+                                const validation = uploadService.validateVideo(file)
+                                if (!validation.valid) {
+                                  alert(validation.error)
+                                  return
+                                }
+                                setCreateSelectedVideo(file)
+                                if (createVideoPreviewUrl) URL.revokeObjectURL(createVideoPreviewUrl)
+                                setCreateVideoPreviewUrl(URL.createObjectURL(file))
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <Video size={18} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {createSelectedImages.length >= 10 && (
+                    <p className="text-xs text-gray-500 mt-2">Maximum 10 images reached</p>
+                  )}
+                </div>
+              </label>
+              {createVideoPreviewUrl && (
+                <div className="max-h-[300px] overflow-hidden border rounded-lg p-2">
+                  <div className="relative rounded-lg overflow-hidden">
+                    <video
+                      src={createVideoPreviewUrl}
+                      controls
+                      className="w-full max-h-[280px] object-contain bg-black"
+                    />
+                    <button
+                      onClick={() => {
+                        if (createVideoPreviewUrl) URL.revokeObjectURL(createVideoPreviewUrl)
+                        setCreateSelectedVideo(null)
+                        setCreateVideoPreviewUrl(null)
+                      }}
+                      className="absolute top-2 right-2 bg-white hover:bg-gray-100 p-1.5 rounded-full shadow-lg transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <label className="posts-field">
+                <span>Image/Video URL (tùy chọn)</span>
                 <input
                   value={createForm.imageUrl}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, imageUrl: e.target.value }))}
@@ -561,7 +746,7 @@ const AdminPosts: React.FC = () => {
               </label>
 
               <label className="posts-field">
-                <span>Video URL</span>
+                <span>Video URL (tùy chọn)</span>
                 <input
                   value={createForm.videoUrl}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, videoUrl: e.target.value }))}
@@ -582,6 +767,26 @@ const AdminPosts: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {showEditModal && editPostId && (
+        <EditPostModal
+          postId={editPostId}
+          initialContent={editInitialContent}
+          initialImages={editInitialImages}
+          initialVideo={editInitialVideo}
+          open={showEditModal}
+          onClose={() => { setShowEditModal(false); setEditPostId(null) }}
+          onUpdated={async () => {
+            const id = editPostId
+            setShowEditModal(false)
+            setEditPostId(null)
+            await load()
+            if (selectedPost?.id === id && id) {
+              openDetail(id)
+            }
+          }}
+        />
       )}
 
       {showDetail && (
@@ -702,7 +907,7 @@ const AdminPosts: React.FC = () => {
                     </button>
 
                     {!editingDetail && (
-                      <button type="button" className="modal-footer-btn primary cursor-pointer" onClick={() => setEditingDetail(true)}>
+                      <button type="button" className="modal-footer-btn primary cursor-pointer" onClick={() => openEditModal(selectedPost.id)}>
                         Chỉnh sửa
                       </button>
                     )}

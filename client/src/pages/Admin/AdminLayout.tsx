@@ -95,17 +95,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </nav>
 
         <div className="sidebar-footer">
-          {sidebarOpen && adminInfo && (
-            <div className="admin-user-info">
-              <div className="brand-icon" style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }}>
-                <Shield size={18} />
-              </div>
-              <div>
-                <div className="admin-name">{adminInfo.name}</div>
-                <div className="admin-role">@{adminInfo.username}</div>
-              </div>
-            </div>
-          )}
           <button className="logout-btn" onClick={handleLogout} title="Đăng xuất">
             <LogOut size={18} />
             {sidebarOpen && <span>Đăng xuất</span>}
