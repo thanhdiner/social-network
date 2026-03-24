@@ -3459,6 +3459,26 @@
   padding: 0 12px;
 }
 
+/* When using CustomSelect we don't want the wrapper to add a second border.
+   Make the wrapper transparent and let the internal button show the visible
+   control so the dropdown visually appears as a single element. */
+.posts-media-select {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.custom-select-wrapper.posts-media-select .custom-select-button {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 12px;
+}
+
 .posts-search-btn {
   background: linear-gradient(135deg, #f97316, #ea580c);
   border-color: transparent;
