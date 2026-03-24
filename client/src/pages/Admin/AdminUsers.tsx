@@ -488,21 +488,17 @@ const AdminUsers: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div
-          className="modal-overlay"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setShowAddModal(false)
-          }}
-        >
-          <div className="modal-content add-user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowAddModal(false)} />
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-[0_20px_40px_rgba(44,42,81,0.12)]">
+            <div className="flex items-start justify-between p-8 pb-4">
               <div>
-                <h3>Thêm người dùng</h3>
-                <p className="modal-subtitle">Tạo tài khoản mới cho người dùng</p>
+                <h2 className="text-2xl font-extrabold font-headline text-gray-900 dark:text-white">Thêm người dùng</h2>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Tạo tài khoản mới cho người dùng</p>
               </div>
               <button
                 type="button"
-                className="modal-close"
+                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors text-gray-500 dark:text-gray-400"
                 onClick={() => setShowAddModal(false)}
                 aria-label="Đóng"
               >
@@ -510,56 +506,89 @@ const AdminUsers: React.FC = () => {
               </button>
             </div>
 
-            <form className="modal-body" onSubmit={handleCreateUser}>
-              <label className="form-label">Họ và tên</label>
-              <input
-                className="form-input"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Tên đầy đủ (tuỳ chọn)"
-              />
-
-              <label className="form-label">Username</label>
-              <input
-                className="form-input"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="username"
-              />
-
-              <label className="form-label">Email</label>
-              <input
-                className="form-input"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="email@example.com"
-              />
-
-              <label className="form-label">Mật khẩu</label>
-              <input
-                className="form-input"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mật khẩu (ít nhất 6 ký tự)"
-              />
-
-              <label className="form-label">Vai trò</label>
-              <div className="role-select-row">
-                <button type="button" className={`role-btn ${newRole === 'user' ? 'active' : ''}`} onClick={() => setNewRole('user')}>
-                  User
-                </button>
-                <button type="button" className={`role-btn ${newRole === 'admin' ? 'active' : ''}`} onClick={() => setNewRole('admin')}>
-                  Admin
-                </button>
+            <form className="p-8 pt-4 space-y-5" onSubmit={handleCreateUser}>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-gray-900 dark:text-white ml-1">Họ và tên</label>
+                <input
+                  className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-gray-400"
+                  placeholder="Nhập họ và tên đầy đủ"
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
               </div>
 
-              <div className="modal-footer-actions">
-                <button type="button" className="modal-footer-btn subtle" onClick={() => setShowAddModal(false)} disabled={creatingUser}>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-gray-900 dark:text-white ml-1">Username</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">@</span>
+                  <input
+                    className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-3.5 pl-8 text-sm focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-gray-400"
+                    placeholder="username"
+                    type="text"
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-gray-900 dark:text-white ml-1">Email</label>
+                <input
+                  className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-gray-400"
+                  placeholder="example@admin-nexus.com"
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-gray-900 dark:text-white ml-1">Mật khẩu</label>
+                <input
+                  className="w-full bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 transition-all placeholder:text-gray-400"
+                  placeholder="••••••••"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-900 dark:text-white ml-1">Vai trò</label>
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1.5 rounded-xl">
+                  <button
+                    type="button"
+                    className={`flex-1 ${newRole === 'user' ? 'bg-white dark:bg-slate-900 text-primary font-bold' : 'text-gray-600 dark:text-gray-400 font-medium'} py-2.5 rounded-lg text-sm shadow-sm transition-all flex items-center justify-center gap-2`}
+                    onClick={() => setNewRole('user')}
+                  >
+                    <UserPlus size={18} />
+                    User
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 ${newRole === 'admin' ? 'bg-white dark:bg-slate-900 text-primary font-bold' : 'text-gray-600 dark:text-gray-400 font-medium'} py-2.5 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2`}
+                    onClick={() => setNewRole('admin')}
+                  >
+                    <Shield size={18} />
+                    Admin
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-6 border-t border-gray-100 dark:border-slate-800 mt-4">
+                <button
+                  className="flex-1 bg-gray-100 text-primary font-bold py-4 rounded-xl text-sm hover:bg-gray-200 transition-colors"
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                >
                   Hủy
                 </button>
-                <button type="submit" className="modal-footer-btn primary" disabled={creatingUser}>
+                <button
+                  className="flex-[1.5] bg-gradient-to-br from-orange-500 to-orange-400 text-white font-bold py-4 rounded-xl text-sm shadow-lg shadow-orange-200/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  type="submit"
+                  disabled={creatingUser}
+                >
                   {creatingUser ? 'Đang tạo...' : 'Tạo người dùng'}
                 </button>
               </div>
