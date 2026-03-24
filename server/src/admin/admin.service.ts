@@ -1,10 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ChatGateway } from '../chat/chat.gateway';
+
+interface CreateAnnouncementPayload {
+  adminId: string;
+  adminName?: string;
+  title?: string;
+  content: string;
+  audience?: 'all' | 'active';
+}
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private chatGateway: ChatGateway,
+  ) {}
 
   // ─── Dashboard Stats ─────────────────────────────────────────────────────────
 
@@ -128,7 +143,121 @@ export class AdminService {
     return { recentUsers, recentPosts };
   }
 
+  async createAnnouncement(payload: CreateAnnouncementPayload) {
+    const prismaAny = this.prisma as any;
+    const title = payload.title?.trim() || '';
+    const content = payload.content?.trim();
+    const audience = payload.audience === 'active' ? 'active' : 'all';
+
+    if (!content) {
+      throw new BadRequestException('Nội dung thông báo không được để trống');
+    }
+
+    const fullContent = title ? `[${title}] ${content}` : content;
+
+    const users = await prismaAny.user.findMany({
+      where: audience === 'active' ? { isActive: true } : undefined,
+      select: { id: true },
+    });
+
+    if (users.length === 0) {
+      return {
+        message: 'Không có người dùng phù hợp để gửi thông báo',
+        delivered: 0,
+      };
+    }
+
+    const actorName = payload.adminName || 'Admin';
+    const chunkSize = 80;
+    let delivered = 0;
+
+    for (let i = 0; i < users.length; i += chunkSize) {
+      const chunk = users.slice(i, i + chunkSize);
+      const notifications = await Promise.all(
+        chunk.map((user: { id: string }) =>
+          this.notificationsService.create({
+            type: 'announcement',
+            content: fullContent,
+            userId: user.id,
+            actorId: payload.adminId,
+            actorName,
+          }),
+        ),
+      );
+
+      notifications.forEach((notification) => {
+        this.chatGateway.notifyUser(notification.userId, notification);
+      });
+
+      delivered += notifications.length;
+    }
+
+    return {
+      message: 'Đã phát thông báo thành công',
+      delivered,
+      audience,
+      title,
+    };
+  }
+
   // ─── User Management ─────────────────────────────────────────────────────────
+
+  async createUser(payload: {
+    name?: string;
+    username: string;
+    email: string;
+    password: string;
+    role?: string;
+    isActive?: boolean;
+    avatar?: string;
+  }) {
+    const prismaAny = this.prisma as any;
+    const name = payload.name?.trim() || '';
+    const username = payload.username?.trim();
+    const email = payload.email?.trim().toLowerCase();
+    const password = payload.password;
+    const role = payload.role === 'admin' ? 'admin' : 'user';
+    const isActive = typeof payload.isActive === 'boolean' ? payload.isActive : true;
+
+    if (!username || !email || !password) {
+      throw new BadRequestException('Username, email và mật khẩu là bắt buộc');
+    }
+
+    if (password.length < 6) {
+      throw new BadRequestException('Mật khẩu phải có ít nhất 6 ký tự');
+    }
+
+    try {
+      const hashed = await bcrypt.hash(password, 10);
+      const user = await prismaAny.user.create({
+        data: {
+          name,
+          username,
+          email,
+          password: hashed,
+          role,
+          isActive,
+          avatar: payload.avatar || null,
+        },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          avatar: true,
+        },
+      });
+      return user;
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new BadRequestException('Tên đăng nhập hoặc email đã tồn tại');
+      }
+      throw err;
+    }
+  }
 
   async getUsers(page = 1, limit = 10, search?: string, role?: string) {
     const prismaAny = this.prisma as any;

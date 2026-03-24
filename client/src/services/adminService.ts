@@ -106,11 +106,26 @@ export interface PaginatedResponse<T> {
   data?: T[]
 }
 
+export interface CreateAnnouncementPayload {
+  title?: string
+  content: string
+  audience?: 'all' | 'active'
+}
+
+export interface CreateAnnouncementResponse {
+  message: string
+  delivered: number
+  audience: 'all' | 'active'
+  title: string
+}
+
 const adminService = {
   // Dashboard
   getStats: () => adminApi.get<AdminStats>('/admin/dashboard/stats').then(r => r.data),
   getGrowthChart: () => adminApi.get<GrowthPoint[]>('/admin/dashboard/growth').then(r => r.data),
   getRecentActivity: () => adminApi.get('/admin/dashboard/activity').then(r => r.data),
+  createAnnouncement: (payload: CreateAnnouncementPayload) =>
+    adminApi.post<CreateAnnouncementResponse>('/admin/dashboard/announcement', payload).then(r => r.data),
 
   // Users
   getUsers: (page = 1, limit = 10, search?: string, role?: string) => {
@@ -121,6 +136,8 @@ const adminService = {
   },
   getUserDetail: (userId: string) =>
     adminApi.get(`/admin/users/${userId}`).then(r => r.data),
+  createUser: (payload: { name?: string; username: string; email: string; password: string; role?: 'user' | 'admin'; isActive?: boolean; avatar?: string }) =>
+    adminApi.post('/admin/users', payload).then(r => r.data),
   updateUserRole: (userId: string, role: string) =>
     adminApi.put(`/admin/users/${userId}/role`, { role }).then(r => r.data),
   toggleUserActive: (userId: string) =>

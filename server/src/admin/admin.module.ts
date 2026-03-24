@@ -6,9 +6,13 @@ import { AdminService } from './admin.service';
 import { AdminJwtGuard } from './admin.guard';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthController } from './admin-auth.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
+    NotificationsModule,
+    ChatModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

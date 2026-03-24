@@ -22,6 +22,8 @@ import { SearchResults } from '@/pages/Search'
 import AccountSettings from '@/pages/AccountSettings'
 import ReelsPage from '@/pages/Reels'
 import CreateReelPage from '@/pages/Reels/CreateReel'
+import NotificationsPage from '@/pages/Notifications'
+import NotificationsDetailPage from '@/pages/Notifications/Detail'
 // Keep ReelDetailPage available for direct single-reel modal if needed
 // ReelDetailPage unused now; deep links handled by ReelsPage
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
@@ -181,6 +183,28 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <SearchResults />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <NotificationsPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/notifications/:notificationId"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <NotificationsDetailPage />
                 </MainLayout>
               </ProtectedRoute>
             }

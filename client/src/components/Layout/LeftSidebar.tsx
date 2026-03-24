@@ -1,4 +1,4 @@
-import { Home, User, UserPlus, Film, MessageCircle, Settings, Video } from 'lucide-react'
+import { Home, User, UserPlus, Film, MessageCircle, Settings, Video, Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -12,6 +12,7 @@ export const LeftSidebar = ({ isCollapsed = false }: LeftSidebarProps) => {
 
   const menu = [
     { icon: Home, label: 'Newsfeed', path: '/' },
+    { icon: Bell, label: 'Notifications', path: '/notifications' },
     { icon: Film, label: 'Stories', path: '/stories' },
     { icon: Video, label: 'Reels', path: '/reels' },
     { icon: User, label: 'Profile', path: user?.username ? `/profile/${user.username}` : '/profile' },

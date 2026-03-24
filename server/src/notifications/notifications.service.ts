@@ -1,8 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 export interface CreateNotificationDto {
-  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message' | 'share';
+  type:
+    | 'follow'
+    | 'unfollow'
+    | 'like'
+    | 'comment'
+    | 'message'
+    | 'share'
+    | 'announcement';
   content: string;
   userId: string;
   actorId?: string;
@@ -49,6 +56,21 @@ export class NotificationsService {
         read: false,
       },
     });
+  }
+
+  async getNotificationById(notificationId: string, userId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: {
+        id: notificationId,
+        userId,
+      },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    return notification;
   }
 
   async markAsRead(notificationId: string, userId: string) {

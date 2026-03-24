@@ -42,6 +42,17 @@ export class NotificationsController {
     return { count };
   }
 
+  @Get(':id')
+  async getNotificationById(
+    @CurrentUser() user: CurrentUserData,
+    @Param('id') notificationId: string,
+  ) {
+    return this.notificationsService.getNotificationById(
+      notificationId,
+      user.userId,
+    );
+  }
+
   @Put(':id/read')
   @HttpCode(HttpStatus.OK)
   async markAsRead(

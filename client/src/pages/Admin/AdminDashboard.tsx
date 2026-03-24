@@ -3,11 +3,13 @@ import {
   Film, MessageSquare, Heart,
   Activity,
   UserPlus,
-  Download, Megaphone, Server, AlertTriangle,
+  Download, Megaphone, Server, AlertTriangle, Users, UserCheck2, Send, X,
 } from 'lucide-react'
 import adminService, { type AdminStats, type GrowthPoint } from '@/services/adminService'
+import { Editor } from '@tinymce/tinymce-react'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { toast } from 'sonner'
 
 type MetricTone = 'blue' | 'violet' | 'rose' | 'indigo'
 
@@ -177,11 +179,103 @@ const BarChart: React.FC<{ data: GrowthPoint[] }> = ({ data }) => {
 
 const LegacyBarChart = BarChart
 
+const csvEscape = (value: unknown): string => {
+  if (value === null || value === undefined) return ''
+  const text = String(value).replace(/"/g, '""')
+  return /[",\n]/.test(text) ? `"${text}"` : text
+}
+
+const csvRow = (values: unknown[]) => values.map(csvEscape).join(',')
+
+const buildDashboardCsv = (
+  stats: AdminStats,
+  growth: GrowthPoint[],
+  activity: { recentUsers: any[]; recentPosts: any[] },
+) => {
+  const lines: string[] = []
+  const generatedAt = new Date().toLocaleString('vi-VN')
+
+  lines.push(csvRow(['Dashboard Report', generatedAt]))
+  lines.push('')
+
+  lines.push('Summary Metrics')
+  lines.push(csvRow(['Metric', 'Value']))
+  lines.push(csvRow(['Total Users', stats.totalUsers]))
+  lines.push(csvRow(['Active Users', stats.activeUsers]))
+  lines.push(csvRow(['New Users This Month', stats.newUsersThisMonth]))
+  lines.push(csvRow(['Users Growth (%)', stats.usersGrowth]))
+  lines.push(csvRow(['Total Posts', stats.totalPosts]))
+  lines.push(csvRow(['New Posts This Month', stats.newPostsThisMonth]))
+  lines.push(csvRow(['Posts Growth (%)', stats.postsGrowth]))
+  lines.push(csvRow(['Total Reels', stats.totalReels]))
+  lines.push(csvRow(['Total Comments', stats.totalComments]))
+  lines.push(csvRow(['Total Likes', stats.totalLikes]))
+  lines.push('')
+
+  lines.push('Growth Chart')
+  lines.push(csvRow(['Month', 'Users', 'Posts']))
+  growth.forEach((point) => {
+    lines.push(csvRow([point.month, point.users, point.posts]))
+  })
+  lines.push('')
+
+  lines.push('Recent Users')
+  lines.push(csvRow(['Name', 'Username', 'Email', 'Role', 'Active', 'Created At']))
+  activity.recentUsers.forEach((user: any) => {
+    lines.push(csvRow([
+      user.name,
+      user.username,
+      user.email,
+      user.role,
+      user.isActive ? 'Yes' : 'No',
+      user.createdAt,
+    ]))
+  })
+  lines.push('')
+
+  lines.push('Recent Posts')
+  lines.push(csvRow(['Author', 'Username', 'Content', 'Likes', 'Comments', 'Created At']))
+  activity.recentPosts.forEach((post: any) => {
+    lines.push(csvRow([
+      post.user?.name,
+      post.user?.username,
+      post.content,
+      post._count?.likes ?? 0,
+      post._count?.comments ?? 0,
+      post.createdAt,
+    ]))
+  })
+
+  return lines.join('\n')
+}
+
+const downloadCsv = (csvContent: string, fileName: string) => {
+  const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+const tinyApiKey =
+  import.meta.env.VITE_TINYMCE_API_KEY ||
+  'yykho2f0c2a1ynhopjf3qaalbrztsd9ia01cgaracup2ut2c'
+
 const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [growth, setGrowth] = useState<GrowthPoint[]>([])
   const [activity, setActivity] = useState<{ recentUsers: any[]; recentPosts: any[] } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false)
+  const [announcementTitle, setAnnouncementTitle] = useState('')
+  const [announcementContent, setAnnouncementContent] = useState('')
+  const [announcementAudience, setAnnouncementAudience] = useState<'all' | 'active'>('all')
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -202,6 +296,70 @@ const AdminDashboard: React.FC = () => {
     }
     load()
   }, [])
+
+  const handleExportReport = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const [s, g, a] = await Promise.all([
+        adminService.getStats(),
+        adminService.getGrowthChart(),
+        adminService.getRecentActivity(),
+      ])
+
+      const csv = buildDashboardCsv(s, g, a)
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')
+      downloadCsv(csv, `admin-dashboard-report-${stamp}.csv`)
+      toast.success('Xuất báo cáo thành công')
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể xuất báo cáo')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const closeAnnouncementModal = (force = false) => {
+    if (creatingAnnouncement && !force) return
+    setShowAnnouncementModal(false)
+    setAnnouncementTitle('')
+    setAnnouncementContent('')
+    setAnnouncementAudience('all')
+  }
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const title = announcementTitle.trim()
+    const contentHtml = announcementContent
+    const content = announcementContent.replace(/<[^>]*>/g, '').trim()
+
+    if (!content) {
+      toast.error('Vui lòng nhập nội dung thông báo')
+      return
+    }
+
+    if (content.length > 500) {
+      toast.error('Nội dung không được vượt quá 500 ký tự (text)')
+      return
+    }
+
+    setCreatingAnnouncement(true)
+    try {
+      const result = await adminService.createAnnouncement({
+        title,
+        content: contentHtml,
+        audience: announcementAudience,
+      })
+
+      toast.success(`Đã gửi thông báo tới ${result.delivered.toLocaleString('vi-VN')} người dùng`)
+      closeAnnouncementModal(true)
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể tạo thông báo')
+    } finally {
+      setCreatingAnnouncement(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -232,11 +390,20 @@ const AdminDashboard: React.FC = () => {
           <p className="page-subtitle">Real-time metrics for social network operations</p>
         </div>
         <div className="executive-actions">
-          <button type="button" className="btn-subtle-action">
+          <button
+            type="button"
+            className="btn-subtle-action"
+            onClick={handleExportReport}
+            disabled={exporting}
+          >
             <Download size={16} />
-            Export Report
+            {exporting ? 'Exporting...' : 'Export Report'}
           </button>
-          <button type="button" className="btn-primary-action">
+          <button
+            type="button"
+            className="btn-primary-action"
+            onClick={() => setShowAnnouncementModal(true)}
+          >
             <Megaphone size={16} />
             Create Announcement
           </button>
@@ -409,6 +576,114 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showAnnouncementModal && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAnnouncementModal()
+            }
+          }}
+        >
+          <div className="modal-content announcement-modal">
+            <div className="modal-header">
+              <div>
+                <h3>Tạo thông báo hệ thống</h3>
+                <p className="announcement-modal-subtitle">Gửi thông báo realtime tới người dùng toàn hệ thống</p>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => closeAnnouncementModal()}
+                aria-label="Đóng"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form className="modal-body announcement-form" onSubmit={handleCreateAnnouncement}>
+              <label className="announcement-label" htmlFor="announcement-title">Tiêu đề</label>
+              <input
+                id="announcement-title"
+                className="announcement-input"
+                value={announcementTitle}
+                onChange={(event) => setAnnouncementTitle(event.target.value)}
+                placeholder="Ví dụ: Bảo trì hệ thống"
+                maxLength={120}
+              />
+
+              <label className="announcement-label" htmlFor="announcement-content">Nội dung</label>
+              <Editor
+                id="announcement-content"
+                apiKey={tinyApiKey}
+                tinymceScriptSrc="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js"
+                value={announcementContent}
+                init={{
+                  height: 300,
+                  menubar: false,
+                  statusbar: false,
+                  branding: false,
+                  promotion: false,
+                  plugins: [
+                    'advlist autolink lists link charmap preview anchor',
+                    'searchreplace visualblocks code fullscreen',
+                    'insertdatetime table paste help wordcount',
+                  ],
+                  toolbar:
+                    'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | code',
+                  content_style:
+                    'body { font-family:Plus Jakarta Sans,Arial,sans-serif; font-size:14px; color:#0f172a; }',
+                }}
+                onEditorChange={(content) => setAnnouncementContent(content)}
+              />
+
+              <div className="announcement-helper">
+                <span>{announcementContent.replace(/<[^>]*>/g, '').trim().length}/500 ký tự</span>
+              </div>
+
+              <p className="announcement-label">Đối tượng nhận</p>
+              <div className="announcement-audience-row">
+                <button
+                  type="button"
+                  className={`announcement-audience-btn ${announcementAudience === 'all' ? 'active' : ''}`}
+                  onClick={() => setAnnouncementAudience('all')}
+                >
+                  <Users size={14} />
+                  Tất cả người dùng
+                </button>
+                <button
+                  type="button"
+                  className={`announcement-audience-btn ${announcementAudience === 'active' ? 'active' : ''}`}
+                  onClick={() => setAnnouncementAudience('active')}
+                >
+                  <UserCheck2 size={14} />
+                  Người dùng đang hoạt động
+                </button>
+              </div>
+
+              <div className="modal-footer-actions announcement-actions">
+                <button
+                  type="button"
+                  className="modal-footer-btn subtle"
+                  onClick={() => closeAnnouncementModal()}
+                  disabled={creatingAnnouncement}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="modal-footer-btn primary"
+                  disabled={creatingAnnouncement}
+                >
+                  <Send size={14} />
+                  {creatingAnnouncement ? 'Đang gửi...' : 'Gửi thông báo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

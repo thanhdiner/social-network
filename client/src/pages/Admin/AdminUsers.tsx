@@ -17,6 +17,13 @@ const AdminUsers: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [showDetail, setShowDetail] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newUsername, setNewUsername] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newRole, setNewRole] = useState<'user' | 'admin'>('user')
+  const [creatingUser, setCreatingUser] = useState(false)
   const [roleSummary, setRoleSummary] = useState({ admins: 0, users: 0 })
   const roleDropdownRef = useRef<HTMLDivElement | null>(null)
 
@@ -107,6 +114,43 @@ const AdminUsers: React.FC = () => {
       loadRoleSummary()
     } catch {
       toast.error('Xóa thất bại')
+    }
+  }
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = newName.trim()
+    const username = newUsername.trim()
+    const email = newEmail.trim()
+    const password = newPassword
+
+    if (!username || !email || !password) {
+      toast.error('Vui lòng điền username, email và mật khẩu')
+      return
+    }
+
+    if (password.length < 6) {
+      toast.error('Mật khẩu phải có ít nhất 6 ký tự')
+      return
+    }
+
+    setCreatingUser(true)
+    try {
+      await adminService.createUser({ name, username, email, password, role: newRole })
+      toast.success('Tạo người dùng thành công')
+      setShowAddModal(false)
+      setNewName('')
+      setNewUsername('')
+      setNewEmail('')
+      setNewPassword('')
+      setNewRole('user')
+      setPage(1)
+      load()
+      loadRoleSummary()
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể tạo người dùng')
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -215,7 +259,7 @@ const AdminUsers: React.FC = () => {
           <button
             type="button"
             className="users-add-btn"
-            onClick={() => toast.info('Hiện chưa hỗ trợ thêm người dùng từ trang admin')}
+            onClick={() => setShowAddModal(true)}
           >
             <UserPlus size={16} />
             Thêm người dùng
@@ -441,6 +485,88 @@ const AdminUsers: React.FC = () => {
           </div>
         </article>
       </div>
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div
+          className="modal-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowAddModal(false)
+          }}
+        >
+          <div className="modal-content add-user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Thêm người dùng</h3>
+                <p className="modal-subtitle">Tạo tài khoản mới cho người dùng</p>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setShowAddModal(false)}
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form className="modal-body" onSubmit={handleCreateUser}>
+              <label className="form-label">Họ và tên</label>
+              <input
+                className="form-input"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Tên đầy đủ (tuỳ chọn)"
+              />
+
+              <label className="form-label">Username</label>
+              <input
+                className="form-input"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="username"
+              />
+
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="email@example.com"
+              />
+
+              <label className="form-label">Mật khẩu</label>
+              <input
+                className="form-input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mật khẩu (ít nhất 6 ký tự)"
+              />
+
+              <label className="form-label">Vai trò</label>
+              <div className="role-select-row">
+                <button type="button" className={`role-btn ${newRole === 'user' ? 'active' : ''}`} onClick={() => setNewRole('user')}>
+                  User
+                </button>
+                <button type="button" className={`role-btn ${newRole === 'admin' ? 'active' : ''}`} onClick={() => setNewRole('admin')}>
+                  Admin
+                </button>
+              </div>
+
+              <div className="modal-footer-actions">
+                <button type="button" className="modal-footer-btn subtle" onClick={() => setShowAddModal(false)} disabled={creatingUser}>
+                  Hủy
+                </button>
+                <button type="submit" className="modal-footer-btn primary" disabled={creatingUser}>
+                  {creatingUser ? 'Đang tạo...' : 'Tạo người dùng'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* User Detail Modal */}
       {showDetail && selectedUser && (

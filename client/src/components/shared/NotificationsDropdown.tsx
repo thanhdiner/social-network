@@ -1,11 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
-import { Bell, X, UserPlus, Heart, MessageCircle, UserMinus, Share2 } from 'lucide-react'
+import { Bell, X, UserPlus, Heart, MessageCircle, UserMinus, Share2, Megaphone } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import socketService from '@/services/socketService'
 import notificationService from '@/services/notificationService'
 import type { Notification } from '@/services/notificationService'
 import { formatDistanceToNow } from 'date-fns'
-import { getReel } from '@/services/reelService'
+
+const htmlToPlainText = (value?: string) => {
+  if (!value) return ''
+
+  if (typeof window === 'undefined') {
+    return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+
+  const temp = window.document.createElement('div')
+  temp.innerHTML = value
+  return (temp.textContent || temp.innerText || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 export const NotificationsDropdown = () => {
   const navigate = useNavigate()
@@ -144,6 +157,8 @@ export const NotificationsDropdown = () => {
         return <MessageCircle className="text-blue-500" size={20} />
       case 'share':
         return <Share2 className="text-green-500" size={20} />
+      case 'announcement':
+        return <Megaphone className="text-orange-500" size={20} />
       default:
         return <Bell className="text-gray-500" size={20} />
     }
@@ -181,6 +196,17 @@ export const NotificationsDropdown = () => {
             <span className="font-semibold">{notification.actorName}</span> {notification.content}
           </>
         )
+      case 'announcement':
+        {
+          const plainContent = htmlToPlainText(notification.content)
+          const readableContent = plainContent || 'Bạn có một thông báo mới'
+
+          return (
+            <>
+              <span className="font-semibold">Thông báo hệ thống:</span> {readableContent}
+            </>
+          )
+        }
       default:
         return notification.content
     }
@@ -188,42 +214,8 @@ export const NotificationsDropdown = () => {
 
   const handleNotificationClick = async (notification: Notification) => {
     setIsOpen(false)
-    
-    // Navigate based on notification type
-    if (notification.type === 'follow' && notification.actorUsername) {
-      // For follow notifications, navigate to the follower's profile
-      navigate(`/profile/${notification.actorUsername}`)
-      return
-    }
 
-    if (
-      (notification.type === 'like' ||
-        notification.type === 'comment' ||
-        notification.type === 'share') &&
-      notification.relatedId
-    ) {
-      const normalizedContent = notification.content?.toLowerCase() ?? ''
-
-      // Fast paths based on explicit wording
-      if (normalizedContent.includes('reel')) {
-        navigate(`/reels/${notification.relatedId}`)
-        return
-      }
-
-      if (normalizedContent.includes('post')) {
-        navigate(`/post/${notification.relatedId}`)
-        return
-      }
-
-      // Fallback: try loading as reel first (covers localized content where "reel" keyword changes)
-      try {
-        await getReel(notification.relatedId)
-        navigate(`/reels/${notification.relatedId}`)
-      } catch (error) {
-        // If fetching the reel fails, assume it's a post
-        navigate(`/post/${notification.relatedId}`)
-      }
-    }
+    navigate(`/notifications/${notification.id}`)
   }
 
   return (
@@ -245,14 +237,25 @@ export const NotificationsDropdown = () => {
           {/* Header */}
           <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white sticky top-0 z-10">
             <h3 className="font-semibold text-lg text-gray-800">Notifications</h3>
-            {notifications.length > 0 && (
+            <div className="flex items-center gap-3">
               <button
-                onClick={clearAll}
-                className="text-sm text-orange-500 hover:text-orange-600 font-medium cursor-pointer"
+                onClick={() => {
+                  setIsOpen(false)
+                  navigate('/notifications')
+                }}
+                className="text-sm text-gray-500 hover:text-orange-600 font-medium cursor-pointer"
               >
-                Clear all
+                Xem tất cả
               </button>
-            )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAll}
+                  className="text-sm text-orange-500 hover:text-orange-600 font-medium cursor-pointer"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Notifications List */}

@@ -2,7 +2,7 @@ import api from './api'
 
 export interface Notification {
   id: string
-  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message' | 'share'
+  type: 'follow' | 'unfollow' | 'like' | 'comment' | 'message' | 'share' | 'announcement'
   content: string
   userId: string
   actorId?: string
@@ -29,6 +29,11 @@ class NotificationService {
   async getUnreadCount(): Promise<number> {
     const response = await api.get('/notifications/unread-count')
     return response.data.count
+  }
+
+  async getNotificationById(notificationId: string): Promise<Notification> {
+    const response = await api.get(`/notifications/${notificationId}`)
+    return response.data
   }
 
   async markAsRead(notificationId: string): Promise<void> {

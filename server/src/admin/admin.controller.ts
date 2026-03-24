@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Delete,
   Param,
@@ -9,6 +10,7 @@ import {
   UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
+  Request,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminJwtGuard } from './admin.guard';
@@ -35,7 +37,53 @@ export class AdminController {
     return this.adminService.getRecentActivity();
   }
 
+  @Post('dashboard/announcement')
+  createAnnouncement(
+    @Request()
+    req: { admin: { adminId: string; username: string; name: string } },
+    @Body()
+    body: {
+      title?: string;
+      content: string;
+      audience?: 'all' | 'active';
+    },
+  ) {
+    return this.adminService.createAnnouncement({
+      adminId: req.admin.adminId,
+      adminName: req.admin.name,
+      title: body.title,
+      content: body.content,
+      audience: body.audience,
+    });
+  }
+
   // ─── Users ────────────────────────────────────────────────────────────────────
+
+  @Post('users')
+  createUser(
+    @Request()
+    req: { admin: { adminId: string; username: string; name: string } },
+    @Body()
+    body: {
+      name?: string;
+      username: string;
+      email: string;
+      password: string;
+      role?: 'admin' | 'user';
+      isActive?: boolean;
+      avatar?: string;
+    },
+  ) {
+    return this.adminService.createUser({
+      name: body.name,
+      username: body.username,
+      email: body.email,
+      password: body.password,
+      role: body.role,
+      isActive: body.isActive,
+      avatar: body.avatar,
+    });
+  }
 
   @Get('users')
   getUsers(

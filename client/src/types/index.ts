@@ -224,7 +224,14 @@ export interface ConversationCustomization {
 }
 
 // Notification Types
-export type NotificationType = 'like' | 'comment' | 'follow' | 'message';
+export type NotificationType =
+  | 'like'
+  | 'comment'
+  | 'follow'
+  | 'unfollow'
+  | 'message'
+  | 'share'
+  | 'announcement';
 
 export interface Notification {
   id: string;
