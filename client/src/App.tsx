@@ -26,6 +26,14 @@ import CreateReelPage from '@/pages/Reels/CreateReel'
 // ReelDetailPage unused now; deep links handled by ReelsPage
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
 import { VideoCallModal } from '@/components/shared/VideoCallModal'
+import { AdminRoute } from '@/components/AdminRoute'
+import { AdminLayout } from '@/pages/Admin/AdminLayout'
+import AdminLogin from '@/pages/Admin/AdminLogin'
+import AdminDashboard from '@/pages/Admin/AdminDashboard'
+import AdminUsers from '@/pages/Admin/AdminUsers'
+import AdminPosts from '@/pages/Admin/AdminPosts'
+import AdminReels from '@/pages/Admin/AdminReels'
+import '@/pages/Admin/admin.css'
 
 function App() {
   return (
@@ -209,6 +217,49 @@ function App() {
                   <CreateReelPage />
                 </MainLayout>
               </ProtectedRoute>
+            }
+          />
+
+          {/* Admin routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminUsers />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/posts"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminPosts />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/reels"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminReels />
+                </AdminLayout>
+              </AdminRoute>
             }
           />
 

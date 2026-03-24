@@ -15,7 +15,19 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
-    if (token) {
+
+    const headers = config.headers as unknown as {
+      Authorization?: string;
+      authorization?: string;
+      get?: (name: string) => string | null;
+    };
+    const existingAuth =
+      headers?.Authorization ||
+      headers?.authorization ||
+      (typeof headers?.get === 'function' ? headers.get('Authorization') : null);
+
+    // Preserve explicit Authorization headers (e.g. admin token) passed by callers.
+    if (token && !existingAuth) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -34,7 +46,15 @@ api.interceptors.response.use(
     // If error is 401 and we haven't tried to refresh yet
     // Don't attempt refresh for auth endpoints (login/register/refresh) to avoid loops
     const requestUrl: string | undefined = originalRequest?.url || originalRequest?.baseURL || undefined;
-    if (requestUrl && (requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register') || requestUrl.includes('/auth/refresh'))) {
+    if (
+      requestUrl &&
+      (
+        requestUrl.includes('/auth/login') ||
+        requestUrl.includes('/auth/register') ||
+        requestUrl.includes('/auth/refresh') ||
+        requestUrl.includes('/admin/auth')
+      )
+    ) {
       return Promise.reject(error);
     }
 

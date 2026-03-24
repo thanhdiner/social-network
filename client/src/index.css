@@ -259,3 +259,26 @@ a:hover {
 [data-chat-icon-button="true"]:hover {
   background-color: var(--chat-accent-soft, #fff7ed);
 }
+
+.comment-textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.comment-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comment-textarea::-webkit-scrollbar-thumb {
+  background-color: #d1d5db; /* gray-300 */
+  border-radius: 3px;
+}
+
+.comment-textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af; /* gray-400 */
+}
+
+/* For Firefox */
+.comment-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}

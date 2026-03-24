@@ -299,11 +299,11 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
   }
 
   return (
-    <div className="space-y-3">
-      <div className="max-h-96 overflow-y-auto space-y-3 pr-4 pb-2">
-        {comments.map(comment => (
-        <div key={comment.id} className="flex gap-2 group">
-          <Link to={`/profile/${comment.user?.username}`} className="cursor-pointer">
+    <div className="space-y-3 overflow-x-hidden">
+      <div className="max-h-96 overflow-y-auto overflow-x-hidden space-y-3 pr-4 pb-2">
+  {comments.map(comment => (
+  <div key={comment.id} className="flex flex-col sm:flex-row gap-2 group max-w-full">
+          <Link to={`/profile/${comment.user?.username}`} className="cursor-pointer shrink-0">
             <Avatar
               src={comment.user?.avatar}
               name={comment.user?.name || 'User'}
@@ -311,8 +311,8 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
               className="shrink-0"
             />
           </Link>
-          <div className="flex-1 min-w-0">
-            <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block max-w-full">
+          <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+            <div className="bg-gray-100 rounded-2xl px-3 py-2 w-full max-w-full break-words">
               <Link to={`/profile/${comment.user?.username}`} className="font-semibold text-sm text-gray-800 hover:text-orange-600 transition cursor-pointer">
                 {comment.user?.name}
               </Link>
@@ -340,7 +340,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-800 wrap-break-word">{comment.content}</p>
+                        <p className="text-sm text-gray-800 break-words break-all whitespace-normal">{comment.content}</p>
                   {comment.imageUrl && (
                     <img
                       src={comment.imageUrl}
@@ -352,7 +352,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1 px-3 text-xs text-gray-500">
+            <div className="flex flex-wrap items-center gap-2 mt-1 px-3 text-xs text-gray-500">
               <span>{formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}</span>
               
               {/* Like button with ReactionPicker */}
@@ -389,7 +389,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
             
             {/* Reply form */}
             {replyingTo === comment.id && (
-              <div className="mt-2 ml-3">
+              <div className="mt-2 ml-0 sm:ml-3 max-w-full overflow-hidden">
                 <div className="flex items-center gap-2 mb-2 px-3">
                   <span className="text-xs text-gray-500">Replying</span>
                   <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
@@ -405,13 +405,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                     <X className="w-3 h-3" />
                   </button>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 max-w-full">
                   <Avatar 
                     src={currentUser?.avatar || undefined}
                     name={currentUser?.name || 'User'}
                     size="sm"
+                    className="shrink-0"
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0 max-w-full overflow-hidden">
                     {/* Image preview */}
                     {replyImagePreview && (
                       <div className="relative mb-2 inline-block">
@@ -428,14 +429,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         </button>
                       </div>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 items-center">
                       <input
                         ref={replyInputRef}
                         type="text"
                         value={replyContent}
                         onChange={(e) => setReplyContent(e.target.value)}
                         placeholder={`Reply to ${replyingToUser?.name}...`}
-                        className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 w-full"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
                             handleReplySubmit(comment.id);
@@ -449,13 +450,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         onChange={handleReplyImageSelect}
                         className="hidden"
                       />
-                      <button
-                        onClick={() => replyImageInputRef.current?.click()}
-                        className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                        title="Add image"
-                      >
-                        <ImageIcon className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => replyImageInputRef.current?.click()}
+                          className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
+                          title="Add image"
+                        >
+                          <ImageIcon className="w-5 h-5" />
+                        </button>
                       {/* AI buttons for reply (icon-only) */}
                       <button
                         onClick={async () => {
@@ -506,10 +508,11 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                       <button
                         onClick={() => handleReplySubmit(comment.id)}
                         disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
-                        className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer w-full sm:w-auto"
                       >
                         {isUploadingReplyImage ? 'Sending...' : 'Send'}
                       </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -518,7 +521,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
 
             {/* Nested replies */}
             {comment.replies && comment.replies.length > 0 && (
-              <div className="mt-2 ml-8 space-y-2">
+              <div className="mt-2 ml-4 sm:ml-8 space-y-2 max-w-full overflow-hidden">
                 {(() => {
                   const total = comment.replies?.length || 0
                   const isExpanded = !!expandedReplies[comment.id]
@@ -529,25 +532,26 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                       {total > visible.length && (
                         <button
                           onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: true }))}
-                          className="text-sm text-gray-500 hover:underline ml-8"
+                          className="text-sm text-gray-500 hover:underline ml-4 sm:ml-8"
                         >
                           View previous replies ({total - visible.length})
                         </button>
                       )}
 
                       {visible.map((reply) => (
-                  <div key={reply.id} className="flex gap-2 group">
+                  <div key={reply.id} className="flex gap-2 group max-w-full">
                     <Avatar 
                       src={reply.user?.avatar || undefined}
                       name={reply.user?.name || 'User'}
                       size="sm"
+                      className="shrink-0"
                     />
-                    <div className="flex-1">
-                      <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block max-w-full">
+                    <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2 w-full max-w-full break-words">
                         <Link to={`/profile/${reply.user?.username}`} className="font-semibold text-sm hover:underline cursor-pointer">
                           {reply.user?.name}
                         </Link>
-                        <p className="text-sm text-gray-800 wrap-break-word">
+                        <p className="text-sm text-gray-800 break-words break-all whitespace-normal">
                           {reply.content.startsWith('@') ? (
                             <>
                               {(() => {
@@ -595,7 +599,7 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                                     ) : (
                                       <span className="font-semibold text-orange-500 mr-1">@{taggedName}</span>
                                     )}
-                                    <span className="text-sm text-gray-800">{remainingContent}</span>
+                                    <span className="text-sm text-gray-800 break-words whitespace-normal">{remainingContent}</span>
                                   </>
                                 )
                               })()}
@@ -637,7 +641,6 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           className="hover:underline font-semibold cursor-pointer flex items-center gap-1"
                         >
                           <MessageCircle className="w-3 h-3" />
-                          Reply
                         </button>
 
                         {/* Delete button for reply - only show if current user is the author */}
@@ -647,7 +650,6 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             className="hover:underline font-semibold cursor-pointer flex items-center gap-1 text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-3 h-3" />
-                            Delete
                           </button>
                         )}
 
@@ -661,14 +663,13 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                     </div>
                   </div>
                 ))}
-
                     </>
                   )
                 })()}
                 
                 {/* Reply form for replying to a reply */}
                 {replyingTo?.startsWith('reply-') && (
-                  <div className="mt-2">
+                  <div className="mt-2 max-w-full overflow-hidden">
                     <div className="flex items-center gap-2 mb-2 px-3">
                       <span className="text-xs text-gray-500">Replying</span>
                       <span className="text-xs font-semibold text-orange-500">{replyingToUser?.name}</span>
@@ -684,13 +685,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                         <X className="w-3 h-3" />
                       </button>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2 max-w-full">
                       <Avatar 
                         src={currentUser?.avatar || undefined}
                         name={currentUser?.name || 'User'}
                         size="sm"
+                        className="shrink-0"
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 max-w-full overflow-hidden">
                         {/* Image preview */}
                         {replyImagePreview && (
                           <div className="relative mb-2 inline-block">
@@ -707,14 +709,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             </button>
                           </div>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2 items-center">
                           <input
                             ref={replyingTo?.startsWith('reply-') ? replyInputRef : null}
                             type="text"
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder={`Reply to ${replyingToUser?.name}...`}
-                            className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            className="flex-1 px-3 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 w-full"
                             onKeyPress={(e) => {
                               if (e.key === 'Enter' && (replyContent.trim() || replyImage)) {
                                 handleReplySubmit(comment.id);
@@ -728,15 +730,16 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                             onChange={handleReplyImageSelect}
                             className="hidden"
                           />
-                          <button
-                            onClick={() => replyImageInputRef.current?.click()}
-                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
-                            title="Add image"
-                          >
-                            <ImageIcon className="w-5 h-5" />
-                          </button>
-                          {/* AI buttons for reply-to-reply (icon-only) */}
-                          <button
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => replyImageInputRef.current?.click()}
+                              className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition cursor-pointer"
+                              title="Add image"
+                            >
+                              <ImageIcon className="w-5 h-5" />
+                            </button>
+                            {/* AI buttons for reply-to-reply (icon-only) */}
+                            <button
                             onClick={async () => {
                               if (!replyContent.trim()) return
                               setIsAiProcessing(true)
@@ -782,13 +785,14 @@ export const CommentList = ({ postId, refresh, initialLimit = 3 }: CommentListPr
                           >
                             <Wand2 className={`w-4 h-4 ${isAiProcessing ? 'text-gray-400' : 'text-orange-600'}`} />
                           </button>
-                          <button
-                          onClick={() => handleReplySubmit(comment.id)}
-                          disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
-                          className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          {isUploadingReplyImage ? 'Sending...' : 'Send'}
-                        </button>
+                            <button
+                              onClick={() => handleReplySubmit(comment.id)}
+                              disabled={(!replyContent.trim() && !replyImage) || isUploadingReplyImage}
+                              className="px-4 py-2 bg-orange-500 text-white rounded-full text-sm hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer w-full sm:w-auto"
+                            >
+                              {isUploadingReplyImage ? 'Sending...' : 'Send'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

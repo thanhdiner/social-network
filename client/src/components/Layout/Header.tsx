@@ -1,4 +1,4 @@
-﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Settings } from 'lucide-react'
+﻿import { MessageCircle, TextAlignJustify, LogOut, User, UserCog, Settings, ChevronRight } from 'lucide-react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useEffect, useRef } from 'react'
@@ -22,12 +22,6 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const chatButtonRef = useRef<HTMLDivElement>(null)
-
-  // Dev debug: log header's unreadCount and popup state to verify re-renders
-  useEffect(() => {
-    // Use warn so it's visible even if 'log' is filtered
-    console.warn('[Header] render/update', { unreadCount, isPopupOpen, path: location.pathname })
-  }, [unreadCount, isPopupOpen, location.pathname])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -59,6 +53,29 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
 
   const avatarUrl = currentUser?.avatar || user?.avatar
   const displayName = user?.name || 'User'
+  const username = user?.username || 'me'
+  const profilePath = `/profile/${username}`
+
+  const menuItems = [
+    {
+      to: profilePath,
+      label: 'My Profile',
+      icon: User,
+      isActive: location.pathname.startsWith('/profile/') && location.pathname !== '/profile/edit',
+    },
+    {
+      to: '/profile/edit',
+      label: 'Edit Profile',
+      icon: UserCog,
+      isActive: location.pathname === '/profile/edit',
+    },
+    {
+      to: '/settings/account',
+      label: 'Account Settings',
+      icon: Settings,
+      isActive: location.pathname.startsWith('/settings/account'),
+    },
+  ]
 
   const handleChatIconClick = () => {
     if (window.innerWidth < 768) {
@@ -123,9 +140,12 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
         </span>
 
         {/* Avatar */}
-        <div
+        <button
+          type="button"
           onClick={() => setOpen(!open)}
           className="cursor-pointer hover:ring-2 hover:ring-orange-300 transition rounded-full"
+          aria-label="Open profile menu"
+          aria-expanded={open}
         >
           <Avatar
             src={avatarUrl}
@@ -133,64 +153,58 @@ export const Header = ({ onToggleSidebar }: HeaderProps) => {
             size="lg"
             className="border-2 border-orange-200"
           />
-        </div>
+        </button>
 
         {/* Dropdown menu */}
         {open && (
-          <div className="absolute top-14 right-0 w-72 bg-white rounded-2xl shadow-lg border z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+          <div className="absolute top-14 right-0 w-64 rounded-2xl border border-orange-100/80 bg-white/95 p-2 shadow-[0_20px_45px_-22px_rgba(249,115,22,0.45)] backdrop-blur-md z-50 animate-in fade-in slide-in-from-top-2">
             {/* Header card */}
-            <div className="bg-linear-to-r from-orange-400 to-orange-500 px-5 py-4 text-white">
-              <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-linear-to-r from-orange-500 to-orange-400 px-3 py-3 text-white">
+              <div className="flex items-center gap-2.5">
                 <Avatar
                   src={avatarUrl}
                   name={displayName}
-                  size="lg"
+                  size="md"
                   className="border-2 border-white"
                 />
-                <div>
-                  <p className="font-semibold text-base">{displayName}</p>
-                  <p className="text-sm opacity-90">Available now</p>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-sm">{displayName}</p>
+                  <p className="truncate text-[11px] text-orange-100">@{username}</p>
                 </div>
               </div>
             </div>
 
             {/* Links */}
-            <div className="divide-y">
-              <div className="space-y-1 py-2">
-                <Link
-                  to={`/profile/${user?.username || 'me'}`}
-                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-orange-50 transition"
-                  onClick={() => setOpen(false)}
-                >
-                  <User className="text-blue-400" />
-                  <span className="text-gray-700 font-medium">My Profile</span>
-                </Link>
-                <Link
-                  to="/profile/edit"
-                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-orange-50 transition"
-                  onClick={() => setOpen(false)}
-                >
-                  <UserCog className="text-orange-400" />
-                  <span className="text-gray-700 font-medium">Edit Profile</span>
-                </Link>
-                <Link
-                  to="/settings/account"
-                  className="flex items-center gap-3 px-5 py-2.5 hover:bg-orange-50 transition"
-                  onClick={() => setOpen(false)}
-                >
-                  <Settings className="text-orange-400" />
-                  <span className="text-gray-700 font-medium">Account Settings</span>
-                </Link>
-                {/* Privacy Settings removed per request */}
+            <div className="pt-2">
+              <div className="space-y-1">
+                {menuItems.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition cursor-pointer ${
+                      item.isActive
+                        ? 'bg-orange-50 text-orange-600'
+                        : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
+                    }`}
+                    onClick={() => setOpen(false)}
+                  >
+                    <item.icon
+                      size={17}
+                      className={item.isActive ? 'text-orange-500' : 'text-gray-400 group-hover:text-orange-500'}
+                    />
+                    <span className="flex-1">{item.label}</span>
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-orange-300" />
+                  </Link>
+                ))}
               </div>
 
               {/* Logout */}
-              <div className="px-5 py-3 bg-gray-50">
+              <div className="mt-2 border-t border-gray-100 pt-2">
                 <button data-chat-trigger
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white py-2.5 rounded-xl hover:bg-orange-600 transition font-medium"
+                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-semibold text-red-500 hover:bg-red-50 transition cursor-pointer"
                 >
-                  <LogOut size={18} />
+                  <LogOut size={17} />
                   Sign Out
                 </button>
               </div>

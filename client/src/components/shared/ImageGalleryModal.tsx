@@ -24,6 +24,7 @@ interface ImageGalleryModalProps {
   postId: string
   post: Post
   onClose: () => void
+  onShare?: (post: Post) => void
 }
 
 export const ImageGalleryModal = ({ images, initialIndex = 0, postId, post, onClose }: ImageGalleryModalProps) => {

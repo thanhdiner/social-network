@@ -313,28 +313,28 @@ export default function ReelsPage() {
         {/* Create Reel Button - still show when no reels */}
         <button
           onClick={() => navigate('/reels/create')}
-          className={`fixed top-20 z-30 text-white rounded-full p-4 shadow-2xl transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-orange-500/50 ${
-            showComments ? 'sm:right-[420px] right-4' : 'right-4'
+          className={`fixed md:top-20 top-4 z-30 text-white rounded-full md:p-4 p-3 shadow-2xl transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-orange-500/50 ${
+            showComments ? 'sm:right-[420px] right-4' : 'md:right-4 right-4'
           }`}
           style={{
             background: 'linear-gradient(135deg, #f97316, #ea580c)',
           }}
           title="Tạo Reel mới"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="md:w-6 md:h-6 w-5 h-5" />
         </button>
 
-        <div className="h-full flex flex-col items-center justify-center gap-4">
+        <div className="h-full flex flex-col items-center justify-center gap-4 px-4">
           <div 
-            className="w-24 h-24 rounded-full flex items-center justify-center border-2 border-orange-500/30"
+            className="md:w-24 md:h-24 w-20 h-20 rounded-full flex items-center justify-center border-2 border-orange-500/30"
             style={{
               background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(234, 88, 12, 0.2))',
             }}
           >
-            <Plus className="w-12 h-12 text-orange-400" />
+            <Plus className="md:w-12 md:h-12 w-10 h-10 text-orange-400" />
           </div>
-          <p className="text-white text-xl font-medium">Không có reels nào</p>
-          <p className="text-gray-400 text-sm">Hãy tạo reel đầu tiên của bạn!</p>
+          <p className="text-white md:text-xl text-lg font-medium text-center">Không có reels nào</p>
+          <p className="text-gray-400 md:text-sm text-xs text-center">Hãy tạo reel đầu tiên của bạn!</p>
         </div>
       </div>
     );
@@ -350,15 +350,15 @@ export default function ReelsPage() {
       {/* Create Reel Button */}
       <button
         onClick={() => navigate('/reels/create')}
-        className={`fixed top-20 z-30 text-white rounded-full p-4 shadow-2xl cursor-pointer hover:scale-110 hover:shadow-orange-500/50 transition-all duration-300 ${
-          showComments ? 'sm:right-[420px] right-4' : 'right-4'
+        className={`fixed md:top-20 top-4 z-30 text-white rounded-full md:p-4 p-3 shadow-2xl cursor-pointer hover:scale-110 hover:shadow-orange-500/50 transition-all duration-300 ${
+          showComments ? 'sm:right-[420px] right-4' : 'md:right-4 right-4'
         }`}
         style={{
           background: 'linear-gradient(135deg, #f97316, #ea580c)',
         }}
         title="Tạo Reel mới"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="md:w-6 md:h-6 w-5 h-5" />
       </button>
 
       <div
@@ -401,14 +401,14 @@ export default function ReelsPage() {
 
       {/* Feed mode selector */}
       <div
-        className={`fixed top-20 z-40 flex gap-2 bg-black/30 backdrop-blur-md p-1.5 rounded-full border border-white/10 transition-all duration-300 ${
-          showComments ? 'sm:right-[520px] right-4' : 'right-20'
+        className={`fixed md:top-20 top-4 z-40 flex gap-1 md:gap-2 bg-black/30 backdrop-blur-md p-1 md:p-1.5 rounded-full border border-white/10 transition-all duration-300 ${
+          showComments ? 'sm:right-[520px] md:right-20 right-4' : 'md:right-20 right-4'
         }`}
       >
         <button
           type="button"
           onClick={() => changeMode('default')}
-          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+          className={`md:px-4 px-3 md:py-2 py-1.5 rounded-full transition-all duration-300 cursor-pointer md:text-sm text-xs font-semibold ${
             mode === 'default' 
               ? 'text-white shadow-lg' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -422,7 +422,7 @@ export default function ReelsPage() {
         <button
           type="button"
           onClick={() => changeMode('trending')}
-          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+          className={`md:px-4 px-3 md:py-2 py-1.5 rounded-full transition-all duration-300 cursor-pointer md:text-sm text-xs font-semibold ${
             mode === 'trending' 
               ? 'text-white shadow-lg' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -436,7 +436,7 @@ export default function ReelsPage() {
         <button
           type="button"
           onClick={() => changeMode('random')}
-          className={`px-4 py-2 rounded-full transition-all duration-300 cursor-pointer text-sm font-semibold ${
+          className={`md:px-4 px-3 md:py-2 py-1.5 rounded-full transition-all duration-300 cursor-pointer md:text-sm text-xs font-semibold ${
             mode === 'random' 
               ? 'text-white shadow-lg' 
               : 'text-gray-400 hover:text-white hover:bg-white/5'
@@ -453,10 +453,10 @@ export default function ReelsPage() {
 
       {/* Loading Indicator */}
       {loading && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-6 py-3 border border-orange-500/30 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-white text-sm font-medium">Đang tải...</p>
+        <div className="fixed md:bottom-8 bottom-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full md:px-6 px-4 md:py-3 py-2 border border-orange-500/30 shadow-lg">
+          <div className="flex items-center md:gap-3 gap-2">
+            <div className="md:w-5 md:h-5 w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-white md:text-sm text-xs font-medium">Đang tải...</p>
           </div>
         </div>
       )}

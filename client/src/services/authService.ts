@@ -19,6 +19,8 @@ export interface User {
   linkedin?: string;
   emailVerified?: boolean;
   emailVerifiedAt?: string | null;
+  role?: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
   stats?: {

@@ -15,6 +15,7 @@ import { StoriesModule } from './stories/stories.module';
 import { SearchModule } from './search/search.module';
 import { ReelsModule } from './reels/reels.module';
 import { GeminiModule } from './gemini/gemini.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { GeminiModule } from './gemini/gemini.module';
     SearchModule,
     ReelsModule,
     GeminiModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

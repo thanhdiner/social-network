@@ -287,7 +287,7 @@ const AudioPlayer = memo(({ audioUrl, isOwn }: AudioPlayerProps) => {
           'flex items-center gap-2 rounded-full px-2 py-2 w-[146px]',
           isOwn ? 'bg-white/20 text-white' : 'text-white'
         )}
-        data-chat-accent-bg={isOwn ? undefined : 'true'}
+      data-chat-accent-bg={isOwn ? undefined : 'true'}
       >
         <button onClick={togglePlay} className="shrink-0 cursor-pointer">
           {isPlaying ? (
@@ -2558,7 +2558,10 @@ export default function Chat() {
                     isCustomizationDefault
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'text-gray-600 hover:bg-gray-100 cursor-pointer'
+
                   )}
+
+                  
                 >
                   Reset to default
                 </button>
@@ -2788,7 +2791,10 @@ export default function Chat() {
   return (
     <div className="flex h-full bg-white overflow-hidden">
   {/* Sidebar - Conversations list */}
-      <div className="w-96 border-r border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className={clsx(
+        selectedUser ? 'hidden lg:flex w-96' : 'flex-1 lg:w-96',
+        'border-r border-gray-200 flex flex-col h-full overflow-hidden'
+      )}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-2xl font-bold mb-3">Messages</h2>
@@ -2954,7 +2960,11 @@ export default function Chat() {
 
       {/* Main chat area */}
   <div
-        className={clsx('flex-1 flex flex-col h-full overflow-hidden', selectedUser ? 'chat-theme' : undefined)}
+        className={clsx(
+          selectedUser ? 'flex-1 flex' : 'hidden lg:flex lg:flex-1',
+          'flex-col h-full overflow-hidden',
+          selectedUser ? 'chat-theme' : undefined
+        )}
         style={selectedUser ? themeStyleVars : undefined}
       >
         {selectedUser ? (
@@ -2962,7 +2972,21 @@ export default function Chat() {
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-white relative">
               <div className="flex items-center gap-3">
-                <div className="relative cursor-pointer" onClick={() => navigateToProfile(selectedUser)}>
+                  {/* Back button for mobile to return to conversations list */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedUser(null);
+                      setShowInfoPanel(false);
+                      navigate('/chat');
+                    }}
+                    className="lg:hidden p-2 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                    title="Back to conversations"
+                    type="button"
+                  >
+                    <X className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <div className="relative cursor-pointer" onClick={() => navigateToProfile(selectedUser)}>
                   <Avatar src={selectedUser.avatar || undefined} name={displayName} className="w-10 h-10" size="md" />
                   {isSelectedOnline && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
@@ -3710,6 +3734,27 @@ export default function Chat() {
                     </div>
                   )}
 
+                  {newMessage.trim() && (
+                    <div className="flex lg:hidden gap-2 mb-3 px-4">
+                      <button
+                        type="button"
+                        onClick={handleCompleteMessageWithAI}
+                        disabled={isAiProcessingChat || uploading}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                      >
+                        {isAiProcessingChat ? 'Processing...' : 'Complete with AI'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleImproveMessageWithAI}
+                        disabled={isAiProcessingChat || uploading}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 disabled:bg-gray-100 disabled:text-gray-400 rounded-lg transition cursor-pointer"
+                      >
+                        {isAiProcessingChat ? 'Processing...' : 'Improve with AI'}
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <input
                       ref={fileInputRef}
@@ -3961,7 +4006,7 @@ export default function Chat() {
                       </button>
                       {/* AI buttons for composing messages */}
                       {newMessage.trim() && (
-                        <div className="flex gap-2 ml-2">
+                        <div className="hidden lg:flex gap-2 ml-2">
                           <button
                             type="button"
                             onClick={handleCompleteMessageWithAI}
@@ -4081,6 +4126,7 @@ export default function Chat() {
                   </div>
                 </>
               )}
+              
               <ImageViewer
                 images={viewerImages}
                 initialIndex={viewerIndex}

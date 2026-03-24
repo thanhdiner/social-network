@@ -411,7 +411,7 @@ export default function ReelPlayer({
             ref={videoRef}
             src={contentReel.videoUrl}
             // use object-contain and full both width+height so video is never cropped
-            className="w-full h-full object-contain cursor-pointer rounded-lg shadow-2xl"
+            className="w-full h-full object-contain cursor-pointer md:rounded-lg rounded-none shadow-2xl"
             loop
             playsInline
             muted={isMuted}
@@ -488,7 +488,7 @@ export default function ReelPlayer({
           {/* Play/Pause button at top-left + Volume control */}
           {displayedSize ? (
             <div
-              className="absolute pointer-events-auto flex items-center gap-2"
+              className="absolute pointer-events-auto flex items-center md:gap-2 gap-1"
               style={{
                 top: `${displayedSize.offsetTop + 12}px`,
                 left: `${displayedSize.offsetLeft + 12}px`,
@@ -500,16 +500,16 @@ export default function ReelPlayer({
                   e.stopPropagation();
                   handleVideoClick();
                 }}
-                className="flex items-center justify-center w-12 h-12 rounded-full backdrop-blur-sm transition-all duration-300 cursor-pointer shrink-0 shadow-lg hover:shadow-orange-500/50 hover:scale-105"
+                className="flex items-center justify-center md:w-12 md:h-12 w-10 h-10 rounded-full backdrop-blur-sm transition-all duration-300 cursor-pointer shrink-0 shadow-lg hover:shadow-orange-500/50 hover:scale-105"
                 style={{
                   background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(234, 88, 12, 0.9))',
                 }}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
                 {isPlaying ? (
-                  <Pause className="w-6 h-6 text-white fill-white" />
+                  <Pause className="md:w-6 md:h-6 w-5 h-5 text-white fill-white" />
                 ) : (
-                  <Play className="w-6 h-6 text-white fill-white" />
+                  <Play className="md:w-6 md:h-6 w-5 h-5 text-white fill-white" />
                 )}
               </button>
 
@@ -519,21 +519,21 @@ export default function ReelPlayer({
                   e.stopPropagation();
                   setOverlaysHidden((s) => !s);
                 }}
-                className="flex items-center justify-center w-10 h-10 rounded-full backdrop-blur-sm transition-all duration-200 cursor-pointer shrink-0 shadow-lg hover:bg-orange-500/20"
+                className="flex items-center justify-center md:w-10 md:h-10 w-9 h-9 rounded-full backdrop-blur-sm transition-all duration-200 cursor-pointer shrink-0 shadow-lg hover:bg-orange-500/20"
                 style={{ zIndex: 60 }}
                 aria-label={overlaysHidden ? 'Show overlays' : 'Hide overlays'}
                 title={overlaysHidden ? 'Show overlays' : 'Hide overlays'}
               >
                 {overlaysHidden ? (
-                  <Eye className="w-5 h-5 text-white" />
+                  <Eye className="md:w-5 md:h-5 w-4 h-4 text-white" />
                 ) : (
-                  <EyeOff className="w-5 h-5 text-white" />
+                  <EyeOff className="md:w-5 md:h-5 w-4 h-4 text-white" />
                 )}
               </button>
 
-              {/* Volume control (compact by default, expands on hover) */}
+              {/* Volume control (compact by default, expands on hover) - hidden on mobile */}
               <div
-                className="flex items-center gap-0 rounded-full bg-black/40 backdrop-blur-md py-2 pl-2 transition-all duration-200 border border-white/10"
+                className="hidden md:flex items-center gap-0 rounded-full bg-black/40 backdrop-blur-md py-2 pl-2 transition-all duration-200 border border-white/10"
                 style={{
                   paddingRight: showVolumeSlider ? '12px' : '8px',
                 }}
@@ -586,6 +586,21 @@ export default function ReelPlayer({
                   </div>
                 )}
               </div>
+              {/* Mobile volume toggle button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMute();
+                }}
+                className="md:hidden flex items-center justify-center w-9 h-9 rounded-full bg-black/40 backdrop-blur-md hover:bg-orange-500/20 transition-all duration-200 cursor-pointer shrink-0 shadow-lg border border-white/10"
+                aria-label={isMuted || volume === 0 ? 'Unmute' : 'Mute'}
+              >
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-white" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-orange-400" />
+                )}
+              </button>
             </div>
           ) : null}
 
@@ -599,14 +614,14 @@ export default function ReelPlayer({
                 <div
                   className="absolute"
                   style={{
-                    left: `${displayedSize.offsetLeft + 24}px`,
-                    bottom: '24px',
+                    left: `${displayedSize.offsetLeft + 12}px`,
+                    bottom: '12px',
                     width: `${contentWidth}px`,
                     pointerEvents: 'none' as const,
                   }}
                 >
                   <div
-                    className="pointer-events-auto flex items-center gap-3 cursor-pointer group"
+                    className="pointer-events-auto flex items-center md:gap-3 gap-2 cursor-pointer group"
                     onClick={() => {
                       if (contentReel.user?.username) {
                         navigate(`/profile/${contentReel.user.username}?tab=reels`);
@@ -615,7 +630,7 @@ export default function ReelPlayer({
                   >
                     <div className="relative">
                       {/* wrapper enforces circular crop and keeps border separate from image pixels */}
-                      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-orange-500/50 group-hover:border-orange-500 transition-all duration-300 shadow-lg bg-transparent">
+                      <div className="md:w-12 md:h-12 w-10 h-10 rounded-full overflow-hidden border-2 border-orange-500/50 group-hover:border-orange-500 transition-all duration-300 shadow-lg bg-transparent">
                         <img
                           src={contentReel.user?.avatar || '/default-avatar.png'}
                           alt={contentReel.user?.name || 'User'}
@@ -625,16 +640,16 @@ export default function ReelPlayer({
                       <div className="absolute inset-0 rounded-full bg-orange-500/0 group-hover:bg-orange-500/20 transition-all duration-300"></div>
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold group-hover:text-orange-400 transition-colors duration-200">{contentReel.user?.name}</h3>
-                      <p className="text-white/70 text-sm">
+                      <h3 className="text-white md:text-base text-sm font-semibold group-hover:text-orange-400 transition-colors duration-200">{contentReel.user?.name}</h3>
+                      <p className="text-white/70 md:text-sm text-xs">
                         {formatDistanceToNow(new Date(contentReel.createdAt), { addSuffix: true, locale: enUS })}
                       </p>
                     </div>
                   </div>
 
                   {contentReel.description ? (
-                    <div className="pointer-events-auto mt-3 bg-black/30 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-                      <p className={`text-white ${descExpanded ? '' : 'line-clamp-3'} max-w-full wrap-break-word whitespace-normal`}>
+                    <div className="pointer-events-auto md:mt-3 mt-2 bg-black/30 backdrop-blur-sm rounded-lg md:p-3 p-2 border border-white/10">
+                      <p className={`text-white md:text-base text-sm ${descExpanded ? '' : 'line-clamp-3'} max-w-full wrap-break-word whitespace-normal`}>
                         {contentReel.description}
                       </p>
                       <button
@@ -642,15 +657,15 @@ export default function ReelPlayer({
                           e.stopPropagation();
                           setDescExpanded((s) => !s);
                         }}
-                        className="text-orange-400 hover:text-orange-300 text-sm mt-2 cursor-pointer font-medium transition-colors duration-200"
+                        className="text-orange-400 hover:text-orange-300 md:text-sm text-xs md:mt-2 mt-1 cursor-pointer font-medium transition-colors duration-200"
                       >
                         {descExpanded ? 'Show less' : 'See more'}
                       </button>
                     </div>
                   ) : null}
-                  <div className="flex items-center gap-2 mt-2 pointer-events-none">
-                    <div className="bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full border border-orange-500/30">
-                      <p className="text-orange-400 text-sm font-medium">{viewsCount.toLocaleString()} views</p>
+                  <div className="flex items-center gap-2 md:mt-2 mt-1 pointer-events-none">
+                    <div className="bg-black/40 backdrop-blur-sm md:px-3 px-2 md:py-1 py-0.5 rounded-full border border-orange-500/30">
+                      <p className="text-orange-400 md:text-sm text-xs font-medium">{viewsCount.toLocaleString()} views</p>
                     </div>
                   </div>
                 </div>
@@ -667,49 +682,49 @@ export default function ReelPlayer({
           className="fixed top-1/2 -translate-y-1/2 pointer-events-auto z-40 transition-all duration-300"
           style={actionStyle}
         >
-          <div className="flex flex-col items-center gap-5 bg-black/20 backdrop-blur-md rounded-full p-3 border border-white/10 shadow-xl">
+          <div className="flex flex-col items-center md:gap-5 gap-3 bg-black/20 backdrop-blur-md rounded-full md:p-3 p-2 border border-white/10 shadow-xl">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onPrevReel?.();
               }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm p-2 hover:bg-orange-500/20 transition-colors duration-200 cursor-pointer"
+              className="flex items-center justify-center md:w-10 md:h-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm md:p-2 p-1.5 hover:bg-orange-500/20 transition-colors duration-200 cursor-pointer"
               aria-label="Previous reel"
               title="Up"
             >
-              <ArrowUp className="w-5 h-5 text-white" />
+              <ArrowUp className="md:w-5 md:h-5 w-4 h-4 text-white" />
             </button>
 
             <button 
               onClick={handleLike} 
               className="flex flex-col items-center gap-1 cursor-pointer group transition-transform duration-200 hover:scale-110"
             >
-              <div className="bg-black/40 backdrop-blur-sm rounded-full p-3 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
+              <div className="bg-black/40 backdrop-blur-sm rounded-full md:p-3 p-2 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
                 <Heart
-                  className={`w-7 h-7 transition-all duration-300 ${isLiked ? 'fill-orange-500 text-orange-500 animate-pulse' : 'text-white group-hover:text-orange-400'}`}
+                  className={`md:w-7 md:h-7 w-6 h-6 transition-all duration-300 ${isLiked ? 'fill-orange-500 text-orange-500 animate-pulse' : 'text-white group-hover:text-orange-400'}`}
                 />
               </div>
-              <span className={`text-xs mt-1 font-semibold ${isLiked ? 'text-orange-400' : 'text-white'}`}>{likesCount}</span>
+              <span className={`md:text-xs text-[10px] mt-1 font-semibold ${isLiked ? 'text-orange-400' : 'text-white'}`}>{likesCount}</span>
             </button>
 
             <button 
               onClick={onCommentClick} 
               className="flex flex-col items-center gap-1 cursor-pointer group transition-transform duration-200 hover:scale-110"
             >
-              <div className="bg-black/40 backdrop-blur-sm rounded-full p-3 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
-                <MessageCircle className="w-7 h-7 text-white group-hover:text-orange-400 transition-colors duration-300" />
+              <div className="bg-black/40 backdrop-blur-sm rounded-full md:p-3 p-2 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
+                <MessageCircle className="md:w-7 md:h-7 w-6 h-6 text-white group-hover:text-orange-400 transition-colors duration-300" />
               </div>
-              <span className="text-white text-xs mt-1 font-semibold">{reel._count?.comments || 0}</span>
+              <span className="text-white md:text-xs text-[10px] mt-1 font-semibold">{reel._count?.comments || 0}</span>
             </button>
 
             <button
               onClick={handleShareClick}
               className="flex flex-col items-center gap-1 cursor-pointer group transition-transform duration-200 hover:scale-110"
             >
-              <div className="bg-black/40 backdrop-blur-sm rounded-full p-3 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
-                <Share2 className="w-7 h-7 text-white group-hover:text-orange-400 transition-colors duration-300" />
+              <div className="bg-black/40 backdrop-blur-sm rounded-full md:p-3 p-2 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
+                <Share2 className="md:w-7 md:h-7 w-6 h-6 text-white group-hover:text-orange-400 transition-colors duration-300" />
               </div>
-              <span className="text-white text-xs mt-1 font-semibold">{sharesCount}</span>
+              <span className="text-white md:text-xs text-[10px] mt-1 font-semibold">{sharesCount}</span>
             </button>
 
             <button
@@ -717,11 +732,11 @@ export default function ReelPlayer({
                 e.stopPropagation();
                 onNextReel?.();
               }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm p-2 hover:bg-orange-500/20 transition-colors duration-200 cursor-pointer"
+              className="flex items-center justify-center md:w-10 md:h-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm md:p-2 p-1.5 hover:bg-orange-500/20 transition-colors duration-200 cursor-pointer"
               aria-label="Next reel"
               title="Down"
             >
-              <ArrowDown className="w-5 h-5 text-white" />
+              <ArrowDown className="md:w-5 md:h-5 w-4 h-4 text-white" />
             </button>
           </div>
         </div>
