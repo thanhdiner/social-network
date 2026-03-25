@@ -68,6 +68,22 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
   const [isAiProcessingComment, setIsAiProcessingComment] = useState(false);
   const [isAiProcessingReply, setIsAiProcessingReply] = useState(false);
 
+  // Measure actual header height so the drawer never covers it
+  const [headerHeight, setHeaderHeight] = useState(0);
+  useEffect(() => {
+    const el = document.querySelector('header');
+    if (!el) return;
+    const update = () => setHeaderHeight(el.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Track temp IDs of optimistic comments we sent — to ignore the socket echo
+  const pendingMyCommentIds = useRef<Set<string>>(new Set());
+  const pendingMyReplyIds = useRef<Set<string>>(new Set());
+
   const loadComments = useCallback(
     async (pageToLoad = 1) => {
       if (pageToLoad === 1) {
@@ -195,44 +211,46 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
         if (!payload) return;
         if (payload.reelId !== reelId) return;
 
-        // If it's a root comment, prepend
         if (!payload.parentId) {
           setComments((prev) => {
-            if (prev.some((comment) => comment.id === payload.id)) {
-              return prev;
+            // Skip if already exists (real ID) or it's our own optimistic echo
+            if (prev.some((c) => c.id === payload.id)) return prev;
+            // If the real comment arrived but we have an optimistic tempId for same content,
+            // replace the tempId entry instead of prepending a new one
+            const tempIdx = prev.findIndex(
+              (c) => c.id.startsWith('temp-') && c.userId === payload.userId && c.content === payload.content,
+            );
+            if (tempIdx !== -1) {
+              const next = [...prev];
+              next[tempIdx] = payload;
+              return next;
             }
-            return [payload, ...prev];
+            // Foreign comment — insert then sort by newest first
+            const next = [payload, ...prev];
+            return next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           });
         } else {
-          // It's a reply — ensure we add to replies cache and increment count
           const parentId = payload.parentId as string;
           let inserted = false;
           setRepliesState((prev) => {
             const current = prev[parentId] ?? { items: [], page: 0, hasMore: false, isLoading: false, isLoadingMore: false };
-            if (current.items.some((reply) => reply.id === payload.id)) {
-              return prev;
+            if (current.items.some((r) => r.id === payload.id)) return prev;
+            // Replace optimistic temp reply if matched by userId + content
+            const tempIdx = current.items.findIndex(
+              (r) => r.id.startsWith('temp-reply-') && r.userId === payload.userId && r.content === payload.content,
+            );
+            if (tempIdx !== -1) {
+              const items = [...current.items];
+              items[tempIdx] = payload;
+              return { ...prev, [parentId]: { ...current, items } };
             }
             inserted = true;
-            return {
-              ...prev,
-              [parentId]: {
-                ...current,
-                items: [...current.items, payload],
-              },
-            };
+            return { ...prev, [parentId]: { ...current, items: [...current.items, payload] } };
           });
-
           if (inserted) {
             setComments((prev) =>
               prev.map((c) =>
-                c.id === parentId
-                  ? {
-                      ...c,
-                      _count: {
-                        replies: (c._count?.replies || 0) + 1,
-                      },
-                    }
-                  : c,
+                c.id === parentId ? { ...c, _count: { replies: (c._count?.replies || 0) + 1 } } : c,
               ),
             );
           }
@@ -495,25 +513,53 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
     if (isSubmittingComment || isUploadingCommentImage) return;
     if (!newComment.trim() && !commentImageUrl) return;
 
+    // Snapshot inputs before clearing
+    const contentSnapshot = newComment.trim();
+    const imageSnapshot = commentImageUrl;
+
+    // Optimistic: build a temporary comment and show instantly
+    const tempId = `temp-${Date.now()}`;
+    const optimisticComment: ReelComment = {
+      id: tempId,
+      reelId,
+      userId: currentUser?.id ?? '',
+      content: contentSnapshot,
+      imageUrl: imageSnapshot ?? undefined,
+      parentId: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      user: {
+        id: currentUser?.id ?? '',
+        email: currentUser?.email ?? '',
+        name: currentUser?.name ?? '',
+        username: currentUser?.username ?? '',
+        avatar: currentUser?.avatar ?? undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      _count: { replies: 0 },
+    };
+
+    setComments((prev) => [optimisticComment, ...prev]);
+    setNewComment('');
+    setCommentImageUrl(null);
+    if (commentImageInputRef.current) commentImageInputRef.current.value = '';
+
     setIsSubmittingComment(true);
     try {
-      const payload = {
-        content: newComment.trim(),
-        imageUrl: commentImageUrl ?? undefined,
-      };
-      const created = await createReelComment(reelId, payload);
-      setComments((prev) => {
-        if (prev.some((comment) => comment.id === created.id)) {
-          return prev;
-        }
-        return [created, ...prev];
+      const created = await createReelComment(reelId, {
+        content: contentSnapshot,
+        imageUrl: imageSnapshot ?? undefined,
       });
-      setNewComment('');
-      setCommentImageUrl(null);
-      if (commentImageInputRef.current) {
-        commentImageInputRef.current.value = '';
-      }
+      // Replace the optimistic comment with the real one from server
+      setComments((prev) =>
+        prev.map((c) => (c.id === tempId ? created : c))
+      );
     } catch (error) {
+      // Revert: remove the optimistic comment
+      setComments((prev) => prev.filter((c) => c.id !== tempId));
+      setNewComment(contentSnapshot);
+      setCommentImageUrl(imageSnapshot);
       console.error('Failed to post comment', error);
     } finally {
       setIsSubmittingComment(false);
@@ -525,87 +571,97 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
     if (!replyTarget || isSubmittingReply || isUploadingReplyImage) return;
     if (!replyContent.trim() && !replyImageUrl) return;
 
+    const trimmedContent = replyContent.trim();
+    const mentionName = replyTarget.mention;
+    const imageSnapshot = replyImageUrl;
+    const parentIdSnapshot = replyTarget.parentId;
+
+    let contentToSend = trimmedContent;
+    if (mentionName) {
+      const wantedPrefix = `@${mentionName}`;
+      if (trimmedContent.startsWith(wantedPrefix)) {
+        contentToSend = trimmedContent;
+      } else if (trimmedContent.startsWith('@')) {
+        contentToSend = trimmedContent;
+      } else {
+        contentToSend = `${wantedPrefix} ${trimmedContent}`.trim();
+      }
+    }
+
+    // Optimistic: build a temp reply and show instantly
+    const tempId = `temp-reply-${Date.now()}`;
+    const optimisticReply: ReelComment = {
+      id: tempId,
+      reelId,
+      userId: currentUser?.id ?? '',
+      content: contentToSend,
+      imageUrl: imageSnapshot ?? null,
+      parentId: parentIdSnapshot,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      user: {
+        id: currentUser?.id ?? '',
+        email: currentUser?.email ?? '',
+        name: currentUser?.name ?? '',
+        username: currentUser?.username ?? '',
+        avatar: currentUser?.avatar ?? undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      _count: { replies: 0 },
+    };
+
+    setRepliesState((prev) => {
+      const current = prev[parentIdSnapshot] ?? { items: [], page: 0, hasMore: false, isLoading: false, isLoadingMore: false };
+      return { ...prev, [parentIdSnapshot]: { ...current, items: [...current.items, optimisticReply] } };
+    });
+    setComments((prev) =>
+      prev.map((c) =>
+        c.id === parentIdSnapshot ? { ...c, _count: { replies: (c._count?.replies || 0) + 1 } } : c,
+      ),
+    );
+
+    // Clear inputs immediately
+    setReplyTarget(null);
+    setReplyContent('');
+    setReplyImageUrl(null);
+    if (replyImageInputRef.current) replyImageInputRef.current.value = '';
+
     setIsSubmittingReply(true);
     try {
-      const trimmedContent = replyContent.trim();
-      const mentionName = replyTarget.mention;
-
-      // Preserve the user's typed content. Only ensure the intended mention is
-      // present as a prefix — do not try to strip mentions with a greedy regex
-      // which can accidentally remove words. Behavior:
-      // - If the user already started the reply with the exact mention (e.g.
-      //   "@Name ..."), keep the content as-is.
-      // - If the user started with a different @-mention, keep as-is (respect
-      //   user's choice).
-      // - Otherwise, prefix the intended mention (if provided).
-      let contentToSend = trimmedContent;
-      if (mentionName) {
-        const wantedPrefix = `@${mentionName}`;
-        if (trimmedContent.startsWith(wantedPrefix)) {
-          // already has the correct mention at start, keep as-is
-          contentToSend = trimmedContent;
-        } else if (trimmedContent.startsWith('@')) {
-          // starts with some other mention, don't overwrite user's text
-          contentToSend = trimmedContent;
-        } else {
-          contentToSend = `${wantedPrefix} ${trimmedContent}`.trim();
-        }
-      }
-
       const created = await createReelComment(reelId, {
         content: contentToSend,
-        parentId: replyTarget.parentId,
-        imageUrl: replyImageUrl ?? undefined,
+        parentId: parentIdSnapshot,
+        imageUrl: imageSnapshot ?? undefined,
       });
 
-      let inserted = false;
+      // Replace optimistic reply with real one
       setRepliesState((prev) => {
-        const current =
-          prev[replyTarget.parentId] ?? {
-            items: [],
-            page: 0,
-            hasMore: false,
-            isLoading: false,
-            isLoadingMore: false,
-          };
-        if (current.items.some((reply) => reply.id === created.id)) {
-          return prev;
-        }
-        inserted = true;
+        const current = prev[parentIdSnapshot];
+        if (!current) return prev;
         return {
           ...prev,
-          [replyTarget.parentId]: {
+          [parentIdSnapshot]: {
             ...current,
-            items: [...current.items, created],
-            hasMore: current.hasMore,
-            isLoading: false,
-            isLoadingMore: false,
+            items: current.items.map((r) => (r.id === tempId ? created : r)),
           },
         };
       });
-
-      if (inserted) {
-        setComments((prev) =>
-          prev.map((comment) =>
-            comment.id === replyTarget.parentId
-              ? {
-                  ...comment,
-                  _count: {
-                    replies: (comment._count?.replies || 0) + 1,
-                  },
-                }
-              : comment,
-          ),
-        );
-      }
-
-      setReplyTarget(null);
-      setReplyContent('');
-      setReplyImageUrl(null);
-      if (replyImageInputRef.current) {
-        replyImageInputRef.current.value = '';
-      }
     } catch (error) {
+      // Revert: remove optimistic reply and decrement count
+      setRepliesState((prev) => {
+        const current = prev[parentIdSnapshot];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [parentIdSnapshot]: { ...current, items: current.items.filter((r) => r.id !== tempId) },
+        };
+      });
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentIdSnapshot ? { ...c, _count: { replies: Math.max((c._count?.replies || 1) - 1, 0) } } : c,
+        ),
+      );
       console.error('Failed to post reply', error);
     } finally {
       setIsSubmittingReply(false);
@@ -841,15 +897,19 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
   };
 
   return (
-  <div className={`fixed inset-0 z-50 flex ${alignmentClasses} ${overlayClasses}`}>
+  <div
+    className={`fixed inset-x-0 bottom-0 z-40 flex ${alignmentClasses} ${overlayClasses}`}
+    style={{ top: drawer ? `${headerHeight}px` : 0 }}
+  >
       <div
         className={
           drawer
-            ? 'pointer-events-auto fixed right-0 top-[65px] bottom-0 flex w-full flex-col overflow-y-auto shadow-2xl sm:top-[65px] sm:w-[380px] border-l border-gray-800'
+            ? `pointer-events-auto fixed right-0 bottom-0 flex w-full flex-col shadow-2xl sm:w-[380px] border-l border-gray-800`
             : 'pointer-events-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border border-gray-800'
         }
         style={{
           background: 'linear-gradient(to bottom, #111827, #000000)',
+          ...(drawer ? { top: `${headerHeight}px` } : {}),
         }}
       >
         <div className="flex items-center justify-between border-b border-gray-800/50 md:p-4 p-3 bg-black/40 backdrop-blur-md">
@@ -975,7 +1035,15 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
                             ref={replyInputRef}
                             value={replyContent}
                             onChange={(event) => setReplyContent(event.target.value)}
-                            placeholder={replyTarget.mention ? `Reply to ${replyTarget.mention}...` : 'Write a reply...'}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                if (replyContent.trim() || replyImageUrl) {
+                                  handleSubmitReply(e as unknown as React.FormEvent);
+                                }
+                              }
+                            }}
+                            placeholder={replyTarget.mention ? `Reply to ${replyTarget.mention}... (Enter to send)` : 'Write a reply... (Enter to send)'}
                             className="md:min-h-20 min-h-16 resize-none bg-gray-900/50 border-gray-700/50 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/30 md:text-base text-sm"
                             disabled={isUploadingReplyImage}
                             onFocus={(e) => {
@@ -1127,7 +1195,15 @@ export default function ReelComments({ reelId, onClose, isDrawer }: ReelComments
               <Textarea
                 value={newComment}
                 onChange={(event) => setNewComment(event.target.value)}
-                placeholder={currentUser ? 'Share your thoughts...' : 'You need to sign in to comment.'}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (newComment.trim() || commentImageUrl) {
+                      handleSubmitComment(e as unknown as React.FormEvent);
+                    }
+                  }
+                }}
+                placeholder={currentUser ? 'Share your thoughts... (Enter to send, Shift+Enter for new line)' : 'You need to sign in to comment.'}
                 disabled={!currentUser || isUploadingCommentImage}
                 className="md:min-h-24 min-h-20 resize-none bg-gray-900/50 border-gray-700/50 text-white placeholder:text-gray-500 focus:border-orange-500/50 focus:ring-orange-500/30 md:text-base text-sm"
               />

@@ -138,18 +138,28 @@ export default function ReelPlayer({
   };
 
   const handleLike = async () => {
+    // Optimistic update — instant UI feedback before API responds
+    const prevLiked = isLiked;
+    const prevCount = likesCount;
+    const nextLiked = !isLiked;
+
+    setIsLiked(nextLiked);
+    setLikesCount((prev) => (nextLiked ? prev + 1 : prev - 1));
+
+    // Sound feedback immediately
     try {
-      const result = await toggleLikeReel(reel.id);
-      setIsLiked(result.liked);
-      setLikesCount((prev) => (result.liked ? prev + 1 : prev - 1));
-      // Play feedback sound: positive on like, negative on unlike
-      try {
-        if (result.liked) notificationSound.playPositive();
-        else notificationSound.playNegative();
-      } catch {
-        // ignore audio errors
-      }
+      if (nextLiked) notificationSound.playPositive();
+      else notificationSound.playNegative();
+    } catch {
+      // ignore audio errors
+    }
+
+    try {
+      await toggleLikeReel(reel.id);
     } catch (error) {
+      // Revert on failure
+      setIsLiked(prevLiked);
+      setLikesCount(prevCount);
       console.error('Error liking reel:', error);
     }
   };
@@ -701,7 +711,7 @@ export default function ReelPlayer({
             >
               <div className="bg-black/40 backdrop-blur-sm rounded-full md:p-3 p-2 group-hover:bg-orange-500/20 transition-all duration-300 border border-white/10 group-hover:border-orange-500/50">
                 <Heart
-                  className={`md:w-7 md:h-7 w-6 h-6 transition-all duration-300 ${isLiked ? 'fill-orange-500 text-orange-500 animate-pulse' : 'text-white group-hover:text-orange-400'}`}
+                  className={`md:w-7 md:h-7 w-6 h-6 transition-all duration-300 ${isLiked ? 'fill-orange-500 text-orange-500 scale-110' : 'text-white group-hover:text-orange-400'}`}
                 />
               </div>
               <span className={`md:text-xs text-[10px] mt-1 font-semibold ${isLiked ? 'text-orange-400' : 'text-white'}`}>{likesCount}</span>

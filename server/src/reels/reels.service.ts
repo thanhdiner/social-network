@@ -358,6 +358,11 @@ export class ReelsService {
   async like(reelId: string, userId: string) {
     const reel = await this.prisma.reel.findUnique({
       where: { id: reelId },
+      include: {
+        user: {
+          select: { id: true }
+        }
+      }
     });
 
     if (!reel) {
@@ -392,6 +397,32 @@ export class ReelsService {
           userId,
         },
       });
+
+      try {
+        if (reel.userId !== userId) {
+          const liker = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true, avatar: true },
+          });
+
+          if (liker) {
+            const notification = await this.notificationsService.create({
+              type: 'like',
+              content: `liked your reel`,
+              userId: reel.userId,
+              actorId: userId,
+              actorName: liker.name,
+              actorAvatar: liker.avatar || undefined,
+              relatedId: reelId,
+            });
+
+            this.chatGateway.notifyUser(reel.userId, notification);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to emit like notification', err);
+      }
+
       return { liked: true };
     }
   }

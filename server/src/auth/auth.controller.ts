@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Res, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -10,6 +11,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // 5 attempts per minute — anti brute-force
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('register')
   async register(
     @Body() dto: RegisterDto,
@@ -20,6 +23,8 @@ export class AuthController {
     return { accessToken: tokens.accessToken };
   }
 
+  // 5 attempts per minute — anti brute-force
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Post('login')
   async login(
     @Body() dto: LoginDto,
@@ -47,11 +52,14 @@ export class AuthController {
     return { message: 'Đăng xuất thành công' };
   }
 
+  // 3 attempts per minute for password reset
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('forgot-password')
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Post('reset-password')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.code, dto.newPassword);

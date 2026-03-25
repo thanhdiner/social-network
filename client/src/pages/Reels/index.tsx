@@ -402,7 +402,7 @@ export default function ReelsPage() {
       {/* Feed mode selector */}
       <div
         className={`fixed md:top-20 top-4 z-40 flex gap-1 md:gap-2 bg-black/30 backdrop-blur-md p-1 md:p-1.5 rounded-full border border-white/10 transition-all duration-300 ${
-          showComments ? 'sm:right-[520px] md:right-20 right-4' : 'md:right-20 right-4'
+          showComments ? 'sm:right-[490px] right-4' : 'md:right-20 right-4'
         }`}
       >
         <button
