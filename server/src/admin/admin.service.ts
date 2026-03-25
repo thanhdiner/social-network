@@ -736,4 +736,48 @@ export class AdminService {
     await prismaAny.reel.delete({ where: { id: reelId } });
     return { message: 'Đã xóa reel thành công' };
   }
+
+  // ─── Comment Management ──────────────────────────────────────────────────────
+
+  async getComments(page = 1, limit = 20, search?: string) {
+    const prismaAny = this.prisma as any;
+    const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (search?.trim()) {
+      where.OR = [
+        { content: { contains: search.trim(), mode: 'insensitive' } },
+        { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
+        { user: { username: { contains: search.trim(), mode: 'insensitive' } } },
+      ];
+    }
+
+    const [comments, total] = await Promise.all([
+      prismaAny.comment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, name: true, username: true, avatar: true } },
+          post: { select: { id: true, content: true } },
+        },
+      }),
+      prismaAny.comment.count({ where }),
+    ]);
+
+    return {
+      comments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async deleteComment(commentId: string) {
+    const prismaAny = this.prisma as any;
+    await prismaAny.comment.delete({ where: { id: commentId } });
+    return { message: 'Đã xóa bình luận thành công' };
+  }
 }

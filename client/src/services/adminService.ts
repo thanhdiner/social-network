@@ -160,6 +160,22 @@ export interface AdminReel {
   }
 }
 
+export interface AdminComment {
+  id: string
+  content: string
+  createdAt: string
+  user: {
+    id: string
+    name: string
+    username: string
+    avatar: string | null
+  }
+  post: {
+    id: string
+    content: string
+  } | null
+}
+
 export interface PaginatedResponse<T> {
   page: number
   limit: number
@@ -232,6 +248,15 @@ const adminService = {
   },
   deleteReel: (reelId: string) =>
     adminApi.delete(`/admin/reels/${reelId}`).then(r => r.data),
+
+  // Comments
+  getComments: (page = 1, limit = 20, search?: string) => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.append('search', search)
+    return adminApi.get<{ comments: AdminComment[]; total: number; totalPages: number }>(`/admin/comments?${params}`).then(r => r.data)
+  },
+  deleteComment: (commentId: string) =>
+    adminApi.delete(`/admin/comments/${commentId}`).then(r => r.data),
 }
 
 export default adminService

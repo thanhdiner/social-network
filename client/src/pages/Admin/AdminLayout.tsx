@@ -5,6 +5,7 @@ import {
   Users,
   FileText,
   Film,
+  MessageSquare,
   LogOut,
   Menu,
   X,
@@ -25,6 +26,7 @@ const navItems = [
   { path: '/admin/users', label: 'Người dùng', icon: Users },
   { path: '/admin/posts', label: 'Bài viết', icon: FileText },
   { path: '/admin/reels', label: 'Reels', icon: Film },
+  { path: '/admin/comments', label: 'Bình luận', icon: MessageSquare },
 ]
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {

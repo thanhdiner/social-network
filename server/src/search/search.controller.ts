@@ -41,6 +41,15 @@ export class SearchController {
     return this.searchService.searchPosts(query, user.userId, limitNum);
   }
 
+  @Get('reels')
+  async searchReels(
+    @Query('q') query: string,
+    @Query('limit') limit: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.searchService.searchReels(query, limitNum);
+  }
+
   @Get('popular')
   async getPopularSearches(@Query('limit') limit: string) {
     const limitNum = limit ? parseInt(limit, 10) : 10;

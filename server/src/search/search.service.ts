@@ -7,7 +7,7 @@ export class SearchService {
 
   async searchAll(query: string, currentUserId: string, limit = 10) {
     if (!query || query.trim().length === 0) {
-      return { users: [], posts: [] };
+      return { users: [], posts: [], reels: [] };
     }
 
     const searchQuery = query.trim();
@@ -75,6 +75,27 @@ export class SearchService {
       },
     });
 
+    // Search reels
+    const reels = await this.prisma.reel.findMany({
+      where: {
+        description: { contains: searchQuery, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        description: true,
+        videoUrl: true,
+        thumbnailUrl: true,
+        views: true,
+        createdAt: true,
+        user: {
+          select: { id: true, name: true, username: true, avatar: true },
+        },
+        _count: { select: { likes: true, comments: true } },
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
     return {
       users: users.map((user) => ({
         ...user,
@@ -86,6 +107,11 @@ export class SearchService {
         likesCount: post._count.likes,
         commentsCount: post._count.comments,
         sharesCount: post._count.shares,
+      })),
+      reels: reels.map((reel) => ({
+        ...reel,
+        likesCount: reel._count.likes,
+        commentsCount: reel._count.comments,
       })),
     };
   }
@@ -231,6 +257,38 @@ export class SearchService {
       type: 'user' as const,
       query: user.name,
       data: user,
+    }));
+  }
+
+  async searchReels(query: string, limit = 20) {
+    if (!query || query.trim().length === 0) return [];
+
+    const searchQuery = query.trim();
+
+    const reels = await this.prisma.reel.findMany({
+      where: {
+        description: { contains: searchQuery, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        description: true,
+        videoUrl: true,
+        thumbnailUrl: true,
+        views: true,
+        createdAt: true,
+        user: {
+          select: { id: true, name: true, username: true, avatar: true },
+        },
+        _count: { select: { likes: true, comments: true } },
+      },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reels.map((reel) => ({
+      ...reel,
+      likesCount: reel._count.likes,
+      commentsCount: reel._count.comments,
     }));
   }
 }

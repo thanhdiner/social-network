@@ -30,13 +30,31 @@ export interface SearchPost {
   sharesCount: number
 }
 
+export interface SearchReel {
+  id: string
+  description: string | null
+  videoUrl: string
+  thumbnailUrl: string | null
+  views: number
+  createdAt: string
+  user: {
+    id: string
+    name: string
+    username: string
+    avatar: string | null
+  }
+  likesCount: number
+  commentsCount: number
+}
+
 export interface SearchResults {
   users: SearchUser[]
   posts: SearchPost[]
+  reels: SearchReel[]
 }
 
 export const searchService = {
-  // Search all (users and posts)
+  // Search all (users, posts, and reels)
   searchAll: async (query: string, limit = 10): Promise<SearchResults> => {
     const response = await api.get(`/search?q=${encodeURIComponent(query)}&limit=${limit}`)
     return response.data
@@ -51,6 +69,12 @@ export const searchService = {
   // Search only posts
   searchPosts: async (query: string, limit = 20): Promise<SearchPost[]> => {
     const response = await api.get(`/search/posts?q=${encodeURIComponent(query)}&limit=${limit}`)
+    return response.data
+  },
+
+  // Search only reels
+  searchReels: async (query: string, limit = 20): Promise<SearchReel[]> => {
+    const response = await api.get(`/search/reels?q=${encodeURIComponent(query)}&limit=${limit}`)
     return response.data
   },
 

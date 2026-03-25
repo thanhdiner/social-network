@@ -210,4 +210,20 @@ export class AdminController {
   deleteReel(@Param('reelId') reelId: string) {
     return this.adminService.deleteReel(reelId);
   }
+
+  // ─── Comments ─────────────────────────────────────────────────────────────────
+
+  @Get('comments')
+  getComments(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('search') search?: string,
+  ) {
+    return this.adminService.getComments(page, limit, search);
+  }
+
+  @Delete('comments/:commentId')
+  deleteComment(@Param('commentId') commentId: string) {
+    return this.adminService.deleteComment(commentId);
+  }
 }

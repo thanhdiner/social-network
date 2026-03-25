@@ -34,6 +34,7 @@ import AdminDashboard from '@/pages/Admin/AdminDashboard'
 import AdminUsers from '@/pages/Admin/AdminUsers'
 import AdminPosts from '@/pages/Admin/AdminPosts'
 import AdminReels from '@/pages/Admin/AdminReels'
+import AdminComments from '@/pages/Admin/AdminComments'
 import '@/pages/Admin/admin.css'
 
 function App() {
@@ -292,6 +293,16 @@ function App() {
               <AdminRoute>
                 <AdminLayout>
                   <AdminReels />
+                </AdminLayout>
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/comments"
+            element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminComments />
                 </AdminLayout>
               </AdminRoute>
             }
