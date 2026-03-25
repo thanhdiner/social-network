@@ -203,56 +203,73 @@ export class PostsService {
   // ─── Feed Ranking Algorithm ───────────────────────────────────────────────
   // Inspired by Facebook EdgeRank / News Feed ranking:
   //
-  //  score = engagement_score / time_decay + relationship_boost + media_boost
+  // ─── Feed Ranking Algorithm v2 ──────────────────────────────────────────
   //
-  //  • engagement_score  = likes×3 + comments×5 + shares×4
-  //  • time_decay        = (hoursAgo + 2) ^ 1.5   (older posts decay faster)
-  //  • relationship_boost= 40 for own posts, 15 for posts from close follows
-  //  • media_boost       = 8 if has image, 12 if has video
-  //  • recency_bonus     = max(0, 20 - hoursAgo)  (fresh posts get a head-start)
+  //  finalScore = (baseEngagement + relationshipBoost + contentBoost + freshnessBoost)
+  //               / pow(hoursAgo + 2, 1.2)
+  //
+  //  • baseEngagement   = likes×2 + comments×4 + shares×5
+  //  • relationshipBoost= 12 (own) | 8+affinity (follow) | 0 (stranger)
+  //  • contentBoost     = video 4 | image 2   (just tie-breaker)
+  //  • freshnessBoost   = max(0, 15 - hoursAgo×0.5)  (linear, lasts ~30h)
+  //  • time decay       = (hoursAgo+2)^1.2             (softer than ^1.5)
+  //  • affinity         = recent likes×2 + recent comments×4 (capped at 20)
+  //
+  //  Feed is then split into 70% deterministic (top-ranked) +
+  //  30% exploration (weighted-random from next tier) — interleaved every 3rd slot.
   // ──────────────────────────────────────────────────────────────────────────
-  private computeScore(post: {
-    createdAt: Date;
-    userId: string;
-    imageUrl?: string | null;
-    videoUrl?: string | null;
-    _count: { likes: number; comments: number; shares: number };
-  }, viewerUserId?: string, followingIds: string[] = []): number {
-    const nowMs   = Date.now();
-    const postMs  = new Date(post.createdAt).getTime();
-    const hoursAgo = (nowMs - postMs) / 3_600_000;
+  private computeScore(
+    post: {
+      createdAt: Date;
+      userId: string;
+      imageUrl?: string | null;
+      videoUrl?: string | null;
+      _count: { likes: number; comments: number; shares: number };
+    },
+    viewerUserId?: string,
+    followingIds: string[] = [],
+    authorAffinity: Record<string, number> = {},
+  ): number {
+    const nowMs    = Date.now();
+    const hoursAgo = (nowMs - new Date(post.createdAt).getTime()) / 3_600_000;
 
-    // Engagement
-    const engagement =
-      (post._count.likes   * 3) +
-      (post._count.comments * 5) +
-      (post._count.shares   * 4);
+    // ── Base engagement (slower multipliers, shares weighted highest) ──────
+    const baseEngagement =
+      post._count.likes    * 2 +
+      post._count.comments * 4 +
+      post._count.shares   * 5;
 
-    // Time decay — older posts drop quickly
-    const decay = Math.pow(hoursAgo + 2, 1.5);
+    // ── Softer time decay — good content survives longer ──────────────────
+    const decay = Math.pow(hoursAgo + 2, 1.2);
 
-    // Recency bonus — boost very recent posts for first 20h
-    const recencyBonus = Math.max(0, 20 - hoursAgo);
+    // ── Linear freshness bonus — decays over ~30h ─────────────────────────
+    const freshnessBoost = Math.max(0, 15 - hoursAgo * 0.5);
 
-    // Relationship strength
+    // ── Dynamic relationship score ────────────────────────────────────────
     let relationshipBoost = 0;
-    if (viewerUserId && post.userId === viewerUserId) {
-      relationshipBoost = 40; // Own posts always near top
-    } else if (followingIds.includes(post.userId)) {
-      relationshipBoost = 15;
+    if (viewerUserId) {
+      if (post.userId === viewerUserId) {
+        // Own posts: reduced from 40 → 12 so they don't dominate
+        relationshipBoost = 12;
+      } else if (followingIds.includes(post.userId)) {
+        // Follow base + personal affinity (capped at 20 each)
+        const affinityScore = Math.min(authorAffinity[post.userId] ?? 0, 20);
+        relationshipBoost = 8 + affinityScore;
+      }
     }
 
-    // Media boost — posts with media get higher priority
-    const mediaBoost = post.videoUrl ? 12 : post.imageUrl ? 8 : 0;
+    // ── Content type — only as tie-breaker (reduced weights) ─────────────
+    const contentBoost = post.videoUrl ? 4 : post.imageUrl ? 2 : 0;
 
-    return (engagement / decay) + recencyBonus + relationshipBoost + mediaBoost;
+    return (baseEngagement + relationshipBoost + contentBoost + freshnessBoost) / decay;
   }
 
   async findAll(page = 1, limit = 10, userId?: string) {
-    const CACHE_TTL_SECONDS = 180; // 3 minutes
-    const CANDIDATE_MULTIPLIER = 4; // fetch 4x posts to rank from
+    const CACHE_TTL_SECONDS = 90;  // Shorter → fresher / more varied on reload
+    const CANDIDATE_POOL    = 250; // Much wider than old 4×limit = 40
+    const EXPLORE_RATIO     = 0.3; // 30% exploration slots per page
 
-    // ── Build visibility-aware where clause ──────────────────────────────────
+    // ── Visibility-aware where clause ────────────────────────────────────────
     let followingIds: string[] = [];
     let whereClause: Prisma.PostWhereInput = {};
 
@@ -265,9 +282,7 @@ export class PostsService {
 
       whereClause = {
         OR: [
-          // Own posts — always visible
           { userId },
-          // Following's posts — visibility filter
           {
             userId: { in: followingIds },
             visibility: { in: ['public', 'friends'] },
@@ -275,37 +290,52 @@ export class PostsService {
         ],
       };
     } else {
-      // Unauthenticated — only public posts
       whereClause = { visibility: 'public' };
     }
 
-    // ── Try Redis cache ───────────────────────────────────────────────────────
-    const cacheKey = `feed:v2:${userId ?? 'anon'}:p${page}`;
+    // ── Redis cache (v3 key — old v2 entries expire naturally) ───────────────
+    const cacheKey = `feed:v3:${userId ?? 'anon'}:p${page}`;
     try {
       const cached = await this.redisService.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
+      if (cached) return JSON.parse(cached);
+    } catch { /* Redis miss — continue */ }
+
+    // ── Dynamic author affinity (last 30 days) ───────────────────────────────
+    // Replaces the fixed follow boost (+15) with personal interaction history.
+    const authorAffinity: Record<string, number> = {};
+    if (userId) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      const [recentLikes, recentComments] = await Promise.all([
+        this.prisma.like.findMany({
+          where: { userId, createdAt: { gte: thirtyDaysAgo }, imageIndex: null },
+          select: { post: { select: { userId: true } } },
+          take: 300,
+        }),
+        this.prisma.comment.findMany({
+          where: { userId, createdAt: { gte: thirtyDaysAgo } },
+          select: { post: { select: { userId: true } } },
+          take: 300,
+        }),
+      ]);
+
+      for (const { post } of recentLikes) {
+        authorAffinity[post.userId] = (authorAffinity[post.userId] ?? 0) + 2;
       }
-    } catch {
-      // Redis miss/failure — continue without cache
+      for (const { post } of recentComments) {
+        authorAffinity[post.userId] = (authorAffinity[post.userId] ?? 0) + 4;
+      }
     }
 
-    // ── Fetch candidate pool (larger than requested page) ────────────────────
-    const candidateLimit = limit * CANDIDATE_MULTIPLIER;
-    const skip = (page - 1) * limit;
-
-    // For ranking we need a time window based on page number
-    // Page 1 → last 7 days, Page 2+ → extend window
-    const windowDays = Math.min(3 + page * 2, 30);
+    // ── Fetch large candidate pool ────────────────────────────────────────────
+    // Window grows gently with page depth (avoid resurfacing very old content early)
+    const windowDays  = Math.min(7 + page, 30);
     const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
 
-    const [recentPosts, total] = await Promise.all([
+    const [candidates, total] = await Promise.all([
       this.prisma.post.findMany({
-        where: {
-          ...whereClause,
-          createdAt: { gte: windowStart },
-        },
-        take: candidateLimit,
+        where: { ...whereClause, createdAt: { gte: windowStart } },
+        take: CANDIDATE_POOL,
         orderBy: { createdAt: 'desc' },
         include: {
           user: { select: POST_USER_SELECT },
@@ -316,55 +346,98 @@ export class PostsService {
             },
           },
           sharedReel: { include: REEL_PREVIEW_INCLUDE },
-          _count: {
-            select: { comments: true, shares: true },
-          },
+          _count: { select: { comments: true, shares: true } },
         },
       }) as unknown as PostWithRelations[],
       this.prisma.post.count({ where: whereClause }),
     ]);
 
-    // ── Attach real like counts ───────────────────────────────────────────────
-    const postsWithLikes = await Promise.all(
-      recentPosts.map(async (post: PostWithRelations) => {
-        const likesCount = await this.prisma.like.count({
-          where: { postId: post.id, imageIndex: null },
-        });
-        return {
-          ...post,
-          _count: {
-            comments: post._count.comments,
-            shares:   post._count.shares,
-            likes:    likesCount,
-          },
-        };
-      }),
-    );
+    // ── Batch like counts — single groupBy query replaces N+1 loop ───────────
+    const likeGroups = await this.prisma.like.groupBy({
+      by: ['postId'],
+      where: {
+        postId:     { in: candidates.map((p) => p.id) },
+        imageIndex: null,
+      },
+      _count: { postId: true },
+    });
+    const likeMap: Record<string, number> = {};
+    for (const g of likeGroups) likeMap[g.postId] = g._count.postId;
 
-    // ── Score & rank ─────────────────────────────────────────────────────────
+    const postsWithLikes = candidates.map((post) => ({
+      ...post,
+      _count: {
+        comments: post._count.comments,
+        shares:   post._count.shares,
+        likes:    likeMap[post.id] ?? 0,
+      },
+    }));
+
+    // ── Score & rank ──────────────────────────────────────────────────────────
     const scored = postsWithLikes
       .map((post) => ({
         post,
-        score: this.computeScore(post, userId, followingIds),
+        score: this.computeScore(post, userId, followingIds, authorAffinity),
       }))
       .sort((a, b) => b.score - a.score);
 
-    // Paginate from sorted results
-    const paginated = scored.slice(skip, skip + limit).map((s) => s.post);
+    // ── Top-K exploration: 70% deterministic + 30% weighted-random ───────────
+    const skip             = (page - 1) * limit;
+    const exploreCount     = Math.round(limit * EXPLORE_RATIO);  // 3 slots
+    const deterministicCnt = limit - exploreCount;               // 7 slots
+
+    // Deterministic slice: top-ranked posts for this page
+    const deterministicSlice = scored.slice(skip, skip + deterministicCnt);
+
+    // Exploration pool: next tier right after the deterministic slice
+    const explorePoolStart = skip + deterministicCnt;
+    const explorePool      = scored.slice(explorePoolStart, explorePoolStart + exploreCount * 4);
+
+    // Weighted random without replacement
+    const chosenExplore: typeof scored = [];
+    const usedIdx     = new Set<number>();
+    const totalWeight = explorePool.reduce((s, e) => s + Math.max(e.score, 0.01), 0);
+
+    for (let i = 0; i < exploreCount; i++) {
+      if (chosenExplore.length >= explorePool.length) break;
+      let rand = Math.random() * totalWeight;
+      for (let j = 0; j < explorePool.length; j++) {
+        if (usedIdx.has(j)) continue;
+        rand -= Math.max(explorePool[j].score, 0.01);
+        if (rand <= 0) {
+          chosenExplore.push(explorePool[j]);
+          usedIdx.add(j);
+          break;
+        }
+      }
+    }
+
+    // Interleave: positions 2, 5, 8 (1-indexed) → exploration slots
+    const finalPosts: PostWithRelations[] = [];
+    let di = 0;
+    let ei = 0;
+    for (let i = 0; i < limit; i++) {
+      const isExploreSlot = (i + 1) % 3 === 0;
+      if (isExploreSlot && ei < chosenExplore.length) {
+        finalPosts.push(chosenExplore[ei++].post);
+      } else if (di < deterministicSlice.length) {
+        finalPosts.push(deterministicSlice[di++].post);
+      } else if (ei < chosenExplore.length) {
+        finalPosts.push(chosenExplore[ei++].post);
+      }
+    }
 
     const result = {
-      posts: paginated,
+      posts: finalPosts,
       total,
       page,
       totalPages: Math.ceil(total / limit),
     };
 
-    // ── Cache result ──────────────────────────────────────────────────────────
+    // ── Cache ─────────────────────────────────────────────────────────────────
     try {
       await this.redisService.set(cacheKey, JSON.stringify(result), CACHE_TTL_SECONDS);
-    } catch {
-      // Cache write failure is non-critical
-    }
+    } catch { /* non-critical */ }
 
     return result;
   }
