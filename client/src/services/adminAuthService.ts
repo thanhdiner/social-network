@@ -6,7 +6,6 @@ export interface AdminInfo {
   name: string
   email?: string
   avatar?: string | null
-  twoFactorEnabled?: boolean
   loginAlertsEnabled?: boolean
   sessionId?: string | null
   createdAt?: string
@@ -20,57 +19,18 @@ interface AdminLoginAdminPayload {
   email: string
 }
 
-interface AdminLoginSuccessResponse {
-  requiresTwoFactor: false
+interface AdminLoginResponse {
   token: string
   admin: AdminLoginAdminPayload
   sessionId: string
 }
-
-interface AdminLoginTwoFactorResponse {
-  requiresTwoFactor: true
-  challengeToken: string
-  expiresAt: number
-  message?: string
-  debugCode?: string
-}
-
-export type AdminLoginResponse =
-  | AdminLoginSuccessResponse
-  | AdminLoginTwoFactorResponse
-
-export interface AdminTwoFactorVerifyResponse extends AdminLoginSuccessResponse {}
 
 const ADMIN_TOKEN_KEY = 'adminToken'
 
 const adminAuthService = {
   async login(username: string, password: string): Promise<AdminLoginResponse> {
     const res = await api.post<AdminLoginResponse>('/admin/auth/login', { username, password })
-    const payload = res.data
-
-    if (!payload.requiresTwoFactor) {
-      localStorage.setItem(ADMIN_TOKEN_KEY, payload.token)
-    }
-
-    return payload
-  },
-
-  async verifyTwoFactor(challengeToken: string, code: string): Promise<AdminTwoFactorVerifyResponse> {
-    const res = await api.post<AdminTwoFactorVerifyResponse>('/admin/auth/verify-2fa', {
-      challengeToken,
-      code,
-    })
-
     localStorage.setItem(ADMIN_TOKEN_KEY, res.data.token)
-
-    return res.data
-  },
-
-  async resendTwoFactor(challengeToken: string): Promise<{ challengeToken: string; expiresAt: number; debugCode?: string }> {
-    const res = await api.post<{ challengeToken: string; expiresAt: number; debugCode?: string }>(
-      '/admin/auth/resend-2fa',
-      { challengeToken },
-    )
     return res.data
   },
 

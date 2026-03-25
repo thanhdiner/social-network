@@ -122,28 +122,6 @@ Ma nay se het han sau 1 gio. Neu ban khong yeu cau dat lai mat khau, vui long bo
     await this.sendEmail({ to, subject, text, html });
   }
 
-  async sendAdminTwoFactorCode(to: string, code: string): Promise<void> {
-    const subject = 'Ma xac thuc 2 lop - Admin Social Network';
-    const text = `Xin chao,
-
-Ma xac thuc 2 lop cua ban la: ${code}
-
-Ma nay se het han sau 5 phut.
-Neu ban khong thuc hien dang nhap, vui long doi mat khau ngay lap tuc.`;
-
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-        <h2>Dang nhap Admin - Xac thuc 2 lop</h2>
-        <p>Ma xac thuc 2FA cua ban la:</p>
-        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #1d4ed8;">${code}</p>
-        <p style="color: #6b7280;">Ma se het han sau 5 phut.</p>
-        <p>Neu ban khong thuc hien dang nhap, vui long doi mat khau va lien he bo phan van hanh.</p>
-      </div>
-    `;
-
-    await this.sendEmail({ to, subject, text, html });
-  }
-
   async sendAdminPasswordReset(to: string, code: string): Promise<void> {
     const subject = 'Admin - Dat lai mat khau - Social Network';
     const text = `Xin chao,

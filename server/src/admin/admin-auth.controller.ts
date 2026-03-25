@@ -34,25 +34,6 @@ export class AdminAuthController {
     });
   }
 
-  @Post('verify-2fa')
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
-  @HttpCode(HttpStatus.OK)
-  verifyTwoFactor(
-    @Body() body: { challengeToken: string; code: string },
-  ) {
-    return this.adminAuthService.verifyTwoFactorCode(
-      body.challengeToken,
-      body.code,
-    );
-  }
-
-  @Post('resend-2fa')
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
-  @HttpCode(HttpStatus.OK)
-  resendTwoFactor(@Body() body: { challengeToken: string }) {
-    return this.adminAuthService.resendTwoFactorCode(body.challengeToken);
-  }
-
   @Get('me')
   @UseGuards(AdminJwtGuard)
   getMe(

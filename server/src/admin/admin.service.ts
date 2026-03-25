@@ -221,7 +221,6 @@ export class AdminService {
         email: true,
         name: true,
         avatar: true,
-        twoFactorEnabled: true,
         loginAlertsEnabled: true,
         createdAt: true,
         updatedAt: true,
@@ -245,7 +244,6 @@ export class AdminService {
         updatedAt: admin.updatedAt,
       },
       security: {
-        twoFactorEnabled: admin.twoFactorEnabled,
         loginAlertsEnabled: admin.loginAlertsEnabled,
       },
       sessions,
@@ -367,36 +365,28 @@ export class AdminService {
 
   async updateAccountSecurity(
     adminId: string,
-    payload: { twoFactorEnabled?: boolean; loginAlertsEnabled?: boolean },
+    payload: { loginAlertsEnabled?: boolean },
   ) {
     const prismaAny = this.prisma as any;
 
-    if (
-      typeof payload.twoFactorEnabled !== 'boolean' &&
-      typeof payload.loginAlertsEnabled !== 'boolean'
-    ) {
+    if (typeof payload.loginAlertsEnabled !== 'boolean') {
       throw new BadRequestException('Không có thiết lập bảo mật để cập nhật');
     }
 
     const updated = await prismaAny.admin.update({
       where: { id: adminId },
       data: {
-        ...(typeof payload.twoFactorEnabled === 'boolean'
-          ? { twoFactorEnabled: payload.twoFactorEnabled }
-          : {}),
         ...(typeof payload.loginAlertsEnabled === 'boolean'
           ? { loginAlertsEnabled: payload.loginAlertsEnabled }
           : {}),
       },
       select: {
-        twoFactorEnabled: true,
         loginAlertsEnabled: true,
         updatedAt: true,
       },
     });
 
     return {
-      twoFactorEnabled: updated.twoFactorEnabled,
       loginAlertsEnabled: updated.loginAlertsEnabled,
       updatedAt: updated.updatedAt,
     };

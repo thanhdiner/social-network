@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, randomInt } from 'crypto';
+import { randomInt } from 'crypto';
 import { MailService } from '../common/mail/mail.service';
 
 export interface AdminJwtPayload {
@@ -25,25 +25,8 @@ interface AdminLoginContext {
   ipAddress?: string;
 }
 
-interface AdminTwoFactorChallenge {
-  token: string;
-  adminId: string;
-  username: string;
-  name: string;
-  email: string;
-  code: string;
-  expiresAt: number;
-  attempts: number;
-  context?: AdminLoginContext;
-}
-
-const ADMIN_TWO_FACTOR_TTL_MS = 5 * 60 * 1000;
-const ADMIN_TWO_FACTOR_MAX_ATTEMPTS = 5;
-
 @Injectable()
 export class AdminAuthService {
-  private readonly twoFactorChallenges = new Map<string, AdminTwoFactorChallenge>();
-
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -70,7 +53,6 @@ export class AdminAuthService {
         email: true,
         name: true,
         password: true,
-        twoFactorEnabled: true,
       },
     });
 
@@ -83,126 +65,7 @@ export class AdminAuthService {
       throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
     }
 
-    if (!admin.twoFactorEnabled) {
-      const authSuccess = await this.createAdminAuthSession(admin, context);
-      return {
-        ...authSuccess,
-        requiresTwoFactor: false as const,
-      };
-    }
-
-    if (!admin.email) {
-      throw new BadRequestException(
-        'Tài khoản admin chưa có email để nhận mã xác thực 2 lớp',
-      );
-    }
-
-    this.pruneExpiredTwoFactorChallenges();
-
-    const challenge = this.buildTwoFactorChallenge(admin, context);
-    await this.sendTwoFactorCode(challenge.email, challenge.code);
-
-    return {
-      requiresTwoFactor: true as const,
-      challengeToken: challenge.token,
-      expiresAt: challenge.expiresAt,
-      message: 'Mã xác thực đã được gửi tới email quản trị',
-      ...(this.mailService.isEnabled() ? {} : { debugCode: challenge.code }),
-    };
-  }
-
-  async verifyTwoFactorCode(challengeToken: string, code: string) {
-    this.pruneExpiredTwoFactorChallenges();
-
-    const token = String(challengeToken || '').trim();
-    const normalizedCode = String(code || '').trim();
-
-    if (!token || !normalizedCode) {
-      throw new BadRequestException('Thiếu challenge token hoặc mã xác thực');
-    }
-
-    const challenge = this.twoFactorChallenges.get(token);
-
-    if (!challenge) {
-      throw new UnauthorizedException('Phiên xác thực 2 lớp không hợp lệ hoặc đã hết hạn');
-    }
-
-    if (Date.now() > challenge.expiresAt) {
-      this.twoFactorChallenges.delete(token);
-      throw new UnauthorizedException('Mã xác thực đã hết hạn');
-    }
-
-    if (challenge.code !== normalizedCode) {
-      challenge.attempts += 1;
-
-      if (challenge.attempts >= ADMIN_TWO_FACTOR_MAX_ATTEMPTS) {
-        this.twoFactorChallenges.delete(token);
-        throw new UnauthorizedException(
-          'Bạn đã nhập sai mã xác thực quá số lần cho phép',
-        );
-      }
-
-      this.twoFactorChallenges.set(token, challenge);
-
-      throw new UnauthorizedException(
-        `Mã xác thực không đúng. Còn ${ADMIN_TWO_FACTOR_MAX_ATTEMPTS - challenge.attempts} lần thử`,
-      );
-    }
-
-    this.twoFactorChallenges.delete(token);
-
-    const prismaAny = this.prisma as any;
-    const admin = await prismaAny.admin.findUnique({
-      where: { id: challenge.adminId },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        name: true,
-      },
-    });
-
-    if (!admin) {
-      throw new UnauthorizedException('Tài khoản admin không tồn tại');
-    }
-
-    const authSuccess = await this.createAdminAuthSession(admin, challenge.context);
-
-    return {
-      ...authSuccess,
-      requiresTwoFactor: false as const,
-    };
-  }
-
-  async resendTwoFactorCode(challengeToken: string) {
-    this.pruneExpiredTwoFactorChallenges();
-
-    const token = String(challengeToken || '').trim();
-    if (!token) {
-      throw new BadRequestException('Thiếu challenge token');
-    }
-
-    const challenge = this.twoFactorChallenges.get(token);
-    if (!challenge) {
-      throw new UnauthorizedException('Phiên xác thực 2 lớp không hợp lệ hoặc đã hết hạn');
-    }
-
-    if (challenge.attempts >= ADMIN_TWO_FACTOR_MAX_ATTEMPTS) {
-      this.twoFactorChallenges.delete(token);
-      throw new UnauthorizedException('Phiên xác thực đã bị khóa do nhập sai quá nhiều lần');
-    }
-
-    challenge.code = this.generateTwoFactorCode();
-    challenge.expiresAt = Date.now() + ADMIN_TWO_FACTOR_TTL_MS;
-    this.twoFactorChallenges.set(token, challenge);
-
-    await this.sendTwoFactorCode(challenge.email, challenge.code);
-
-    return {
-      challengeToken: token,
-      expiresAt: challenge.expiresAt,
-      ...(this.mailService.isEnabled() ? {} : { debugCode: challenge.code }),
-    };
+    return this.createAdminAuthSession(admin, context);
   }
 
   async verifyToken(token: string): Promise<AdminJwtPayload> {
@@ -373,7 +236,6 @@ export class AdminAuthService {
         name: true,
         email: true,
         avatar: true,
-        twoFactorEnabled: true,
         loginAlertsEnabled: true,
         createdAt: true,
         updatedAt: true,
@@ -392,7 +254,6 @@ export class AdminAuthService {
       name: admin.name,
       email: admin.email,
       avatar: admin.avatar,
-      twoFactorEnabled: admin.twoFactorEnabled,
       loginAlertsEnabled: admin.loginAlertsEnabled,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
@@ -412,45 +273,6 @@ export class AdminAuthService {
     if (raw.includes('linux')) return 'Linux Device';
 
     return 'Browser Session';
-  }
-
-  private generateTwoFactorCode() {
-    return randomInt(100000, 1000000).toString();
-  }
-
-  private buildTwoFactorChallenge(
-    admin: { id: string; username: string; name: string; email: string },
-    context?: AdminLoginContext,
-  ): AdminTwoFactorChallenge {
-    const token = randomBytes(24).toString('hex');
-    const challenge: AdminTwoFactorChallenge = {
-      token,
-      adminId: admin.id,
-      username: admin.username,
-      name: admin.name,
-      email: admin.email,
-      code: this.generateTwoFactorCode(),
-      expiresAt: Date.now() + ADMIN_TWO_FACTOR_TTL_MS,
-      attempts: 0,
-      context,
-    };
-
-    this.twoFactorChallenges.set(token, challenge);
-
-    return challenge;
-  }
-
-  private pruneExpiredTwoFactorChallenges() {
-    const now = Date.now();
-    this.twoFactorChallenges.forEach((value, key) => {
-      if (value.expiresAt <= now) {
-        this.twoFactorChallenges.delete(key);
-      }
-    });
-  }
-
-  private async sendTwoFactorCode(email: string, code: string) {
-    await this.mailService.sendAdminTwoFactorCode(email, code);
   }
 
   private async touchSession(adminId: string, sessionId?: string) {

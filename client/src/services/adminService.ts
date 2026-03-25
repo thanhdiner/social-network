@@ -232,7 +232,6 @@ export interface AdminAccountProfileData {
 }
 
 export interface AdminAccountSecurityData {
-  twoFactorEnabled: boolean
   loginAlertsEnabled: boolean
 }
 
@@ -257,7 +256,7 @@ const adminService = {
     adminApi.put<AdminAccountProfileData>('/admin/account/profile', payload).then(r => r.data),
   updateAccountPassword: (payload: { currentPassword: string; newPassword: string; confirmPassword?: string }) =>
     adminApi.put<{ message: string }>('/admin/account/password', payload).then(r => r.data),
-  updateAccountSecurity: (payload: { twoFactorEnabled?: boolean; loginAlertsEnabled?: boolean }) =>
+  updateAccountSecurity: (payload: { loginAlertsEnabled?: boolean }) =>
     adminApi.put<AdminAccountSecurityData>('/admin/account/security', payload).then(r => r.data),
   getAccountSessions: () =>
     adminApi.get<AdminAccountSession[]>('/admin/account/sessions').then(r => r.data),

@@ -120,12 +120,10 @@ export class AdminController {
     },
     @Body()
     body: {
-      twoFactorEnabled?: boolean;
       loginAlertsEnabled?: boolean;
     },
   ) {
     return this.adminService.updateAccountSecurity(req.admin.adminId, {
-      twoFactorEnabled: body.twoFactorEnabled,
       loginAlertsEnabled: body.loginAlertsEnabled,
     });
   }

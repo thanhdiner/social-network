@@ -10,7 +10,6 @@ import {
   Shield,
   Smartphone,
   User,
-  UserCog,
   X,
   LogOut,
   Headset,
@@ -26,7 +25,6 @@ import adminService, {
 import { toast } from 'sonner'
 
 interface SecuritySettings {
-  twoFactorEnabled: boolean
   loginAlertsEnabled: boolean
 }
 
@@ -73,12 +71,10 @@ const AdminProfile: React.FC = () => {
   })
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({
-    twoFactorEnabled: false,
     loginAlertsEnabled: true,
   })
 
   const [initialSecuritySettings, setInitialSecuritySettings] = useState<SecuritySettings>({
-    twoFactorEnabled: false,
     loginAlertsEnabled: true,
   })
 
@@ -96,7 +92,6 @@ const AdminProfile: React.FC = () => {
       }
 
       const nextSecurity = {
-        twoFactorEnabled: Boolean(data.security?.twoFactorEnabled),
         loginAlertsEnabled: Boolean(data.security?.loginAlertsEnabled),
       }
 
@@ -237,17 +232,14 @@ const AdminProfile: React.FC = () => {
       }
 
       const securityChanged =
-        securitySettings.twoFactorEnabled !== initialSecuritySettings.twoFactorEnabled ||
         securitySettings.loginAlertsEnabled !== initialSecuritySettings.loginAlertsEnabled
 
       if (securityChanged) {
         const updatedSecurity: AdminAccountSecurityData = await adminService.updateAccountSecurity({
-          twoFactorEnabled: securitySettings.twoFactorEnabled,
           loginAlertsEnabled: securitySettings.loginAlertsEnabled,
         })
 
         const nextSecurity = {
-          twoFactorEnabled: Boolean(updatedSecurity.twoFactorEnabled),
           loginAlertsEnabled: Boolean(updatedSecurity.loginAlertsEnabled),
         }
 
@@ -448,27 +440,6 @@ const AdminProfile: React.FC = () => {
             </div>
 
             <div className="admin-security-list">
-              <div className="admin-security-item">
-                <div className="admin-security-copy">
-                  <span className="admin-security-item-icon">
-                    <UserCog size={16} />
-                  </span>
-                  <div>
-                    <p>Xac thuc 2 yeu to (2FA)</p>
-                    <small>Bao ve tai khoan bang ma xac minh OTP.</small>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={`admin-security-toggle ${securitySettings.twoFactorEnabled ? 'on' : ''}`}
-                  onClick={() => setSecuritySettings((prev) => ({ ...prev, twoFactorEnabled: !prev.twoFactorEnabled }))}
-                  aria-pressed={securitySettings.twoFactorEnabled}
-                  disabled={saving}
-                >
-                  <span />
-                </button>
-              </div>
-
               <div className="admin-security-item">
                 <div className="admin-security-copy">
                   <span className="admin-security-item-icon">
