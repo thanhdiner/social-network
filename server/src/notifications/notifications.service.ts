@@ -9,7 +9,9 @@ export interface CreateNotificationDto {
     | 'comment'
     | 'message'
     | 'share'
-    | 'announcement';
+    | 'announcement'
+    | 'friend_request'
+    | 'friend_accept';
   content: string;
   userId: string;
   actorId?: string;

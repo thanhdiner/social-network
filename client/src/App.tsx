@@ -24,8 +24,7 @@ import ReelsPage from '@/pages/Reels'
 import CreateReelPage from '@/pages/Reels/CreateReel'
 import NotificationsPage from '@/pages/Notifications'
 import NotificationsDetailPage from '@/pages/Notifications/Detail'
-// Keep ReelDetailPage available for direct single-reel modal if needed
-// ReelDetailPage unused now; deep links handled by ReelsPage
+import FriendsPage from '@/pages/Friends'
 import { VoiceCallModal } from '@/components/shared/VoiceCallModal'
 import { VideoCallModal } from '@/components/shared/VideoCallModal'
 import { AdminRoute } from '@/components/AdminRoute'
@@ -239,6 +238,17 @@ function App() {
               <ProtectedRoute>
                 <MainLayout>
                   <CreateReelPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/friends"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <FriendsPage />
                 </MainLayout>
               </ProtectedRoute>
             }

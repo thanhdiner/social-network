@@ -10,6 +10,7 @@ import uploadService from '@/services/uploadService'
 import userService from '@/services/userService'
 import socketService from '@/services/socketService'
 import { Avatar } from '@/components/shared/Avatar'
+import { FriendButton } from '@/components/shared/FriendButton'
 
 interface ProfileHeaderProps {
   username?: string
@@ -453,8 +454,12 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
         </div>
 
         {/* Action Buttons dưới stats - Chỉ cho profile người khác */}
-        {!isOwnProfile && (
-          <div className="flex gap-3 mt-5">
+        {!isOwnProfile && profileUser && (
+          <div className="flex flex-wrap gap-3 mt-5 justify-center">
+            {/* Kết bạn */}
+            <FriendButton targetUserId={profileUser.id} />
+
+            {/* Follow */}
             <Button
               onClick={handleFollow}
               disabled={isLoading || checkingFollow}
@@ -483,6 +488,8 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
                 </>
               )}
             </Button>
+
+            {/* Message */}
             <Button
               onClick={handleMessage}
               variant="outline"

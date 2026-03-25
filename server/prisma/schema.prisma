@@ -65,6 +65,8 @@ model User {
   reelLikes            ReelLike[]
   reelComments         ReelComment[]
   reelShares           ReelShare[]
+  sentFriendRequests   FriendRequest[]             @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[]           @relation("ReceivedFriendRequests")
 }
 
 model Post {
@@ -162,6 +164,23 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model FriendRequest {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     String   @default("pending") // 'pending' | 'accepted' | 'rejected'
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender   User @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
 }
 
 model Message {

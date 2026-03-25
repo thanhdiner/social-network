@@ -1,4 +1,4 @@
-﻿import { Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import userService, { type ActiveUser } from '../../services/userService'
 import storyService, { type GroupedStories } from '../../services/storyService'
@@ -6,6 +6,7 @@ import socketService from '../../services/socketService'
 import { Link } from 'react-router-dom'
 import { CreateStoryModal } from '../shared/CreateStoryModal'
 import { Avatar } from '../shared/Avatar'
+import { FriendSuggestions } from '../shared/FriendSuggestions'
 import { formatDistanceToNow } from 'date-fns'
 
 export const RightSidebar = () => {
@@ -14,14 +15,11 @@ export const RightSidebar = () => {
   const [groupedStories, setGroupedStories] = useState<GroupedStories[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(true)
   const [createStoryOpen, setCreateStoryOpen] = useState(false)
-  // const [viewerOpen, setViewerOpen] = useState(false)
-  // const [selectedStoryGroup, setSelectedStoryGroup] = useState<GroupedStories | null>(null)
 
   useEffect(() => {
     loadActiveUsers()
     loadStories()
 
-    // Listen for online users updates
     socketService.onOnlineUsersUpdated(() => {
       loadActiveUsers()
     })
@@ -57,24 +55,13 @@ export const RightSidebar = () => {
     loadStories()
   }
 
-  // const handleStoryDeleted = () => {
-  //   loadStories()
-  //   setViewerOpen(false)
-  // }
-
-  // const handleViewStory = (group: GroupedStories) => {
-  //   setSelectedStoryGroup(group)
-  //   setViewerOpen(true)
-  // }
-
   return (
-    <aside className="h-full p-4 bg-white">
+    <aside className="h-full p-4 bg-white space-y-5">
       {/* Stories */}
       <section>
         <h3 className="text-base font-semibold text-gray-800 mb-3">Stories</h3>
 
-        {/* Create Story */}
-        <div 
+        <div
           onClick={() => setCreateStoryOpen(true)}
           className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 transition cursor-pointer group"
         >
@@ -87,7 +74,6 @@ export const RightSidebar = () => {
           </div>
         </div>
 
-        {/* Friend Stories */}
         {isStoriesLoading ? (
           <div className="mt-2 space-y-2">
             {[...Array(3)].map((_, i) => (
@@ -107,17 +93,18 @@ export const RightSidebar = () => {
         ) : (
           <div className="space-y-2 mt-2">
             {groupedStories.map(group => (
-              <div 
-                key={group.userId} 
-                // onClick={() => handleViewStory(group)}
+              <div
+                key={group.userId}
                 className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 transition"
               >
                 <div className="relative">
                   <Avatar
-  src={group.user.avatar || undefined}
-  name={group.user.name}
-  className={group.hasUnviewed ? 'w-12 h-12 ring-2 ring-orange-400 ring-offset-2' : 'w-12 h-12 ring-2 ring-gray-300 ring-offset-2'}
-/>
+                    src={group.user.avatar || undefined}
+                    name={group.user.name}
+                    className={group.hasUnviewed
+                      ? 'w-12 h-12 ring-2 ring-orange-400 ring-offset-2'
+                      : 'w-12 h-12 ring-2 ring-gray-300 ring-offset-2'}
+                  />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-medium text-gray-800">{group.user.name}</span>
@@ -140,7 +127,12 @@ export const RightSidebar = () => {
         )}
       </section>
 
-      <hr className="my-5" />
+      <hr />
+
+      {/* Friend Suggestions */}
+      <FriendSuggestions />
+
+      <hr />
 
       {/* Active Users */}
       <section>
@@ -158,17 +150,17 @@ export const RightSidebar = () => {
           <ul className="space-y-2">
             {activeUsers.map(user => (
               <li key={user.id}>
-                <Link 
+                <Link
                   to={`/profile/${user.username}`}
                   className="flex items-center gap-3 p-2 rounded-lg hover:bg-orange-50 transition cursor-pointer"
                 >
                   <div className="relative">
                     <Avatar
-  src={user.avatar || undefined}
-  name={user.name}
-  className="w-9 h-9 border border-gray-200"
-/>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+                      src={user.avatar || undefined}
+                      name={user.name}
+                      className="w-9 h-9 border border-gray-200"
+                    />
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                   </div>
                   <span className="text-gray-800 font-medium truncate">{user.name}</span>
                 </Link>
@@ -178,26 +170,11 @@ export const RightSidebar = () => {
         )}
       </section>
 
-      {/* Modals */}
-      <CreateStoryModal 
-        open={createStoryOpen} 
-        onClose={() => setCreateStoryOpen(false)} 
+      <CreateStoryModal
+        open={createStoryOpen}
+        onClose={() => setCreateStoryOpen(false)}
         onStoryCreated={handleStoryCreated}
       />
-
-      {/* TODO: Fix StoryViewer component
-      {selectedStoryGroup && (
-        <StoryViewer 
-          open={viewerOpen} 
-          onClose={() => setViewerOpen(false)}
-          stories={selectedStoryGroup.stories}
-          onDelete={handleStoryDeleted}
-        />
-      )}
-      */}
     </aside>
   )
 }
-
-
-

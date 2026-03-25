@@ -20,6 +20,7 @@ import { SearchModule } from './search/search.module';
 import { ReelsModule } from './reels/reels.module';
 import { GeminiModule } from './gemini/gemini.module';
 import { AdminModule } from './admin/admin.module';
+import { FriendsModule } from './friends/friends.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AdminModule } from './admin/admin.module';
     ReelsModule,
     GeminiModule,
     AdminModule,
+    FriendsModule,
   ],
   controllers: [AppController],
   providers: [
