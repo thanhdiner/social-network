@@ -17,8 +17,8 @@ interface CreateAnnouncementPayload {
   audience?: 'all' | 'active';
 }
 
-const COMMENT_FLAG_PATTERN =
-  /(https?:\/\/|www\.|telegram|zalo|khuyen mai|khuyến mãi|mien phi|miễn phí|spam|click vào)/i;
+const normalizeModerationKeyword = (keyword: string) =>
+  keyword.trim().toLowerCase().replace(/\s+/g, ' ');
 
 @Injectable()
 export class AdminService {
@@ -742,18 +742,88 @@ export class AdminService {
 
   // ─── Comment Management ──────────────────────────────────────────────────────
 
-  async getComments(page = 1, limit = 20, search?: string) {
+  async getCommentBannedKeywords() {
+    const prismaAny = this.prisma as any;
+    return prismaAny.commentBannedKeyword.findMany({
+      orderBy: [{ createdAt: 'desc' }],
+    });
+  }
+
+  async createCommentBannedKeyword(keyword: string) {
+    const prismaAny = this.prisma as any;
+    const normalizedKeyword = normalizeModerationKeyword(keyword || '');
+
+    if (!normalizedKeyword) {
+      throw new BadRequestException('Từ khóa cấm không được để trống');
+    }
+
+    if (normalizedKeyword.length < 2) {
+      throw new BadRequestException('Từ khóa cấm phải có ít nhất 2 ký tự');
+    }
+
+    const existed = await prismaAny.commentBannedKeyword.findUnique({
+      where: { keyword: normalizedKeyword },
+    });
+
+    if (existed) {
+      throw new BadRequestException('Từ khóa này đã tồn tại');
+    }
+
+    return prismaAny.commentBannedKeyword.create({
+      data: { keyword: normalizedKeyword },
+    });
+  }
+
+  async deleteCommentBannedKeyword(keywordId: string) {
+    const prismaAny = this.prisma as any;
+    await prismaAny.commentBannedKeyword.delete({ where: { id: keywordId } });
+    return { message: 'Đã xóa từ khóa cấm' };
+  }
+
+  async getComments(
+    page = 1,
+    limit = 20,
+    search?: string,
+    flaggedOnly = false,
+  ) {
     const prismaAny = this.prisma as any;
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const conditions: any[] = [];
+
+    const keywordRows = await prismaAny.commentBannedKeyword.findMany({
+      select: { keyword: true },
+    });
+    const bannedKeywords = keywordRows.map((row: { keyword: string }) => row.keyword);
 
     if (search?.trim()) {
-      where.OR = [
+      conditions.push({
+        OR: [
         { content: { contains: search.trim(), mode: 'insensitive' } },
         { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
         { user: { username: { contains: search.trim(), mode: 'insensitive' } } },
-      ];
+        ],
+      });
     }
+
+    if (flaggedOnly) {
+      if (bannedKeywords.length === 0) {
+        return {
+          comments: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        };
+      }
+
+      conditions.push({
+        OR: bannedKeywords.map((keyword: string) => ({
+          content: { contains: keyword, mode: 'insensitive' },
+        })),
+      });
+    }
+
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const [comments, total] = await Promise.all([
       prismaAny.comment.findMany({
@@ -771,8 +841,12 @@ export class AdminService {
     ]);
 
     const normalizedComments = comments.map((comment: any) => {
-      const keywordFlagged = COMMENT_FLAG_PATTERN.test(comment.content || '');
-      const moderationReason = keywordFlagged ? 'keyword_suspected' : null;
+      const commentContent = String(comment.content || '').toLowerCase();
+      const matchedKeywords = bannedKeywords.filter((keyword: string) =>
+        commentContent.includes(String(keyword).toLowerCase()),
+      );
+      const keywordFlagged = matchedKeywords.length > 0;
+      const moderationReason = keywordFlagged ? 'banned_keyword' : null;
 
       return {
         id: comment.id,
@@ -784,6 +858,7 @@ export class AdminService {
         moderation: {
           flagged: keywordFlagged,
           reason: moderationReason,
+          matchedKeywords,
         },
       };
     });

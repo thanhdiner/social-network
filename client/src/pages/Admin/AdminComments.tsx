@@ -15,8 +15,9 @@ import {
   Heart,
   Eye,
   EyeOff,
+  Plus,
 } from 'lucide-react'
-import adminService, { type AdminComment } from '@/services/adminService'
+import adminService, { type AdminComment, type CommentBannedKeyword } from '@/services/adminService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
@@ -37,13 +38,30 @@ const AdminComments: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [flaggedOnly, setFlaggedOnly] = useState(false)
+  const [bannedKeywords, setBannedKeywords] = useState<CommentBannedKeyword[]>([])
+  const [keywordInput, setKeywordInput] = useState('')
+  const [keywordLoading, setKeywordLoading] = useState(false)
+  const [deletingKeywordId, setDeletingKeywordId] = useState<string | null>(null)
   const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set())
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadKeywords = useCallback(async () => {
+    setKeywordLoading(true)
+    try {
+      const data = await adminService.getCommentBannedKeywords()
+      setBannedKeywords(data)
+    } catch {
+      toast.error('Không thể tải danh sách từ khóa cấm')
+    } finally {
+      setKeywordLoading(false)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await adminService.getComments(page, PAGE_SIZE, search || undefined)
+      const data = await adminService.getComments(page, PAGE_SIZE, search || undefined, flaggedOnly)
       setComments(data.comments)
       setTotal(data.total)
       setTotalPages(data.totalPages)
@@ -64,9 +82,10 @@ const AdminComments: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [page, search])
+  }, [page, search, flaggedOnly])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadKeywords() }, [loadKeywords])
 
   useEffect(() => {
     return () => {
@@ -87,7 +106,38 @@ const AdminComments: React.FC = () => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
     setSearchInput('')
     setSearch('')
+    setFlaggedOnly(false)
     setPage(1)
+  }
+
+  const handleAddKeyword = async () => {
+    const keyword = keywordInput.trim()
+    if (!keyword) {
+      toast.error('Vui lòng nhập từ khóa cấm')
+      return
+    }
+
+    try {
+      await adminService.createCommentBannedKeyword(keyword)
+      toast.success('Đã thêm từ khóa cấm')
+      setKeywordInput('')
+      await Promise.all([loadKeywords(), load()])
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể thêm từ khóa cấm')
+    }
+  }
+
+  const handleDeleteKeyword = async (keywordId: string) => {
+    setDeletingKeywordId(keywordId)
+    try {
+      await adminService.deleteCommentBannedKeyword(keywordId)
+      toast.success('Đã xóa từ khóa cấm')
+      await Promise.all([loadKeywords(), load()])
+    } catch {
+      toast.error('Không thể xóa từ khóa cấm')
+    } finally {
+      setDeletingKeywordId(null)
+    }
   }
 
   const handleDelete = async (comment: AdminComment) => {
@@ -121,7 +171,7 @@ const AdminComments: React.FC = () => {
       comment.content,
       comment.post?.content || '',
       comment.likesCount,
-      comment.moderation.flagged ? 'Có' : 'Không',
+      comment.moderation.flagged ? `Có (${comment.moderation.matchedKeywords.join(', ')})` : 'Không',
       comment.createdAt,
     ]))
 
@@ -233,6 +283,29 @@ const AdminComments: React.FC = () => {
         </div>
 
         <div className="comments-header-actions">
+          <div className="comments-violation-filter" role="tablist" aria-label="Bộ lọc vi phạm">
+            <button
+              type="button"
+              className={`comments-filter-pill ${!flaggedOnly ? 'active' : ''}`}
+              onClick={() => {
+                setFlaggedOnly(false)
+                setPage(1)
+              }}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              className={`comments-filter-pill ${flaggedOnly ? 'active' : ''}`}
+              onClick={() => {
+                setFlaggedOnly(true)
+                setPage(1)
+              }}
+            >
+              Chỉ vi phạm
+            </button>
+          </div>
+
           <button
             type="button"
             className="comments-filter-btn"
@@ -284,6 +357,57 @@ const AdminComments: React.FC = () => {
             <p className="comments-kpi-value dark">{responseRate}%</p>
           </div>
         </article>
+      </div>
+
+      <div className="admin-card comments-keywords-card">
+        <div className="comments-keywords-head">
+          <div>
+            <h3>Quản lý từ khóa cấm</h3>
+            <p>Dùng để đánh dấu và lọc các bình luận vi phạm theo từ khóa</p>
+          </div>
+          <span>{bannedKeywords.length} từ khóa</span>
+        </div>
+
+        <div className="comments-keywords-add-row">
+          <input
+            type="text"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            placeholder="Nhập từ khóa cấm..."
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleAddKeyword()
+              }
+            }}
+          />
+          <button type="button" onClick={handleAddKeyword}>
+            <Plus size={15} />
+            Thêm từ khóa
+          </button>
+        </div>
+
+        <div className="comments-keywords-list">
+          {keywordLoading ? (
+            <p className="comments-keywords-empty">Đang tải từ khóa cấm...</p>
+          ) : bannedKeywords.length === 0 ? (
+            <p className="comments-keywords-empty">Chưa có từ khóa cấm nào</p>
+          ) : (
+            bannedKeywords.map((item) => (
+              <div key={item.id} className="comments-keyword-chip">
+                <span>{item.keyword}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteKeyword(item.id)}
+                  disabled={deletingKeywordId === item.id}
+                  aria-label={`Xóa từ khóa ${item.keyword}`}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <div className="admin-card comments-search-card">
@@ -377,6 +501,13 @@ const AdminComments: React.FC = () => {
                       <p className="comments-content-text">
                         {comment.content}
                       </p>
+                      {comment.moderation.matchedKeywords.length > 0 && (
+                        <div className="comments-match-tags">
+                          {comment.moderation.matchedKeywords.map((keyword) => (
+                            <span key={`${comment.id}-${keyword}`}>{keyword}</span>
+                          ))}
+                        </div>
+                      )}
                     </td>
 
                     {/* Post */}

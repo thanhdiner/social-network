@@ -135,6 +135,15 @@ model CommentLike {
   @@index([userId])
 }
 
+model CommentBannedKeyword {
+  id        String   @id @default(uuid())
+  keyword   String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([keyword])
+}
+
 model Like {
   id         String   @id @default(uuid())
   postId     String

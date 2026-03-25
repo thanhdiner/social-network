@@ -168,6 +168,7 @@ export interface AdminComment {
   moderation: {
     flagged: boolean
     reason: string | null
+    matchedKeywords: string[]
   }
   user: {
     id: string
@@ -179,6 +180,13 @@ export interface AdminComment {
     id: string
     content: string
   } | null
+}
+
+export interface CommentBannedKeyword {
+  id: string
+  keyword: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PaginatedResponse<T> {
@@ -255,11 +263,18 @@ const adminService = {
     adminApi.delete(`/admin/reels/${reelId}`).then(r => r.data),
 
   // Comments
-  getComments: (page = 1, limit = 20, search?: string) => {
+  getComments: (page = 1, limit = 20, search?: string, flaggedOnly?: boolean) => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
     if (search) params.append('search', search)
+    if (flaggedOnly) params.append('flaggedOnly', 'true')
     return adminApi.get<{ comments: AdminComment[]; total: number; totalPages: number }>(`/admin/comments?${params}`).then(r => r.data)
   },
+  getCommentBannedKeywords: () =>
+    adminApi.get<CommentBannedKeyword[]>('/admin/comments/banned-keywords').then(r => r.data),
+  createCommentBannedKeyword: (keyword: string) =>
+    adminApi.post<CommentBannedKeyword>('/admin/comments/banned-keywords', { keyword }).then(r => r.data),
+  deleteCommentBannedKeyword: (keywordId: string) =>
+    adminApi.delete(`/admin/comments/banned-keywords/${keywordId}`).then(r => r.data),
   deleteComment: (commentId: string) =>
     adminApi.delete(`/admin/comments/${commentId}`).then(r => r.data),
 }

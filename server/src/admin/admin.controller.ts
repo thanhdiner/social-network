@@ -213,13 +213,29 @@ export class AdminController {
 
   // ─── Comments ─────────────────────────────────────────────────────────────────
 
+  @Get('comments/banned-keywords')
+  getCommentBannedKeywords() {
+    return this.adminService.getCommentBannedKeywords();
+  }
+
+  @Post('comments/banned-keywords')
+  createCommentBannedKeyword(@Body('keyword') keyword: string) {
+    return this.adminService.createCommentBannedKeyword(keyword);
+  }
+
+  @Delete('comments/banned-keywords/:keywordId')
+  deleteCommentBannedKeyword(@Param('keywordId') keywordId: string) {
+    return this.adminService.deleteCommentBannedKeyword(keywordId);
+  }
+
   @Get('comments')
   getComments(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('search') search?: string,
+    @Query('flaggedOnly') flaggedOnly?: string,
   ) {
-    return this.adminService.getComments(page, limit, search);
+    return this.adminService.getComments(page, limit, search, flaggedOnly === 'true');
   }
 
   @Delete('comments/:commentId')

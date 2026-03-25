@@ -226,7 +226,7 @@ export class PostsService {
       videoUrl?: string | null;
       _count: { likes: number; comments: number; shares: number };
     },
-    viewerUserId?: string,
+    viewerUserId?: string,  
     followingIds: string[] = [],
     authorAffinity: Record<string, number> = {},
   ): number {
