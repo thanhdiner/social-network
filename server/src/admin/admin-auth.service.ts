@@ -3,25 +3,52 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { randomBytes, randomInt } from 'crypto';
+import { MailService } from '../common/mail/mail.service';
 
 export interface AdminJwtPayload {
   sub: string;
   username: string;
   name: string;
+  sid?: string;
   type: 'admin';
 }
 
+interface AdminLoginContext {
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+interface AdminTwoFactorChallenge {
+  token: string;
+  adminId: string;
+  username: string;
+  name: string;
+  email: string;
+  code: string;
+  expiresAt: number;
+  attempts: number;
+  context?: AdminLoginContext;
+}
+
+const ADMIN_TWO_FACTOR_TTL_MS = 5 * 60 * 1000;
+const ADMIN_TWO_FACTOR_MAX_ATTEMPTS = 5;
+
 @Injectable()
 export class AdminAuthService {
+  private readonly twoFactorChallenges = new Map<string, AdminTwoFactorChallenge>();
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) {}
 
   private get adminSecret(): string {
@@ -31,11 +58,19 @@ export class AdminAuthService {
     );
   }
 
-  async login(username: string, password: string) {
+  async login(username: string, password: string, context?: AdminLoginContext) {
     const prismaAny = this.prisma as any;
     const admin = await prismaAny.admin.findFirst({
       where: {
         OR: [{ username }, { email: username }],
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        name: true,
+        password: true,
+        twoFactorEnabled: true,
       },
     });
 
@@ -48,16 +83,125 @@ export class AdminAuthService {
       throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
     }
 
-    const token = await this.signToken(admin.id, admin.username, admin.name);
+    if (!admin.twoFactorEnabled) {
+      const authSuccess = await this.createAdminAuthSession(admin, context);
+      return {
+        ...authSuccess,
+        requiresTwoFactor: false as const,
+      };
+    }
+
+    if (!admin.email) {
+      throw new BadRequestException(
+        'Tài khoản admin chưa có email để nhận mã xác thực 2 lớp',
+      );
+    }
+
+    this.pruneExpiredTwoFactorChallenges();
+
+    const challenge = this.buildTwoFactorChallenge(admin, context);
+    await this.sendTwoFactorCode(challenge.email, challenge.code);
 
     return {
-      token,
-      admin: {
-        id: admin.id,
-        username: admin.username,
-        email: admin.email,
-        name: admin.name,
+      requiresTwoFactor: true as const,
+      challengeToken: challenge.token,
+      expiresAt: challenge.expiresAt,
+      message: 'Mã xác thực đã được gửi tới email quản trị',
+      ...(this.mailService.isEnabled() ? {} : { debugCode: challenge.code }),
+    };
+  }
+
+  async verifyTwoFactorCode(challengeToken: string, code: string) {
+    this.pruneExpiredTwoFactorChallenges();
+
+    const token = String(challengeToken || '').trim();
+    const normalizedCode = String(code || '').trim();
+
+    if (!token || !normalizedCode) {
+      throw new BadRequestException('Thiếu challenge token hoặc mã xác thực');
+    }
+
+    const challenge = this.twoFactorChallenges.get(token);
+
+    if (!challenge) {
+      throw new UnauthorizedException('Phiên xác thực 2 lớp không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (Date.now() > challenge.expiresAt) {
+      this.twoFactorChallenges.delete(token);
+      throw new UnauthorizedException('Mã xác thực đã hết hạn');
+    }
+
+    if (challenge.code !== normalizedCode) {
+      challenge.attempts += 1;
+
+      if (challenge.attempts >= ADMIN_TWO_FACTOR_MAX_ATTEMPTS) {
+        this.twoFactorChallenges.delete(token);
+        throw new UnauthorizedException(
+          'Bạn đã nhập sai mã xác thực quá số lần cho phép',
+        );
+      }
+
+      this.twoFactorChallenges.set(token, challenge);
+
+      throw new UnauthorizedException(
+        `Mã xác thực không đúng. Còn ${ADMIN_TWO_FACTOR_MAX_ATTEMPTS - challenge.attempts} lần thử`,
+      );
+    }
+
+    this.twoFactorChallenges.delete(token);
+
+    const prismaAny = this.prisma as any;
+    const admin = await prismaAny.admin.findUnique({
+      where: { id: challenge.adminId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        name: true,
       },
+    });
+
+    if (!admin) {
+      throw new UnauthorizedException('Tài khoản admin không tồn tại');
+    }
+
+    const authSuccess = await this.createAdminAuthSession(admin, challenge.context);
+
+    return {
+      ...authSuccess,
+      requiresTwoFactor: false as const,
+    };
+  }
+
+  async resendTwoFactorCode(challengeToken: string) {
+    this.pruneExpiredTwoFactorChallenges();
+
+    const token = String(challengeToken || '').trim();
+    if (!token) {
+      throw new BadRequestException('Thiếu challenge token');
+    }
+
+    const challenge = this.twoFactorChallenges.get(token);
+    if (!challenge) {
+      throw new UnauthorizedException('Phiên xác thực 2 lớp không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (challenge.attempts >= ADMIN_TWO_FACTOR_MAX_ATTEMPTS) {
+      this.twoFactorChallenges.delete(token);
+      throw new UnauthorizedException('Phiên xác thực đã bị khóa do nhập sai quá nhiều lần');
+    }
+
+    challenge.code = this.generateTwoFactorCode();
+    challenge.expiresAt = Date.now() + ADMIN_TWO_FACTOR_TTL_MS;
+    this.twoFactorChallenges.set(token, challenge);
+
+    await this.sendTwoFactorCode(challenge.email, challenge.code);
+
+    return {
+      challengeToken: token,
+      expiresAt: challenge.expiresAt,
+      ...(this.mailService.isEnabled() ? {} : { debugCode: challenge.code }),
     };
   }
 
@@ -107,11 +251,271 @@ export class AdminAuthService {
     };
   }
 
-  private async signToken(id: string, username: string, name: string) {
+  async forgotPassword(email: string) {
+    const prismaAny = this.prisma as any;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      throw new BadRequestException('Email không được để trống');
+    }
+
+    const admin = await prismaAny.admin.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, email: true, name: true },
+    });
+
+    // Always return success to avoid email enumeration
+    if (!admin) {
+      return {
+        message: 'Nếu email tồn tại trong hệ thống, mã xác nhận đã được gửi',
+      };
+    }
+
+    // Generate 6-digit code
+    const code = randomInt(100000, 1000000).toString();
+    const tokenHash = await bcrypt.hash(code, 8);
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await prismaAny.admin.update({
+      where: { id: admin.id },
+      data: {
+        resetPasswordToken: tokenHash,
+        resetPasswordExpiry: expiry,
+      },
+    });
+
+    await this.mailService.sendAdminPasswordReset(admin.email, code);
+
+    return {
+      message: 'Nếu email tồn tại trong hệ thống, mã xác nhận đã được gửi',
+      ...(this.mailService.isEnabled() ? {} : { debugCode: code }),
+    };
+  }
+
+  async resetPassword(
+    email: string,
+    code: string,
+    newPassword: string,
+    confirmPassword: string,
+  ) {
+    const prismaAny = this.prisma as any;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const trimmedCode = String(code || '').trim();
+
+    if (!normalizedEmail || !trimmedCode || !newPassword) {
+      throw new BadRequestException('Thiếu thông tin bắt buộc');
+    }
+
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException('Mật khẩu xác nhận không khớp');
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Mật khẩu phải có ít nhất 8 ký tự');
+    }
+
+    const admin = await prismaAny.admin.findUnique({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        resetPasswordToken: true,
+        resetPasswordExpiry: true,
+      },
+    });
+
+    if (!admin || !admin.resetPasswordToken || !admin.resetPasswordExpiry) {
+      throw new BadRequestException('Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (new Date() > new Date(admin.resetPasswordExpiry)) {
+      // Clear expired token
+      await prismaAny.admin.update({
+        where: { id: admin.id },
+        data: { resetPasswordToken: null, resetPasswordExpiry: null },
+      });
+      throw new BadRequestException('Mã đặt lại mật khẩu đã hết hạn');
+    }
+
+    const isValid = await bcrypt.compare(trimmedCode, admin.resetPasswordToken);
+    if (!isValid) {
+      throw new BadRequestException('Mã xác nhận không đúng');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and clear token
+    await prismaAny.admin.update({
+      where: { id: admin.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpiry: null,
+      },
+    });
+
+    // Revoke all active sessions for security
+    await prismaAny.adminSession.updateMany({
+      where: { adminId: admin.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    return { message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' };
+  }
+
+  async getAdminMe(adminId: string, sessionId?: string) {
+    const prismaAny = this.prisma as any;
+
+    const admin = await prismaAny.admin.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        email: true,
+        avatar: true,
+        twoFactorEnabled: true,
+        loginAlertsEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!admin) {
+      throw new UnauthorizedException('Tài khoản admin không tồn tại');
+    }
+
+    await this.touchSession(adminId, sessionId);
+
+    return {
+      adminId: admin.id,
+      username: admin.username,
+      name: admin.name,
+      email: admin.email,
+      avatar: admin.avatar,
+      twoFactorEnabled: admin.twoFactorEnabled,
+      loginAlertsEnabled: admin.loginAlertsEnabled,
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt,
+      sessionId: sessionId || null,
+    };
+  }
+
+  private resolveDeviceName(userAgent?: string) {
+    const raw = String(userAgent || '').toLowerCase();
+
+    if (!raw) return 'Unknown Device';
+    if (raw.includes('iphone')) return 'iPhone';
+    if (raw.includes('android')) return 'Android Phone';
+    if (raw.includes('ipad')) return 'iPad';
+    if (raw.includes('macintosh') || raw.includes('mac os')) return 'Mac Device';
+    if (raw.includes('windows')) return 'Windows PC';
+    if (raw.includes('linux')) return 'Linux Device';
+
+    return 'Browser Session';
+  }
+
+  private generateTwoFactorCode() {
+    return randomInt(100000, 1000000).toString();
+  }
+
+  private buildTwoFactorChallenge(
+    admin: { id: string; username: string; name: string; email: string },
+    context?: AdminLoginContext,
+  ): AdminTwoFactorChallenge {
+    const token = randomBytes(24).toString('hex');
+    const challenge: AdminTwoFactorChallenge = {
+      token,
+      adminId: admin.id,
+      username: admin.username,
+      name: admin.name,
+      email: admin.email,
+      code: this.generateTwoFactorCode(),
+      expiresAt: Date.now() + ADMIN_TWO_FACTOR_TTL_MS,
+      attempts: 0,
+      context,
+    };
+
+    this.twoFactorChallenges.set(token, challenge);
+
+    return challenge;
+  }
+
+  private pruneExpiredTwoFactorChallenges() {
+    const now = Date.now();
+    this.twoFactorChallenges.forEach((value, key) => {
+      if (value.expiresAt <= now) {
+        this.twoFactorChallenges.delete(key);
+      }
+    });
+  }
+
+  private async sendTwoFactorCode(email: string, code: string) {
+    await this.mailService.sendAdminTwoFactorCode(email, code);
+  }
+
+  private async touchSession(adminId: string, sessionId?: string) {
+    if (!sessionId) return;
+    const prismaAny = this.prisma as any;
+
+    await prismaAny.adminSession.updateMany({
+      where: {
+        id: sessionId,
+        adminId,
+        revokedAt: null,
+      },
+      data: {
+        lastActiveAt: new Date(),
+      },
+    });
+  }
+
+  private async createAdminAuthSession(
+    admin: { id: string; username: string; name: string; email: string },
+    context?: AdminLoginContext,
+  ) {
+    const prismaAny = this.prisma as any;
+
+    const session = await prismaAny.adminSession.create({
+      data: {
+        adminId: admin.id,
+        device: this.resolveDeviceName(context?.userAgent),
+        ipAddress: context?.ipAddress || null,
+        userAgent: context?.userAgent || null,
+        location: null,
+      },
+      select: { id: true },
+    });
+
+    const token = await this.signToken(
+      admin.id,
+      admin.username,
+      admin.name,
+      session.id,
+    );
+
+    return {
+      token,
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        name: admin.name,
+      },
+      sessionId: session.id,
+    };
+  }
+
+  private async signToken(
+    id: string,
+    username: string,
+    name: string,
+    sessionId?: string,
+  ) {
     const payload: AdminJwtPayload = {
       sub: id,
       username,
       name,
+      sid: sessionId,
       type: 'admin',
     };
     return this.jwtService.signAsync(payload, {

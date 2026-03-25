@@ -4,8 +4,10 @@ import adminService, { type AdminUser, type AdminUserDetail } from '@/services/a
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { useSearchParams } from 'react-router-dom'
 
 const AdminUsers: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -84,6 +86,31 @@ const AdminUsers: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    const urlSearch = (searchParams.get('search') || '').trim()
+    const urlRole = (searchParams.get('role') || '').trim()
+
+    let shouldResetPage = false
+
+    if (urlSearch !== searchInput) {
+      setSearchInput(urlSearch)
+    }
+
+    if (urlSearch !== search) {
+      setSearch(urlSearch)
+      shouldResetPage = true
+    }
+
+    if (urlRole !== roleFilter) {
+      setRoleFilter(urlRole)
+      shouldResetPage = true
+    }
+
+    if (shouldResetPage) {
+      setPage(1)
+    }
+  }, [searchParams])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -178,6 +205,19 @@ const AdminUsers: React.FC = () => {
       toast.error('Không thể tải thông tin người dùng')
     }
   }
+
+  useEffect(() => {
+    const openUserId = searchParams.get('openUser')
+    if (!openUserId) return
+
+    handleViewDetail(openUserId).finally(() => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('openUser')
+      setSearchParams(nextParams, { replace: true })
+    })
+    // This effect should run only when URL params are changed by quick search navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams])
 
   const closeDetailModal = () => {
     setIsEditingDetail(false)

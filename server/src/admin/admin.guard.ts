@@ -27,6 +27,7 @@ export class AdminJwtGuard implements CanActivate {
         adminId: payload.sub,
         username: payload.username,
         name: payload.name,
+        sessionId: payload.sid,
       };
       return true;
     } catch {

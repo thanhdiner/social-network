@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -207,6 +208,265 @@ export class AdminService {
     };
   }
 
+  // ─── Admin Account Management ──────────────────────────────────────────────
+
+  async getAccountProfile(adminId: string, currentSessionId?: string) {
+    const prismaAny = this.prisma as any;
+
+    const admin = await prismaAny.admin.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        name: true,
+        avatar: true,
+        twoFactorEnabled: true,
+        loginAlertsEnabled: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!admin) {
+      throw new NotFoundException('Không tìm thấy tài khoản admin');
+    }
+
+    const sessions = await this.getAccountSessions(adminId, currentSessionId);
+
+    return {
+      profile: {
+        adminId: admin.id,
+        username: admin.username,
+        name: admin.name,
+        email: admin.email,
+        avatar: admin.avatar,
+        createdAt: admin.createdAt,
+        updatedAt: admin.updatedAt,
+      },
+      security: {
+        twoFactorEnabled: admin.twoFactorEnabled,
+        loginAlertsEnabled: admin.loginAlertsEnabled,
+      },
+      sessions,
+    };
+  }
+
+  async updateAccountProfile(
+    adminId: string,
+    payload: { name?: string; email?: string; avatar?: string | null },
+  ) {
+    const prismaAny = this.prisma as any;
+
+    const name = payload.name?.trim();
+    const email = payload.email?.trim().toLowerCase();
+    const avatar =
+      payload.avatar === undefined
+        ? undefined
+        : payload.avatar
+          ? payload.avatar.trim()
+          : null;
+
+    if (!name) {
+      throw new BadRequestException('Tên hiển thị không được để trống');
+    }
+
+    if (!email) {
+      throw new BadRequestException('Email không được để trống');
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new BadRequestException('Email không hợp lệ');
+    }
+
+    try {
+      const updated = await prismaAny.admin.update({
+        where: { id: adminId },
+        data: {
+          name,
+          email,
+          avatar,
+        },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          email: true,
+          avatar: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return {
+        adminId: updated.id,
+        username: updated.username,
+        name: updated.name,
+        email: updated.email,
+        avatar: updated.avatar,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+      };
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new BadRequestException('Email đã được sử dụng bởi tài khoản khác');
+      }
+      if (err?.code === 'P2025') {
+        throw new NotFoundException('Không tìm thấy tài khoản admin');
+      }
+      throw err;
+    }
+  }
+
+  async updateAccountPassword(
+    adminId: string,
+    payload: { currentPassword: string; newPassword: string; confirmPassword?: string },
+  ) {
+    const prismaAny = this.prisma as any;
+
+    const currentPassword = payload.currentPassword || '';
+    const newPassword = payload.newPassword || '';
+    const confirmPassword = payload.confirmPassword || '';
+
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException('Vui lòng cung cấp mật khẩu hiện tại và mật khẩu mới');
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Mật khẩu mới phải có ít nhất 8 ký tự');
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      throw new BadRequestException('Xác nhận mật khẩu không khớp');
+    }
+
+    const admin = await prismaAny.admin.findUnique({
+      where: { id: adminId },
+      select: { id: true, password: true },
+    });
+
+    if (!admin) {
+      throw new NotFoundException('Không tìm thấy tài khoản admin');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, admin.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await prismaAny.admin.update({
+      where: { id: adminId },
+      data: { password: hashed },
+    });
+
+    return { message: 'Đổi mật khẩu thành công' };
+  }
+
+  async updateAccountSecurity(
+    adminId: string,
+    payload: { twoFactorEnabled?: boolean; loginAlertsEnabled?: boolean },
+  ) {
+    const prismaAny = this.prisma as any;
+
+    if (
+      typeof payload.twoFactorEnabled !== 'boolean' &&
+      typeof payload.loginAlertsEnabled !== 'boolean'
+    ) {
+      throw new BadRequestException('Không có thiết lập bảo mật để cập nhật');
+    }
+
+    const updated = await prismaAny.admin.update({
+      where: { id: adminId },
+      data: {
+        ...(typeof payload.twoFactorEnabled === 'boolean'
+          ? { twoFactorEnabled: payload.twoFactorEnabled }
+          : {}),
+        ...(typeof payload.loginAlertsEnabled === 'boolean'
+          ? { loginAlertsEnabled: payload.loginAlertsEnabled }
+          : {}),
+      },
+      select: {
+        twoFactorEnabled: true,
+        loginAlertsEnabled: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      twoFactorEnabled: updated.twoFactorEnabled,
+      loginAlertsEnabled: updated.loginAlertsEnabled,
+      updatedAt: updated.updatedAt,
+    };
+  }
+
+  async getAccountSessions(adminId: string, currentSessionId?: string) {
+    const prismaAny = this.prisma as any;
+
+    const sessions = await prismaAny.adminSession.findMany({
+      where: {
+        adminId,
+        revokedAt: null,
+      },
+      orderBy: [{ lastActiveAt: 'desc' }, { createdAt: 'desc' }],
+      take: 12,
+      select: {
+        id: true,
+        device: true,
+        location: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+        lastActiveAt: true,
+      },
+    });
+
+    return sessions.map((session: any) => ({
+      id: session.id,
+      device: session.device,
+      location: session.location || session.ipAddress || 'Unknown location',
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      createdAt: session.createdAt,
+      lastActiveAt: session.lastActiveAt,
+      current: Boolean(currentSessionId && session.id === currentSessionId),
+    }));
+  }
+
+  async revokeAccountSession(
+    adminId: string,
+    sessionId: string,
+    currentSessionId?: string,
+  ) {
+    const prismaAny = this.prisma as any;
+
+    if (sessionId === currentSessionId) {
+      throw new BadRequestException('Không thể thu hồi phiên hiện tại');
+    }
+
+    const target = await prismaAny.adminSession.findFirst({
+      where: {
+        id: sessionId,
+        adminId,
+        revokedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (!target) {
+      throw new NotFoundException('Không tìm thấy phiên đăng nhập');
+    }
+
+    await prismaAny.adminSession.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+
+    return { message: 'Đã thu hồi phiên đăng nhập' };
+  }
+
   // ─── User Management ─────────────────────────────────────────────────────────
 
   async createUser(payload: {
@@ -273,11 +533,13 @@ export class AdminService {
     const conditions: any[] = [];
 
     if (search) {
+      const searchTerm = search.trim();
       conditions.push({
         OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { username: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
+          { id: { contains: searchTerm, mode: 'insensitive' } },
+          { name: { contains: searchTerm, mode: 'insensitive' } },
+          { username: { contains: searchTerm, mode: 'insensitive' } },
+          { email: { contains: searchTerm, mode: 'insensitive' } },
         ],
       });
     }
@@ -466,11 +728,14 @@ export class AdminService {
     const where: any = {};
 
     if (search?.trim()) {
+      const searchTerm = search.trim();
       where.OR = [
-        { content: { contains: search.trim(), mode: 'insensitive' } },
-        { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
+        { id: { contains: searchTerm, mode: 'insensitive' } },
+        { content: { contains: searchTerm, mode: 'insensitive' } },
+        { user: { id: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
         {
-          user: { username: { contains: search.trim(), mode: 'insensitive' } },
+          user: { username: { contains: searchTerm, mode: 'insensitive' } },
         },
       ];
     }
@@ -706,12 +971,25 @@ export class AdminService {
 
   // ─── Reels Management ────────────────────────────────────────────────────────
 
-  async getReels(page = 1, limit = 10) {
+  async getReels(page = 1, limit = 10, search?: string) {
     const prismaAny = this.prisma as any;
     const skip = (page - 1) * limit;
+    const where: any = {};
+
+    if (search?.trim()) {
+      const searchTerm = search.trim();
+      where.OR = [
+        { id: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+        { user: { id: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { user: { username: { contains: searchTerm, mode: 'insensitive' } } },
+      ];
+    }
 
     const [reels, total] = await Promise.all([
       prismaAny.reel.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -722,7 +1000,7 @@ export class AdminService {
           _count: { select: { likes: true, comments: true, shares: true } },
         },
       }),
-      prismaAny.reel.count(),
+      prismaAny.reel.count({ where }),
     ]);
 
     return {
@@ -796,11 +1074,15 @@ export class AdminService {
     const bannedKeywords = keywordRows.map((row: { keyword: string }) => row.keyword);
 
     if (search?.trim()) {
+      const searchTerm = search.trim();
       conditions.push({
         OR: [
-        { content: { contains: search.trim(), mode: 'insensitive' } },
-        { user: { name: { contains: search.trim(), mode: 'insensitive' } } },
-        { user: { username: { contains: search.trim(), mode: 'insensitive' } } },
+          { id: { contains: searchTerm, mode: 'insensitive' } },
+          { content: { contains: searchTerm, mode: 'insensitive' } },
+          { user: { id: { contains: searchTerm, mode: 'insensitive' } } },
+          { user: { name: { contains: searchTerm, mode: 'insensitive' } } },
+          { user: { username: { contains: searchTerm, mode: 'insensitive' } } },
+          { post: { id: { contains: searchTerm, mode: 'insensitive' } } },
         ],
       });
     }

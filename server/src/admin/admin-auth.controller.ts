@@ -8,6 +8,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminJwtGuard } from './admin.guard';
 
@@ -16,15 +17,54 @@ export class AdminAuthController {
   constructor(private adminAuthService: AdminAuthService) {}
 
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 8 } })
   @HttpCode(HttpStatus.OK)
-  login(@Body() body: { username: string; password: string }) {
-    return this.adminAuthService.login(body.username, body.password);
+  login(
+    @Body() body: { username: string; password: string },
+    @Request() req: { headers?: Record<string, string | string[] | undefined>; ip?: string },
+  ) {
+    const rawUserAgent = req?.headers?.['user-agent'];
+    const userAgent = Array.isArray(rawUserAgent)
+      ? rawUserAgent[0]
+      : rawUserAgent;
+
+    return this.adminAuthService.login(body.username, body.password, {
+      userAgent,
+      ipAddress: req?.ip,
+    });
+  }
+
+  @Post('verify-2fa')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  verifyTwoFactor(
+    @Body() body: { challengeToken: string; code: string },
+  ) {
+    return this.adminAuthService.verifyTwoFactorCode(
+      body.challengeToken,
+      body.code,
+    );
+  }
+
+  @Post('resend-2fa')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  resendTwoFactor(@Body() body: { challengeToken: string }) {
+    return this.adminAuthService.resendTwoFactorCode(body.challengeToken);
   }
 
   @Get('me')
   @UseGuards(AdminJwtGuard)
-  getMe(@Request() req: { admin: { adminId: string; username: string; name: string } }) {
-    return req.admin;
+  getMe(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+  ) {
+    return this.adminAuthService.getAdminMe(
+      req.admin.adminId,
+      req.admin.sessionId,
+    );
   }
 
   // Endpoint nội bộ để tạo admin đầu tiên (nên disable sau khi dùng)
@@ -52,5 +92,32 @@ export class AdminAuthController {
       password: body.password,
       name: body.name,
     });
+  }
+
+  @Post('forgot-password')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body() body: { email: string }) {
+    return this.adminAuthService.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @HttpCode(HttpStatus.OK)
+  resetPassword(
+    @Body()
+    body: {
+      email: string;
+      code: string;
+      newPassword: string;
+      confirmPassword: string;
+    },
+  ) {
+    return this.adminAuthService.resetPassword(
+      body.email,
+      body.code,
+      body.newPassword,
+      body.confirmPassword,
+    );
   }
 }

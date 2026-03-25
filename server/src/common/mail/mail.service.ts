@@ -121,4 +121,56 @@ Ma nay se het han sau 1 gio. Neu ban khong yeu cau dat lai mat khau, vui long bo
 
     await this.sendEmail({ to, subject, text, html });
   }
+
+  async sendAdminTwoFactorCode(to: string, code: string): Promise<void> {
+    const subject = 'Ma xac thuc 2 lop - Admin Social Network';
+    const text = `Xin chao,
+
+Ma xac thuc 2 lop cua ban la: ${code}
+
+Ma nay se het han sau 5 phut.
+Neu ban khong thuc hien dang nhap, vui long doi mat khau ngay lap tuc.`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
+        <h2>Dang nhap Admin - Xac thuc 2 lop</h2>
+        <p>Ma xac thuc 2FA cua ban la:</p>
+        <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #1d4ed8;">${code}</p>
+        <p style="color: #6b7280;">Ma se het han sau 5 phut.</p>
+        <p>Neu ban khong thuc hien dang nhap, vui long doi mat khau va lien he bo phan van hanh.</p>
+      </div>
+    `;
+
+    await this.sendEmail({ to, subject, text, html });
+  }
+
+  async sendAdminPasswordReset(to: string, code: string): Promise<void> {
+    const subject = 'Admin - Dat lai mat khau - Social Network';
+    const text = `Xin chao,
+
+Ma dat lai mat khau Admin cua ban la: ${code}
+
+Ma nay se het han sau 15 phut.
+Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay va lien he bo phan van hanh.`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 520px; margin: 0 auto;">
+        <div style="background: #1e40af; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h2 style="color: #fff; margin: 0; font-size: 20px;">🔐 Admin — Đặt lại mật khẩu</h2>
+        </div>
+        <div style="background: #f8fafc; padding: 28px; border: 1px solid #e2e8f0; border-top: 0; border-radius: 0 0 8px 8px;">
+          <p>Xin chào,</p>
+          <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản Admin. Mã xác nhận của bạn là:</p>
+          <div style="background: #fff; border: 2px dashed #1d4ed8; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #1d4ed8;">${code}</span>
+          </div>
+          <p style="color: #ef4444; font-size: 13px;">⚠ Mã này sẽ hết hạn sau <strong>15 phút</strong>.</p>
+          <p style="color: #6b7280; font-size: 13px;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này và liên hệ đội vận hành ngay lập tức.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({ to, subject, text, html });
+  }
 }
+

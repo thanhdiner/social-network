@@ -57,6 +57,107 @@ export class AdminController {
     });
   }
 
+  // ─── Account ───────────────────────────────────────────────────────────────
+
+  @Get('account/profile')
+  getAccountProfile(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+  ) {
+    return this.adminService.getAccountProfile(
+      req.admin.adminId,
+      req.admin.sessionId,
+    );
+  }
+
+  @Put('account/profile')
+  updateAccountProfile(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+    @Body()
+    body: {
+      name?: string;
+      email?: string;
+      avatar?: string | null;
+    },
+  ) {
+    return this.adminService.updateAccountProfile(req.admin.adminId, {
+      name: body.name,
+      email: body.email,
+      avatar: body.avatar,
+    });
+  }
+
+  @Put('account/password')
+  updateAccountPassword(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+    @Body()
+    body: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword?: string;
+    },
+  ) {
+    return this.adminService.updateAccountPassword(req.admin.adminId, {
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+      confirmPassword: body.confirmPassword,
+    });
+  }
+
+  @Put('account/security')
+  updateAccountSecurity(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+    @Body()
+    body: {
+      twoFactorEnabled?: boolean;
+      loginAlertsEnabled?: boolean;
+    },
+  ) {
+    return this.adminService.updateAccountSecurity(req.admin.adminId, {
+      twoFactorEnabled: body.twoFactorEnabled,
+      loginAlertsEnabled: body.loginAlertsEnabled,
+    });
+  }
+
+  @Get('account/sessions')
+  getAccountSessions(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+  ) {
+    return this.adminService.getAccountSessions(
+      req.admin.adminId,
+      req.admin.sessionId,
+    );
+  }
+
+  @Delete('account/sessions/:sessionId')
+  revokeAccountSession(
+    @Request()
+    req: {
+      admin: { adminId: string; username: string; name: string; sessionId?: string };
+    },
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.adminService.revokeAccountSession(
+      req.admin.adminId,
+      sessionId,
+      req.admin.sessionId,
+    );
+  }
+
   // ─── Users ────────────────────────────────────────────────────────────────────
 
   @Post('users')
@@ -202,8 +303,9 @@ export class AdminController {
   getReels(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string,
   ) {
-    return this.adminService.getReels(page, limit);
+    return this.adminService.getReels(page, limit, search);
   }
 
   @Delete('reels/:reelId')

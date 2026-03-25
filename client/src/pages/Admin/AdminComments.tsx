@@ -21,6 +21,7 @@ import adminService, { type AdminComment, type CommentBannedKeyword } from '@/se
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { useSearchParams } from 'react-router-dom'
 
 const PAGE_SIZE = 20
 
@@ -31,6 +32,7 @@ const escapeCsv = (value: string | number | null | undefined) => {
 }
 
 const AdminComments: React.FC = () => {
+  const [searchParams] = useSearchParams()
   const [comments, setComments] = useState<AdminComment[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -92,6 +94,32 @@ const AdminComments: React.FC = () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current)
     }
   }, [])
+
+  useEffect(() => {
+    const urlSearch = (searchParams.get('search') || '').trim()
+    const flaggedValue = (searchParams.get('flagged') || '').trim().toLowerCase()
+    const urlFlaggedOnly = flaggedValue === '1' || flaggedValue === 'true'
+
+    let shouldResetPage = false
+
+    if (urlSearch !== searchInput) {
+      setSearchInput(urlSearch)
+    }
+
+    if (urlSearch !== search) {
+      setSearch(urlSearch)
+      shouldResetPage = true
+    }
+
+    if (urlFlaggedOnly !== flaggedOnly) {
+      setFlaggedOnly(urlFlaggedOnly)
+      shouldResetPage = true
+    }
+
+    if (shouldResetPage) {
+      setPage(1)
+    }
+  }, [searchParams])
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value)
@@ -425,7 +453,7 @@ const AdminComments: React.FC = () => {
               type="button"
               className="comments-clear-btn"
               onClick={clearFilters}
-              title="Xóa tìm kiếm"
+               disabled={!search && !searchInput && !flaggedOnly}
             >
               <X size={14} />
             </button>

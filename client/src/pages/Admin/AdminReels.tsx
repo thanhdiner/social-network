@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Trash2, ChevronLeft, ChevronRight, Play, Eye, Heart, MessageCircle, Share2, Film } from 'lucide-react'
 import adminService, { type AdminReel } from '@/services/adminService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { useSearchParams } from 'react-router-dom'
 
 /* ─── Aspect-ratio detection ────────────────────────────────────────────────
    We detect the natural width/height of the thumbnail image and compute
@@ -140,6 +141,10 @@ const ReelCard: React.FC<{ reel: AdminReel; onDelete: (r: AdminReel) => void }> 
 
 /* ─── Page ────────────────────────────────────────────────────────────────── */
 const AdminReels: React.FC = () => {
+  const [searchParams] = useSearchParams()
+  const reelSearch = (searchParams.get('search') || '').trim()
+  const normalizedReelSearch = reelSearch.toLowerCase()
+  const reelPeriod = (searchParams.get('period') || 'all').trim().toLowerCase()
   const [reels, setReels] = useState<AdminReel[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -149,7 +154,7 @@ const AdminReels: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await adminService.getReels(page, 12)
+      const data = await adminService.getReels(page, 12, reelSearch || undefined)
       setReels(data.reels)
       setTotal(data.total)
       setTotalPages(data.totalPages)
@@ -158,9 +163,13 @@ const AdminReels: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, reelSearch])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [reelSearch, reelPeriod])
 
   const handleDelete = async (reel: AdminReel) => {
     if (!confirm(`Xóa reel của ${reel.user.name}?`)) return
@@ -173,13 +182,53 @@ const AdminReels: React.FC = () => {
     }
   }
 
+  const filteredReels = useMemo(() => {
+    const searchMatched = !normalizedReelSearch
+      ? reels
+      : reels.filter((reel) => {
+          const haystack = [
+            reel.id,
+            reel.description || '',
+            reel.user?.name || '',
+            reel.user?.username || '',
+          ]
+            .join(' ')
+            .toLowerCase()
+
+          return haystack.includes(normalizedReelSearch)
+        })
+
+    if (reelPeriod !== 'recent' && reelPeriod !== 'month') {
+      return searchMatched
+    }
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const sevenDaysAgo = new Date(startOfToday)
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    return searchMatched.filter((reel) => {
+      const createdAt = new Date(reel.createdAt)
+
+      if (reelPeriod === 'recent') {
+        return createdAt >= sevenDaysAgo
+      }
+
+      return (
+        createdAt.getFullYear() === now.getFullYear() &&
+        createdAt.getMonth() === now.getMonth()
+      )
+    })
+  }, [reels, normalizedReelSearch, reelPeriod])
+
   return (
     <div className="admin-page">
       <div className="page-header reels-page-header">
         <div>
           <h1 className="page-title">Quản lý Reels</h1>
           <p className="page-subtitle">
-            Tổng cộng <strong>{total}</strong> reels · Grid tự động theo tỷ lệ khung hình gốc
+            Tổng cộng <strong>{total}</strong> reels · Đang hiển thị <strong>{filteredReels.length}</strong>{' '}
+            reels · Grid tự động theo tỷ lệ khung hình gốc
           </p>
         </div>
         <div className="reels-legend">
@@ -195,14 +244,14 @@ const AdminReels: React.FC = () => {
             <div className="loading-spinner" />
             <span>Đang tải reels...</span>
           </div>
-        ) : reels.length === 0 ? (
+        ) : filteredReels.length === 0 ? (
           <div className="reels-empty-v2">
             <Film size={52} opacity={0.25} />
-            <p>Chưa có reel nào</p>
+            <p>{normalizedReelSearch ? 'Không có reel khớp từ khóa tìm kiếm' : 'Chưa có reel nào'}</p>
           </div>
         ) : (
           <div className="reels-masonry">
-            {reels.map(reel => (
+            {filteredReels.map(reel => (
               <ReelCard key={reel.id} reel={reel} onDelete={handleDelete} />
             ))}
           </div>

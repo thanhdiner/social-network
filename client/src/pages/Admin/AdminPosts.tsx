@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Search,
   Trash2,
@@ -25,8 +25,10 @@ import uploadService from '@/services/uploadService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+import { useSearchParams } from 'react-router-dom'
 
 type MediaFilter = 'all' | 'image' | 'video' | 'text'
+type PeriodFilter = 'all' | 'recent' | 'month'
 
 const PAGE_SIZE = 10
 
@@ -37,6 +39,7 @@ const escapeCsv = (value: string | number | null | undefined) => {
 }
 
 const AdminPosts: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [posts, setPosts] = useState<AdminPost[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -44,6 +47,7 @@ const AdminPosts: React.FC = () => {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>('all')
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all')
   const [loading, setLoading] = useState(true)
 
   const [selectedPost, setSelectedPost] = useState<AdminPostDetail | null>(null)
@@ -135,6 +139,43 @@ const AdminPosts: React.FC = () => {
     }
   }, [showCreateModal])
 
+  useEffect(() => {
+    const urlSearch = (searchParams.get('search') || '').trim()
+    const urlMedia = (searchParams.get('media') || 'all').trim()
+    const urlPeriod = (searchParams.get('period') || 'all').trim()
+    const nextMedia = ['all', 'image', 'video', 'text'].includes(urlMedia)
+      ? (urlMedia as MediaFilter)
+      : 'all'
+    const nextPeriod = ['all', 'recent', 'month'].includes(urlPeriod)
+      ? (urlPeriod as PeriodFilter)
+      : 'all'
+
+    let shouldResetPage = false
+
+    if (urlSearch !== searchInput) {
+      setSearchInput(urlSearch)
+    }
+
+    if (urlSearch !== search) {
+      setSearch(urlSearch)
+      shouldResetPage = true
+    }
+
+    if (nextMedia !== mediaFilter) {
+      setMediaFilter(nextMedia)
+      shouldResetPage = true
+    }
+
+    if (nextPeriod !== periodFilter) {
+      setPeriodFilter(nextPeriod)
+      shouldResetPage = true
+    }
+
+    if (shouldResetPage) {
+      setPage(1)
+    }
+  }, [searchParams])
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setSearch(searchInput)
@@ -145,17 +186,18 @@ const AdminPosts: React.FC = () => {
     setSearchInput('')
     setSearch('')
     setMediaFilter('all')
+    setPeriodFilter('all')
     setPage(1)
   }
 
   const handleExport = () => {
-    if (posts.length === 0) {
+    if (visiblePosts.length === 0) {
       toast.info('Không có dữ liệu để xuất')
       return
     }
 
     const header = ['ID', 'Tác giả', 'Username', 'Nội dung', 'Ảnh', 'Video', 'Likes', 'Comments', 'Shares', 'Thời gian tạo']
-    const rows = posts.map(post => ([
+    const rows = visiblePosts.map(post => ([
       post.id,
       post.user.name,
       post.user.username,
@@ -207,6 +249,19 @@ const AdminPosts: React.FC = () => {
       setDetailLoading(false)
     }
   }
+
+  useEffect(() => {
+    const openPostId = searchParams.get('openPost')
+    if (!openPostId) return
+
+    openDetail(openPostId).finally(() => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('openPost')
+      setSearchParams(nextParams, { replace: true })
+    })
+    // This effect is URL-driven and should only run when quick search sets openPost.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, setSearchParams])
 
   const openEditModal = async (postId: string) => {
     setEditPostId(postId)
@@ -293,7 +348,7 @@ const AdminPosts: React.FC = () => {
       return
     }
 
-    if (!content && !imageUrl && !videoUrl) {
+    if (!content && !imageUrlText && !videoUrlText) {
       toast.error('Bài viết phải có nội dung hoặc media')
       return
     }
@@ -360,11 +415,33 @@ const AdminPosts: React.FC = () => {
     }
   }
 
+  const visiblePosts = useMemo(() => {
+    if (periodFilter === 'all') return posts
+
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const sevenDaysAgo = new Date(startOfToday)
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    return posts.filter((post) => {
+      const createdAt = new Date(post.createdAt)
+
+      if (periodFilter === 'recent') {
+        return createdAt >= sevenDaysAgo
+      }
+
+      return (
+        createdAt.getFullYear() === now.getFullYear() &&
+        createdAt.getMonth() === now.getMonth()
+      )
+    })
+  }, [posts, periodFilter])
+
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const postsThisWeek = posts.filter(p => new Date(p.createdAt).getTime() >= weekAgo).length
-  const mediaCount = posts.filter(p => !!p.imageUrl || !!p.videoUrl).length
-  const likesTotal = posts.reduce((s, p) => s + (p._count?.likes || 0), 0)
-  const showingCount = posts.length
+  const postsThisWeek = visiblePosts.filter(p => new Date(p.createdAt).getTime() >= weekAgo).length
+  const mediaCount = visiblePosts.filter(p => !!p.imageUrl || !!p.videoUrl).length
+  const likesTotal = visiblePosts.reduce((s, p) => s + (p._count?.likes || 0), 0)
+  const showingCount = visiblePosts.length
 
   return (
     <div className="admin-page posts-page">
@@ -472,13 +549,13 @@ const AdminPosts: React.FC = () => {
                 </tr>
               )}
 
-              {!loading && posts.length === 0 && (
+              {!loading && visiblePosts.length === 0 && (
                 <tr>
                   <td colSpan={6} className="users-empty-row">Không có bài viết phù hợp</td>
                 </tr>
               )}
 
-              {!loading && posts.map(post => (
+              {!loading && visiblePosts.map(post => (
                 <tr key={post.id} className="hover-row">
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-3">

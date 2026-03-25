@@ -210,6 +210,38 @@ export interface CreateAnnouncementResponse {
   title: string
 }
 
+export interface AdminAccountSession {
+  id: string
+  device: string
+  location: string
+  ipAddress?: string | null
+  userAgent?: string | null
+  createdAt: string
+  lastActiveAt: string
+  current: boolean
+}
+
+export interface AdminAccountProfileData {
+  adminId: string
+  username: string
+  name: string
+  email: string
+  avatar?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminAccountSecurityData {
+  twoFactorEnabled: boolean
+  loginAlertsEnabled: boolean
+}
+
+export interface AdminAccountProfileResponse {
+  profile: AdminAccountProfileData
+  security: AdminAccountSecurityData
+  sessions: AdminAccountSession[]
+}
+
 const adminService = {
   // Dashboard
   getStats: () => adminApi.get<AdminStats>('/admin/dashboard/stats').then(r => r.data),
@@ -217,6 +249,20 @@ const adminService = {
   getRecentActivity: () => adminApi.get('/admin/dashboard/activity').then(r => r.data),
   createAnnouncement: (payload: CreateAnnouncementPayload) =>
     adminApi.post<CreateAnnouncementResponse>('/admin/dashboard/announcement', payload).then(r => r.data),
+
+  // Account
+  getAccountProfile: () =>
+    adminApi.get<AdminAccountProfileResponse>('/admin/account/profile').then(r => r.data),
+  updateAccountProfile: (payload: { name: string; email: string; avatar?: string | null }) =>
+    adminApi.put<AdminAccountProfileData>('/admin/account/profile', payload).then(r => r.data),
+  updateAccountPassword: (payload: { currentPassword: string; newPassword: string; confirmPassword?: string }) =>
+    adminApi.put<{ message: string }>('/admin/account/password', payload).then(r => r.data),
+  updateAccountSecurity: (payload: { twoFactorEnabled?: boolean; loginAlertsEnabled?: boolean }) =>
+    adminApi.put<AdminAccountSecurityData>('/admin/account/security', payload).then(r => r.data),
+  getAccountSessions: () =>
+    adminApi.get<AdminAccountSession[]>('/admin/account/sessions').then(r => r.data),
+  revokeAccountSession: (sessionId: string) =>
+    adminApi.delete<{ message: string }>(`/admin/account/sessions/${sessionId}`).then(r => r.data),
 
   // Users
   getUsers: (page = 1, limit = 10, search?: string, role?: string) => {
@@ -255,8 +301,9 @@ const adminService = {
     adminApi.delete(`/admin/posts/${postId}`).then(r => r.data),
 
   // Reels
-  getReels: (page = 1, limit = 10) => {
+  getReels: (page = 1, limit = 10, search?: string) => {
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search) params.append('search', search)
     return adminApi.get(`/admin/reels?${params}`).then(r => r.data)
   },
   deleteReel: (reelId: string) =>
