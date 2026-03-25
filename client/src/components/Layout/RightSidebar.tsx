@@ -5,6 +5,7 @@ import storyService, { type GroupedStories } from '../../services/storyService'
 import socketService from '../../services/socketService'
 import { Link } from 'react-router-dom'
 import { CreateStoryModal } from '../shared/CreateStoryModal'
+import { StoryViewer } from '../shared/StoryViewer'
 import { Avatar } from '../shared/Avatar'
 import { FriendSuggestions } from '../shared/FriendSuggestions'
 import { formatDistanceToNow } from 'date-fns'
@@ -15,6 +16,8 @@ export const RightSidebar = () => {
   const [groupedStories, setGroupedStories] = useState<GroupedStories[]>([])
   const [isStoriesLoading, setIsStoriesLoading] = useState(true)
   const [createStoryOpen, setCreateStoryOpen] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [selectedGroup, setSelectedGroup] = useState<GroupedStories | null>(null)
 
   useEffect(() => {
     loadActiveUsers()
@@ -91,13 +94,14 @@ export const RightSidebar = () => {
             No stories yet. Be the first to share!
           </div>
         ) : (
-          <div className="space-y-2 mt-2">
+          <div className="space-y-1 mt-2">
             {groupedStories.map(group => (
-              <div
+              <button
                 key={group.userId}
-                className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 transition"
+                onClick={() => { setSelectedGroup(group); setViewerOpen(true) }}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-orange-50 transition cursor-pointer text-left"
               >
-                <div className="relative">
+                <div className="relative shrink-0">
                   <Avatar
                     src={group.user.avatar || undefined}
                     name={group.user.name}
@@ -105,14 +109,17 @@ export const RightSidebar = () => {
                       ? 'w-12 h-12 ring-2 ring-orange-400 ring-offset-2'
                       : 'w-12 h-12 ring-2 ring-gray-300 ring-offset-2'}
                   />
+                  {group.hasUnviewed && (
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-orange-500 rounded-full border-2 border-white" />
+                  )}
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-medium text-gray-800">{group.user.name}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="font-medium text-gray-800 truncate">{group.user.name}</span>
                   <span className="text-xs text-gray-500">
                     {formatDistanceToNow(new Date(group.stories[0].createdAt), { addSuffix: true })}
                   </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -175,6 +182,15 @@ export const RightSidebar = () => {
         onClose={() => setCreateStoryOpen(false)}
         onStoryCreated={handleStoryCreated}
       />
+
+      {selectedGroup && (
+        <StoryViewer
+          open={viewerOpen}
+          onClose={() => { setViewerOpen(false); setSelectedGroup(null) }}
+          stories={selectedGroup.stories}
+          onDelete={() => { setViewerOpen(false); setSelectedGroup(null); loadStories() }}
+        />
+      )}
     </aside>
   )
 }
