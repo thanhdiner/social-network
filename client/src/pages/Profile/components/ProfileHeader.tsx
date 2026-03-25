@@ -167,7 +167,20 @@ export const ProfileHeader = ({ username, isOwnProfile }: ProfileHeaderProps) =>
   }
 
   const handleMessage = () => {
-    navigate('/chat')
+    if (profileUser?.id) {
+      navigate(`/chat?userId=${profileUser.id}`, {
+        state: {
+          openUser: {
+            id: profileUser.id,
+            name: profileUser.name,
+            username: profileUser.username,
+            avatar: profileUser.avatar ?? undefined,
+          }
+        }
+      })
+    } else {
+      navigate('/chat')
+    }
   }
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

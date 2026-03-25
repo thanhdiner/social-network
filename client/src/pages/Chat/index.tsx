@@ -1,7 +1,7 @@
-﻿import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, memo } from 'react';
 import type { MouseEvent as ReactMouseEvent, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Search,
@@ -317,6 +317,7 @@ AudioPlayer.displayName = 'AudioPlayer';
 
 export default function Chat() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user: currentUser } = useAuth();
   const { conversations, loadConversations, typingUsers, setTyping, onlineUsers, markAsRead, sendMessage, setActiveConversation } = useChat();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1259,11 +1260,33 @@ export default function Chat() {
       return;
     }
 
+    // Check if conversation already exists
     const conv = conversations.find(c => c.participantId === userId);
     if (conv) {
       setSelectedUser(conv.participant);
+      return;
     }
-  }, [searchParams, conversations, selectedUser]);
+
+    // No existing conversation — use state passed from profile page if available
+    const openUser = (location.state as { openUser?: User } | null)?.openUser;
+    if (openUser && openUser.id === userId) {
+      setSelectedUser(openUser);
+      return;
+    }
+
+    // Fallback: fetch via username lookup won't work — try chatService user search
+    void (async () => {
+      try {
+        const results = await chatService.searchUsers(userId);
+        const found = results.find(u => u.id === userId);
+        if (found) {
+          setSelectedUser(found);
+        }
+      } catch {
+        toast.error('Không tìm thấy người dùng');
+      }
+    })();
+  }, [searchParams, conversations, selectedUser, location.state]);
 
   // TÃ¬m kiáº¿m users
   useEffect(() => {
