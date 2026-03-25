@@ -7,6 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { ReelsService } from '../reels/reels.service';
 import { ShareReelDto } from '../reels/dto/share-reel.dto';
+import { RedisService } from '../common/redis/redis.service';
 
 const POST_USER_SELECT = {
   id: true,
@@ -134,7 +135,29 @@ export class PostsService {
     private notificationsService: NotificationsService,
     private chatGateway: ChatGateway,
     private reelsService: ReelsService,
+    private redisService: RedisService,
   ) {}
+
+  // Invalidate all feed cache pages for a given user (and their followers)
+  private async invalidateFeedCache(userId: string): Promise<void> {
+    try {
+      // Delete cached pages for this user
+      const userKeys = await this.redisService.keys(`feed:v2:${userId}:*`);
+      for (const key of userKeys) await this.redisService.del(key);
+
+      // Also invalidate followers' feeds since their feed contains this user's posts
+      const followers = await this.prisma.follow.findMany({
+        where: { followingId: userId },
+        select: { followerId: true },
+      });
+      for (const { followerId } of followers) {
+        const followerKeys = await this.redisService.keys(`feed:v2:${followerId}:*`);
+        for (const key of followerKeys) await this.redisService.del(key);
+      }
+    } catch {
+      // Non-critical — cache invalidation failure shouldn't break the operation
+    }
+  }
 
   async create(userId: string, createPostDto: CreatePostDto) {
     const newPost = await this.prisma.post.create({
@@ -163,109 +186,187 @@ export class PostsService {
     });
 
     // New post has 0 likes initially
-    return {
+    const result = {
       ...newPost,
       _count: {
         ...newPost._count,
         likes: 0,
       },
     };
+
+    // Bust feed cache for author + their followers
+    void this.invalidateFeedCache(userId);
+
+    return result;
+  }
+
+  // ─── Feed Ranking Algorithm ───────────────────────────────────────────────
+  // Inspired by Facebook EdgeRank / News Feed ranking:
+  //
+  //  score = engagement_score / time_decay + relationship_boost + media_boost
+  //
+  //  • engagement_score  = likes×3 + comments×5 + shares×4
+  //  • time_decay        = (hoursAgo + 2) ^ 1.5   (older posts decay faster)
+  //  • relationship_boost= 40 for own posts, 15 for posts from close follows
+  //  • media_boost       = 8 if has image, 12 if has video
+  //  • recency_bonus     = max(0, 20 - hoursAgo)  (fresh posts get a head-start)
+  // ──────────────────────────────────────────────────────────────────────────
+  private computeScore(post: {
+    createdAt: Date;
+    userId: string;
+    imageUrl?: string | null;
+    videoUrl?: string | null;
+    _count: { likes: number; comments: number; shares: number };
+  }, viewerUserId?: string, followingIds: string[] = []): number {
+    const nowMs   = Date.now();
+    const postMs  = new Date(post.createdAt).getTime();
+    const hoursAgo = (nowMs - postMs) / 3_600_000;
+
+    // Engagement
+    const engagement =
+      (post._count.likes   * 3) +
+      (post._count.comments * 5) +
+      (post._count.shares   * 4);
+
+    // Time decay — older posts drop quickly
+    const decay = Math.pow(hoursAgo + 2, 1.5);
+
+    // Recency bonus — boost very recent posts for first 20h
+    const recencyBonus = Math.max(0, 20 - hoursAgo);
+
+    // Relationship strength
+    let relationshipBoost = 0;
+    if (viewerUserId && post.userId === viewerUserId) {
+      relationshipBoost = 40; // Own posts always near top
+    } else if (followingIds.includes(post.userId)) {
+      relationshipBoost = 15;
+    }
+
+    // Media boost — posts with media get higher priority
+    const mediaBoost = post.videoUrl ? 12 : post.imageUrl ? 8 : 0;
+
+    return (engagement / decay) + recencyBonus + relationshipBoost + mediaBoost;
   }
 
   async findAll(page = 1, limit = 10, userId?: string) {
-    const skip = (page - 1) * limit;
+    const CACHE_TTL_SECONDS = 180; // 3 minutes
+    const CANDIDATE_MULTIPLIER = 4; // fetch 4x posts to rank from
 
-    // Build where clause: posts from user or people they follow,
-    // respecting visibility settings
+    // ── Build visibility-aware where clause ──────────────────────────────────
+    let followingIds: string[] = [];
     let whereClause: Prisma.PostWhereInput = {};
+
     if (userId) {
-      // Get list of users that current user is following
       const following = await this.prisma.follow.findMany({
         where: { followerId: userId },
         select: { followingId: true },
       });
+      followingIds = following.map((f) => f.followingId);
 
-      const followingIds = following.map((f) => f.followingId);
-
-      // Visibility rules:
-      // - Own posts: see all (public, friends, private)
-      // - Following posts: see public + friends
-      // - Others: see only public (not applicable here since we filter by followingIds)
       whereClause = {
         OR: [
-          // Own posts — see everything
+          // Own posts — always visible
           { userId },
-          // Followed users — see public and friends posts
+          // Following's posts — visibility filter
           {
             userId: { in: followingIds },
             visibility: { in: ['public', 'friends'] },
           },
         ],
       };
+    } else {
+      // Unauthenticated — only public posts
+      whereClause = { visibility: 'public' };
     }
 
-    const posts = (await this.prisma.post.findMany({
-      where: whereClause,
-      skip,
-      take: limit,
-      orderBy: {
-        createdAt: 'desc',
-      },
-      include: {
-        user: {
-          select: POST_USER_SELECT,
+    // ── Try Redis cache ───────────────────────────────────────────────────────
+    const cacheKey = `feed:v2:${userId ?? 'anon'}:p${page}`;
+    try {
+      const cached = await this.redisService.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // Redis miss/failure — continue without cache
+    }
+
+    // ── Fetch candidate pool (larger than requested page) ────────────────────
+    const candidateLimit = limit * CANDIDATE_MULTIPLIER;
+    const skip = (page - 1) * limit;
+
+    // For ranking we need a time window based on page number
+    // Page 1 → last 7 days, Page 2+ → extend window
+    const windowDays = Math.min(3 + page * 2, 30);
+    const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    const [recentPosts, total] = await Promise.all([
+      this.prisma.post.findMany({
+        where: {
+          ...whereClause,
+          createdAt: { gte: windowStart },
         },
-        sharedPost: {
-          include: {
-            user: {
-              select: POST_USER_SELECT,
-            },
-            sharedReel: {
-              include: REEL_PREVIEW_INCLUDE,
+        take: candidateLimit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: POST_USER_SELECT },
+          sharedPost: {
+            include: {
+              user: { select: POST_USER_SELECT },
+              sharedReel: { include: REEL_PREVIEW_INCLUDE },
             },
           },
-        },
-        sharedReel: {
-          include: REEL_PREVIEW_INCLUDE,
-        },
-        _count: {
-          select: {
-            comments: true,
-            shares: true,
+          sharedReel: { include: REEL_PREVIEW_INCLUDE },
+          _count: {
+            select: { comments: true, shares: true },
           },
         },
-      },
-    })) as PostWithRelations[];
+      }) as unknown as PostWithRelations[],
+      this.prisma.post.count({ where: whereClause }),
+    ]);
 
-    const total = await this.prisma.post.count({ where: whereClause });
-
-    // Count likes with imageIndex = null for each post
+    // ── Attach real like counts ───────────────────────────────────────────────
     const postsWithLikes = await Promise.all(
-      posts.map(async (post: PostWithRelations) => {
-        const postLikesCount = await this.prisma.like.count({
-          where: {
-            postId: post.id,
-            imageIndex: null,
-          },
+      recentPosts.map(async (post: PostWithRelations) => {
+        const likesCount = await this.prisma.like.count({
+          where: { postId: post.id, imageIndex: null },
         });
-
         return {
           ...post,
           _count: {
             comments: post._count.comments,
-            shares: post._count.shares,
-            likes: postLikesCount,
+            shares:   post._count.shares,
+            likes:    likesCount,
           },
         };
       }),
     );
 
-    return {
-      posts: postsWithLikes,
+    // ── Score & rank ─────────────────────────────────────────────────────────
+    const scored = postsWithLikes
+      .map((post) => ({
+        post,
+        score: this.computeScore(post, userId, followingIds),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    // Paginate from sorted results
+    const paginated = scored.slice(skip, skip + limit).map((s) => s.post);
+
+    const result = {
+      posts: paginated,
       total,
       page,
       totalPages: Math.ceil(total / limit),
     };
+
+    // ── Cache result ──────────────────────────────────────────────────────────
+    try {
+      await this.redisService.set(cacheKey, JSON.stringify(result), CACHE_TTL_SECONDS);
+    } catch {
+      // Cache write failure is non-critical
+    }
+
+    return result;
   }
 
   async findByUserId(userId: string, page = 1, limit = 10) {
@@ -607,9 +708,14 @@ export class PostsService {
       throw new Error('Unauthorized');
     }
 
-    return this.prisma.post.delete({
+    const deleted = await this.prisma.post.delete({
       where: { id },
     });
+
+    // Bust feed cache for author + their followers
+    void this.invalidateFeedCache(userId);
+
+    return deleted;
   }
 
   async update(id: string, userId: string, updatePostDto: UpdatePostDto) {
@@ -688,13 +794,18 @@ export class PostsService {
       },
     });
 
-    return {
+    const result = {
       ...updatedPost,
       _count: {
         ...updatedPost._count,
         likes: postLikesCount,
       },
     };
+
+    // Bust feed cache since post content/visibility changed
+    void this.invalidateFeedCache(userId);
+
+    return result;
   }
 
   async getUserPhotos(userId: string, page = 1, limit = 9) {
