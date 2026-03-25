@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsIn } from 'class-validator';
 
 export class CreatePostDto {
   @IsString()
@@ -12,4 +12,9 @@ export class CreatePostDto {
   @IsString()
   @IsOptional()
   videoUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['public', 'friends', 'private'])
+  visibility?: string;
 }

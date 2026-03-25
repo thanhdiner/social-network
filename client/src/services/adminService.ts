@@ -83,6 +83,7 @@ export interface AdminPost {
   content: string
   imageUrl?: string
   videoUrl?: string
+  visibility: string
   createdAt: string
   updatedAt?: string
   user: {
@@ -219,7 +220,7 @@ const adminService = {
     adminApi.get<AdminPostDetail>(`/admin/posts/${postId}`).then(r => r.data),
   createPost: (payload: { userId: string; content?: string; imageUrl?: string; videoUrl?: string }) =>
     adminApi.post<AdminPost>('/admin/posts', payload).then(r => r.data),
-  updatePost: (postId: string, payload: { content?: string; imageUrl?: string | null; videoUrl?: string | null }) =>
+  updatePost: (postId: string, payload: { content?: string; imageUrl?: string | null; videoUrl?: string | null; visibility?: string }) =>
     adminApi.put<AdminPost>(`/admin/posts/${postId}`, payload).then(r => r.data),
   deletePost: (postId: string) =>
     adminApi.delete(`/admin/posts/${postId}`).then(r => r.data),

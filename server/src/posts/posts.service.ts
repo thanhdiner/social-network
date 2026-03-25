@@ -142,6 +142,7 @@ export class PostsService {
         content: createPostDto.content,
         imageUrl: createPostDto.imageUrl,
         videoUrl: createPostDto.videoUrl,
+        visibility: createPostDto.visibility ?? 'public',
         userId,
       },
       include: {
@@ -174,7 +175,8 @@ export class PostsService {
   async findAll(page = 1, limit = 10, userId?: string) {
     const skip = (page - 1) * limit;
 
-    // Build where clause: posts from user or people they follow
+    // Build where clause: posts from user or people they follow,
+    // respecting visibility settings
     let whereClause: Prisma.PostWhereInput = {};
     if (userId) {
       // Get list of users that current user is following
@@ -185,11 +187,20 @@ export class PostsService {
 
       const followingIds = following.map((f) => f.followingId);
 
-      // Include posts from user and people they follow
+      // Visibility rules:
+      // - Own posts: see all (public, friends, private)
+      // - Following posts: see public + friends
+      // - Others: see only public (not applicable here since we filter by followingIds)
       whereClause = {
-        userId: {
-          in: [userId, ...followingIds],
-        },
+        OR: [
+          // Own posts — see everything
+          { userId },
+          // Followed users — see public and friends posts
+          {
+            userId: { in: followingIds },
+            visibility: { in: ['public', 'friends'] },
+          },
+        ],
       };
     }
 
@@ -627,6 +638,7 @@ export class PostsService {
       content?: string;
       imageUrl?: string | null;
       videoUrl?: string | null;
+      visibility?: string;
     } = {};
 
     if (updatePostDto.content !== undefined) {
@@ -639,6 +651,10 @@ export class PostsService {
 
     if (updatePostDto.videoUrl !== undefined) {
       updateData.videoUrl = updatePostDto.videoUrl || null;
+    }
+
+    if (updatePostDto.visibility !== undefined) {
+      updateData.visibility = updatePostDto.visibility;
     }
 
     console.log('Final updateData:', updateData);

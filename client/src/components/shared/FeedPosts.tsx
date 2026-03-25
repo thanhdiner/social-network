@@ -533,6 +533,7 @@ export const FeedPosts = ({ refresh }: FeedPostsProps) => {
           initialContent={editingPost.content}
           initialImages={editingPost.imageUrl || ''}
           initialVideo={editingPost.videoUrl}
+          initialVisibility={editingPost.visibility}
           open={!!editingPost}
           onClose={() => setEditingPost(null)}
           onUpdated={handlePostUpdated}

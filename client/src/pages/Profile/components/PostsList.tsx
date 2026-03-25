@@ -536,6 +536,7 @@ export const PostsList = ({ userId, refresh }: PostsListProps) => {
           initialContent={editingPost.content}
           initialImages={editingPost.imageUrl || ''}
           initialVideo={editingPost.videoUrl}
+          initialVisibility={editingPost.visibility}
           open={!!editingPost}
           onClose={() => setEditingPost(null)}
           onUpdated={handlePostUpdated}

@@ -293,7 +293,7 @@ const AdminPosts: React.FC = () => {
       return
     }
 
-    if (!content && !imageUrl && !videoUrl) {
+    if (!content && !imageUrlText && !videoUrlText) {
       toast.error('Bài viết phải có nội dung hoặc media')
       return
     }
@@ -775,6 +775,7 @@ const AdminPosts: React.FC = () => {
           initialContent={editInitialContent}
           initialImages={editInitialImages}
           initialVideo={editInitialVideo}
+          initialVisibility={selectedPost?.visibility}
           open={showEditModal}
           onClose={() => { setShowEditModal(false); setEditPostId(null) }}
           onUpdated={async () => {

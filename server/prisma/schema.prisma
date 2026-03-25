@@ -75,6 +75,7 @@ model Post {
   userId       String
   sharedPostId String? // ID của post được share (nếu đây là shared post)
   sharedReelId String?
+  visibility   String   @default("public") // 'public' | 'friends' | 'private'
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -91,6 +92,7 @@ model Post {
   @@index([createdAt])
   @@index([sharedPostId])
   @@index([sharedReelId])
+  @@index([visibility])
 }
 
 model Comment {

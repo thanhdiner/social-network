@@ -6,6 +6,7 @@ export interface Post {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  visibility: string;
   userId: string;
   sharedPostId?: string;
   sharedReelId?: string | null;
@@ -33,6 +34,7 @@ export interface CreatePostData {
   content?: string;
   imageUrl?: string | null;
   videoUrl?: string | null;
+  visibility?: 'public' | 'friends' | 'private';
 }
 
 export interface PostsResponse {
