@@ -1,9 +1,33 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
-import { Trash2, ChevronLeft, ChevronRight, MessageSquare, Search, ExternalLink, X } from 'lucide-react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import {
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  Search,
+  ExternalLink,
+  X,
+  Filter,
+  Download,
+  TrendingUp,
+  AlertTriangle,
+  MessagesSquare,
+  Heart,
+  Eye,
+  EyeOff,
+} from 'lucide-react'
 import adminService, { type AdminComment } from '@/services/adminService'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
 import { vi } from 'date-fns/locale'
+
+const PAGE_SIZE = 20
+
+const escapeCsv = (value: string | number | null | undefined) => {
+  const normalized = String(value ?? '').replace(/\r?\n/g, ' ').trim()
+  const escaped = normalized.replace(/"/g, '""')
+  return `"${escaped}"`
+}
 
 const AdminComments: React.FC = () => {
   const [comments, setComments] = useState<AdminComment[]>([])
@@ -13,15 +37,28 @@ const AdminComments: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [selectedCommentIds, setSelectedCommentIds] = useState<Set<string>>(new Set())
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await adminService.getComments(page, 20, search || undefined)
+      const data = await adminService.getComments(page, PAGE_SIZE, search || undefined)
       setComments(data.comments)
       setTotal(data.total)
       setTotalPages(data.totalPages)
+      setSelectedCommentIds((prev) => {
+        const availableIds = new Set(data.comments.map((comment) => comment.id))
+        return new Set([...prev].filter((id) => availableIds.has(id)))
+      })
+
+      if (data.totalPages > 0 && page > data.totalPages) {
+        setPage(data.totalPages)
+      }
+
+      if (data.totalPages === 0 && page !== 1) {
+        setPage(1)
+      }
     } catch {
       toast.error('Không thể tải danh sách bình luận')
     } finally {
@@ -30,6 +67,12 @@ const AdminComments: React.FC = () => {
   }, [page, search])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    }
+  }, [])
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value)
@@ -40,11 +83,23 @@ const AdminComments: React.FC = () => {
     }, 400)
   }
 
+  const clearFilters = () => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+    setSearchInput('')
+    setSearch('')
+    setPage(1)
+  }
+
   const handleDelete = async (comment: AdminComment) => {
     const preview = comment.content.length > 60 ? comment.content.slice(0, 60) + '…' : comment.content
     if (!confirm(`Xóa bình luận: "${preview}"?`)) return
     try {
       await adminService.deleteComment(comment.id)
+      setSelectedCommentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(comment.id)
+        return next
+      })
       toast.success('Đã xóa bình luận')
       load()
     } catch {
@@ -52,131 +107,343 @@ const AdminComments: React.FC = () => {
     }
   }
 
+  const handleExport = () => {
+    if (comments.length === 0) {
+      toast.info('Không có dữ liệu để xuất')
+      return
+    }
+
+    const header = ['ID', 'Tác giả', 'Username', 'Nội dung', 'Bài viết', 'Lượt thích', 'Cờ kiểm duyệt', 'Thời gian tạo']
+    const rows = comments.map((comment) => ([
+      comment.id,
+      comment.user.name,
+      `@${comment.user.username}`,
+      comment.content,
+      comment.post?.content || '',
+      comment.likesCount,
+      comment.moderation.flagged ? 'Có' : 'Không',
+      comment.createdAt,
+    ]))
+
+    const csv = [
+      header.map((item) => escapeCsv(item)).join(','),
+      ...rows.map((row) => row.map((item) => escapeCsv(item)).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `admin-comments-${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    toast.success('Đã xuất báo cáo CSV')
+  }
+
+  const toggleCommentSelection = (commentId: string) => {
+    setSelectedCommentIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(commentId)) {
+        next.delete(commentId)
+      } else {
+        next.add(commentId)
+      }
+      return next
+    })
+  }
+
+  const selectedCommentsOnPage = useMemo(
+    () => comments.filter((comment) => selectedCommentIds.has(comment.id)),
+    [comments, selectedCommentIds],
+  )
+
+  const selectedCount = selectedCommentsOnPage.length
+  const allSelectedOnPage = comments.length > 0 && selectedCount === comments.length
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedCommentIds((prev) => {
+      const next = new Set(prev)
+
+      if (allSelectedOnPage) {
+        comments.forEach((comment) => next.delete(comment.id))
+      } else {
+        comments.forEach((comment) => next.add(comment.id))
+      }
+
+      return next
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0) return
+
+    if (!confirm(`Xóa ${selectedCount} bình luận đã chọn?`)) return
+
+    const results = await Promise.allSettled(
+      selectedCommentsOnPage.map((comment) => adminService.deleteComment(comment.id)),
+    )
+
+    const successCount = results.filter((result) => result.status === 'fulfilled').length
+    const failedCount = results.length - successCount
+
+    if (successCount > 0) {
+      toast.success(`Đã xóa ${successCount} bình luận`)
+    }
+
+    if (failedCount > 0) {
+      toast.error(`${failedCount} bình luận xóa thất bại`)
+    }
+
+    setSelectedCommentIds(new Set())
+    load()
+  }
+
+  const recentInteraction = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    return comments.filter((comment) => new Date(comment.createdAt).getTime() >= weekAgo).length
+  }, [comments])
+
+  const flaggedCount = useMemo(
+    () => comments.filter((comment) => comment.moderation.flagged).length,
+    [comments],
+  )
+
+  const responseRate = useMemo(() => {
+    if (comments.length === 0) return 0
+    const validPostCommentCount = comments.filter((comment) => Boolean(comment.post)).length
+    return Math.round((validPostCommentCount / comments.length) * 100)
+  }, [comments])
+
+  const startIndex = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const endIndex = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total)
+
   return (
-    <div className="admin-page">
-      <div className="page-header">
+    <div className="admin-page comments-page">
+      <div className="page-header comments-page-header">
         <div>
-          <h1 className="page-title">Quản lý Bình luận</h1>
-          <p className="page-subtitle">
+          <p className="comments-breadcrumb">Dashboard / Comment Management</p>
+          <h1 className="page-title">Quản lý bình luận</h1>
+          <p className="page-subtitle comments-page-subtitle">
+            <span className="comments-status-dot" />
             Tổng cộng <strong>{total.toLocaleString('vi-VN')}</strong> bình luận
           </p>
         </div>
+
+        <div className="comments-header-actions">
+          <button
+            type="button"
+            className="comments-filter-btn"
+            onClick={clearFilters}
+            disabled={!search && !searchInput}
+            title="Xóa điều kiện lọc"
+          >
+            <Filter size={16} />
+            Lọc dữ liệu
+          </button>
+          <button
+            type="button"
+            className="comments-export-btn"
+            onClick={handleExport}
+          >
+            <Download size={16} />
+            Xuất báo cáo
+          </button>
+        </div>
       </div>
 
-      {/* Search bar */}
-      <div className="admin-card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
-        <div style={{ position: 'relative', maxWidth: 400 }}>
-          <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', pointerEvents: 'none' }} />
+      <div className="comments-kpi-grid">
+        <article className="comments-kpi-card comments-kpi-card-primary">
+          <div className="comments-kpi-icon">
+            <TrendingUp size={20} />
+          </div>
+          <div className="comments-kpi-body">
+            <p className="comments-kpi-label">Tương tác tuần qua</p>
+            <p className="comments-kpi-value">+{recentInteraction}</p>
+          </div>
+        </article>
+
+        <article className="comments-kpi-card">
+          <div className="comments-kpi-icon warn">
+            <AlertTriangle size={20} />
+          </div>
+          <div className="comments-kpi-body">
+            <p className="comments-kpi-label">Bình luận cần xem xét</p>
+            <p className="comments-kpi-value dark">{flaggedCount}</p>
+          </div>
+        </article>
+
+        <article className="comments-kpi-card">
+          <div className="comments-kpi-icon soft">
+            <MessagesSquare size={20} />
+          </div>
+          <div className="comments-kpi-body">
+            <p className="comments-kpi-label">Tỷ lệ phản hồi</p>
+            <p className="comments-kpi-value dark">{responseRate}%</p>
+          </div>
+        </article>
+      </div>
+
+      <div className="admin-card comments-search-card">
+        <div className="comments-search-wrap">
+          <Search size={16} />
           <input
             type="text"
-            placeholder="Tìm theo nội dung hoặc tên người dùng..."
+            className="comments-search-input"
+            placeholder="Tìm kiếm nội dung hoặc tác giả..."
             value={searchInput}
-            onChange={e => handleSearchChange(e.target.value)}
-            style={{
-              width: '100%',
-              paddingLeft: 32,
-              paddingRight: searchInput ? 32 : 12,
-              paddingTop: 7,
-              paddingBottom: 7,
-              border: '1px solid #e5e7eb',
-              borderRadius: 8,
-              fontSize: 13,
-              outline: 'none',
-              background: '#f9fafb',
-            }}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
           {searchInput && (
-            <button onClick={() => handleSearchChange('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="comments-clear-btn"
+              onClick={clearFilters}
+              title="Xóa tìm kiếm"
+            >
               <X size={14} />
             </button>
           )}
         </div>
       </div>
 
-      <div className="admin-card">
+      <div className="admin-card comments-table-card">
         {loading ? (
           <div className="admin-loading">
             <div className="loading-spinner" />
             <span>Đang tải bình luận...</span>
           </div>
         ) : comments.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem', gap: 12, color: '#9ca3af' }}>
+          <div className="comments-empty-state">
             <MessageSquare size={48} opacity={0.25} />
-            <p style={{ margin: 0, fontSize: 14 }}>
+            <p>
               {search ? `Không tìm thấy bình luận nào cho "${search}"` : 'Chưa có bình luận nào'}
             </p>
           </div>
         ) : (
-          <div className="admin-table-wrapper">
-            <table className="admin-table">
+          <div className="posts-table-wrap">
+            <table className="admin-table comments-table">
               <thead>
                 <tr>
+                  <th className="comments-checkbox-col">
+                    <input
+                      type="checkbox"
+                      checked={allSelectedOnPage}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Chọn tất cả bình luận trên trang"
+                    />
+                  </th>
                   <th>Người dùng</th>
                   <th>Nội dung bình luận</th>
                   <th>Bài viết</th>
+                  <th>Lượt thích</th>
                   <th>Thời gian</th>
-                  <th style={{ textAlign: 'center' }}>Thao tác</th>
+                  <th className="comments-actions-col">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {comments.map(comment => (
-                  <tr key={comment.id}>
+                  <tr
+                    key={comment.id}
+                    className={`comments-row ${comment.moderation.flagged ? 'is-flagged' : ''}`}
+                  >
+                    <td className="comments-checkbox-col">
+                      <input
+                        type="checkbox"
+                        checked={selectedCommentIds.has(comment.id)}
+                        onChange={() => toggleCommentSelection(comment.id)}
+                        aria-label={`Chọn bình luận của ${comment.user.name}`}
+                      />
+                    </td>
+
                     {/* User */}
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>
+                      <div className="table-user">
                         <img
                           src={comment.user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${comment.user.name}`}
                           alt={comment.user.name}
-                          style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                         />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>{comment.user.name}</div>
-                          <div style={{ fontSize: 11, color: '#6b7280' }}>@{comment.user.username}</div>
+                        <div>
+                          <div className="user-name">{comment.user.name}</div>
+                          <div className="user-username">@{comment.user.username}</div>
                         </div>
                       </div>
                     </td>
 
                     {/* Comment content */}
-                    <td style={{ maxWidth: 300 }}>
-                      <p style={{ margin: 0, fontSize: 13, color: '#374151', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    <td className="comments-content-col">
+                      <p className="comments-content-text">
                         {comment.content}
                       </p>
                     </td>
 
                     {/* Post */}
-                    <td style={{ maxWidth: 200 }}>
+                    <td className="comments-post-col">
                       {comment.post ? (
                         <a
                           href={`/post/${comment.post.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#f97316', textDecoration: 'none' }}
+                          className="comments-post-link"
                           title={comment.post.content}
                         >
-                          <ExternalLink size={12} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
+                          <ExternalLink size={13} />
+                          <span>
                             {comment.post.content || '(Bài viết không có text)'}
                           </span>
                         </a>
                       ) : (
-                        <span style={{ fontSize: 12, color: '#9ca3af' }}>—</span>
+                        <span className="comments-post-empty">—</span>
                       )}
                     </td>
 
+                    <td>
+                      <span className={`comments-like-pill ${comment.likesCount === 0 ? 'is-zero' : ''}`}>
+                        <Heart size={13} />
+                        {comment.likesCount}
+                      </span>
+                    </td>
+
                     {/* Time */}
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: '#6b7280' }}>
+                    <td className="comments-time-cell">
                       {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true, locale: vi })}
                     </td>
 
                     {/* Actions */}
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="action-btn danger"
-                        onClick={() => handleDelete(comment)}
-                        title="Xóa bình luận"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                    <td className="comments-actions-col">
+                      <div className="action-btns comments-action-group">
+                        <a
+                          href={comment.post ? `/post/${comment.post.id}` : '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`action-btn view ${comment.post ? '' : 'disabled'}`}
+                          aria-label="Xem bài viết chứa bình luận"
+                          onClick={(event) => {
+                            if (!comment.post) event.preventDefault()
+                          }}
+                          title="Xem bài viết"
+                        >
+                          <Eye size={14} />
+                        </a>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          title="Ẩn bình luận (sắp ra mắt)"
+                          disabled
+                        >
+                          <EyeOff size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn danger"
+                          onClick={() => handleDelete(comment)}
+                          title="Xóa bình luận"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -186,13 +453,46 @@ const AdminComments: React.FC = () => {
         )}
 
         {/* Pagination */}
-        <div className="pagination">
-          <button className="page-btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-            <ChevronLeft size={16} />
+        <div className="pagination comments-pagination-wrap">
+          <p className="comments-pagination-meta">
+            Đang hiển thị <strong>{startIndex} - {endIndex}</strong> của <strong>{total}</strong> bình luận
+          </p>
+
+          <div className="comments-pagination-controls">
+            <button
+              type="button"
+              className="page-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((current) => current - 1)}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="page-info">Trang {page} / {Math.max(totalPages, 1)}</span>
+            <button
+              type="button"
+              className="page-btn"
+              disabled={page >= totalPages}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <p className="comments-pagination-chip">Trang {page} / {Math.max(totalPages, 1)}</p>
+        </div>
+      </div>
+
+      <div className="comments-bulk-bar">
+        <p>Đã chọn {selectedCount} bình luận</p>
+        <div className="comments-bulk-separator" />
+        <div className="comments-bulk-actions">
+          <button type="button" disabled>
+            <EyeOff size={15} />
+            Ẩn hàng loạt
           </button>
-          <span className="page-info">Trang {page} / {totalPages || 1}</span>
-          <button className="page-btn" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-            <ChevronRight size={16} />
+          <button type="button" onClick={handleBulkDelete} disabled={selectedCount === 0}>
+            <Trash2 size={15} />
+            Xóa hàng loạt
           </button>
         </div>
       </div>

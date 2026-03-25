@@ -17,6 +17,9 @@ interface CreateAnnouncementPayload {
   audience?: 'all' | 'active';
 }
 
+const COMMENT_FLAG_PATTERN =
+  /(https?:\/\/|www\.|telegram|zalo|khuyen mai|khuyến mãi|mien phi|miễn phí|spam|click vào)/i;
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -761,13 +764,32 @@ export class AdminService {
         include: {
           user: { select: { id: true, name: true, username: true, avatar: true } },
           post: { select: { id: true, content: true } },
+          _count: { select: { likes: true } },
         },
       }),
       prismaAny.comment.count({ where }),
     ]);
 
+    const normalizedComments = comments.map((comment: any) => {
+      const keywordFlagged = COMMENT_FLAG_PATTERN.test(comment.content || '');
+      const moderationReason = keywordFlagged ? 'keyword_suspected' : null;
+
+      return {
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        user: comment.user,
+        post: comment.post,
+        likesCount: comment._count?.likes ?? 0,
+        moderation: {
+          flagged: keywordFlagged,
+          reason: moderationReason,
+        },
+      };
+    });
+
     return {
-      comments,
+      comments: normalizedComments,
       total,
       page,
       limit,

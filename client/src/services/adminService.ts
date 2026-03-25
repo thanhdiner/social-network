@@ -164,6 +164,11 @@ export interface AdminComment {
   id: string
   content: string
   createdAt: string
+  likesCount: number
+  moderation: {
+    flagged: boolean
+    reason: string | null
+  }
   user: {
     id: string
     name: string
